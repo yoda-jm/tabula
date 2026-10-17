@@ -51,7 +51,7 @@ func (r reader) num(addr string) float64 {
 	if err != nil {
 		return 0
 	}
-	if n, ok := l.Type().(schema.Num); ok {
+	if n, ok := r.s.store.TypeOf(l).(schema.Num); ok {
 		return n.Display(v)
 	}
 	return float64(v.Int)

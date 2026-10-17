@@ -4,6 +4,7 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,6 +12,10 @@ import (
 	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/schema"
 )
+
+// ErrNotModelled is returned for parameters whose type depends on a value
+// that is not modelled yet (effect parameters of some effects).
+var ErrNotModelled = errors.New("not modelled yet")
 
 // Change is one parameter that took a new value.
 type Change struct {
@@ -26,6 +31,9 @@ type Store struct {
 
 	mu   sync.RWMutex
 	vals map[*schema.Node][]osc.Arg
+	// raw keeps the verbatim text of variant nodes that are not modelled for
+	// their current selector, or whose text did not parse.
+	raw map[*schema.Node]string
 
 	subMu  sync.Mutex
 	subs   map[int]func([]Change)
@@ -35,13 +43,19 @@ type Store struct {
 
 // New returns a store holding the default value of every parameter.
 func New(s *schema.Schema) *Store {
-	st := &Store{sch: s, vals: make(map[*schema.Node][]osc.Arg, len(s.Nodes)), subs: map[int]func([]Change){}}
+	st := &Store{sch: s, vals: make(map[*schema.Node][]osc.Arg, len(s.Nodes)),
+		raw: map[*schema.Node]string{}, subs: map[int]func([]Change){}}
 	for _, n := range s.Nodes {
 		v := make([]osc.Arg, len(n.Fields))
 		for i, f := range n.Fields {
 			v[i] = f.Type.Default()
 		}
 		st.vals[n] = v
+	}
+	for _, n := range s.Nodes {
+		if n.Variant != nil {
+			st.resetLocked(n, "default")
+		}
 	}
 	return st
 }
@@ -80,6 +94,42 @@ func (st *Store) publish(ch []Change) {
 	}
 }
 
+// fieldsLocked returns the current fields of n; ok is false for a variant
+// node whose selector value is not modelled.
+func (st *Store) fieldsLocked(n *schema.Node) ([]schema.Field, bool) {
+	if n.Variant == nil {
+		return n.Fields, true
+	}
+	sel := st.sch.Leaf(n.Variant.Selector)
+	fs := n.Variant.Fields(st.vals[sel.Node][sel.Index])
+	return fs, fs != nil
+}
+
+// Fields returns the current fields of a node (they vary for variant nodes);
+// ok is false when the node is not modelled for its current selector.
+func (st *Store) Fields(n *schema.Node) ([]schema.Field, bool) {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+	return st.fieldsLocked(n)
+}
+
+// TypeOf returns the current type of a parameter, nil if not modelled.
+func (st *Store) TypeOf(l *schema.Leaf) schema.Type {
+	fs, ok := st.Fields(l.Node)
+	if !ok {
+		return nil
+	}
+	return fs[l.Index].Type
+}
+
+func (st *Store) mutate(fn func() ([]Change, error)) ([]Change, error) {
+	st.mu.Lock()
+	ch, err := fn()
+	st.mu.Unlock()
+	st.publish(ch)
+	return ch, err
+}
+
 // Get returns the value of the parameter at addr.
 func (st *Store) Get(addr string) (osc.Arg, *schema.Leaf, error) {
 	l := st.sch.Leaf(addr)
@@ -88,6 +138,9 @@ func (st *Store) Get(addr string) (osc.Arg, *schema.Leaf, error) {
 	}
 	st.mu.RLock()
 	defer st.mu.RUnlock()
+	if _, ok := st.fieldsLocked(l.Node); !ok {
+		return osc.Arg{}, l, fmt.Errorf("%s: %w", l.Addr, ErrNotModelled)
+	}
 	return st.vals[l.Node][l.Index], l, nil
 }
 
@@ -97,94 +150,114 @@ func (st *Store) Set(addr string, a osc.Arg, origin string) (bool, error) {
 	if l == nil {
 		return false, fmt.Errorf("unknown parameter %s", addr)
 	}
-	v, err := l.Type().Coerce(a)
-	if err != nil {
-		return false, fmt.Errorf("%s: %w", l.Addr, err)
-	}
-	ch := st.store(l.Node, []int{l.Index}, []osc.Arg{v}, origin)
-	st.publish(ch)
-	return len(ch) > 0, nil
+	ch, err := st.mutate(func() ([]Change, error) {
+		fs, ok := st.fieldsLocked(l.Node)
+		if !ok {
+			return nil, fmt.Errorf("%s: %w", l.Addr, ErrNotModelled)
+		}
+		v, err := fs[l.Index].Type.Coerce(a)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", l.Addr, err)
+		}
+		return st.storeLocked(l.Node, []int{l.Index}, []osc.Arg{v}, origin), nil
+	})
+	return len(ch) > 0, err
 }
 
 // SetNode sets the leading fields of a node from OSC arguments (the
 // multiple-type-tag form, e.g. /ch/01/eq/1 ,ifff).
 func (st *Store) SetNode(n *schema.Node, args []osc.Arg, origin string) ([]Change, error) {
-	if len(args) > len(n.Fields) {
-		return nil, fmt.Errorf("%s: %d values for %d fields", n.Path, len(args), len(n.Fields))
-	}
-	idx := make([]int, len(args))
-	vals := make([]osc.Arg, len(args))
-	for i, a := range args {
-		v, err := n.Fields[i].Type.Coerce(a)
-		if err != nil {
-			return nil, fmt.Errorf("%s/%s: %w", n.Path, n.Fields[i].Name, err)
+	return st.mutate(func() ([]Change, error) {
+		fs, ok := st.fieldsLocked(n)
+		if !ok {
+			return nil, fmt.Errorf("%s: %w", n.Path, ErrNotModelled)
 		}
-		idx[i], vals[i] = i, v
-	}
-	ch := st.store(n, idx, vals, origin)
-	st.publish(ch)
-	return ch, nil
+		if len(args) > len(fs) {
+			return nil, fmt.Errorf("%s: %d values for %d fields", n.Path, len(args), len(fs))
+		}
+		idx := make([]int, len(args))
+		vals := make([]osc.Arg, len(args))
+		for i, a := range args {
+			v, err := fs[i].Type.Coerce(a)
+			if err != nil {
+				return nil, fmt.Errorf("%s/%s: %w", n.Path, fs[i].Name, err)
+			}
+			idx[i], vals[i] = i, v
+		}
+		return st.storeLocked(n, idx, vals, origin), nil
+	})
 }
 
 // ApplyText applies node text such as "/ch/01/mix ON -3.0" (leading fields
 // of a node, a prefix such as "ch/01" standing for its first node) or
 // "ch/01/mix/fader -85.4" (one parameter), as the console's "/" command does.
 func (st *Store) ApplyText(text, origin string) ([]Change, error) {
-	ch, err := st.applyText(text, origin)
-	st.publish(ch)
-	return ch, err
-}
-
-func (st *Store) applyText(text, origin string) ([]Change, error) {
-	path, rest := schema.SplitLine(strings.TrimLeft(text, " "))
-	if l := st.sch.Leaf(path); l != nil {
-		tok := strings.TrimSpace(rest)
-		v, err := l.Type().Parse(tok)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", l.Addr, err)
-		}
-		return st.store(l.Node, []int{l.Index}, []osc.Arg{v}, origin), nil
-	}
-	n := st.sch.Resolve(path)
-	if n == nil {
-		return nil, fmt.Errorf("unknown node %s", path)
-	}
-	var toks []string
-	if _, raw := n.Fields[0].Type.(schema.Raw); raw && len(n.Fields) == 1 {
-		toks = []string{rest}
-	} else {
-		toks = schema.Tokenize(rest)
-	}
-	vals, err := n.ParseTokens(toks)
-	if err != nil {
-		return nil, err
-	}
-	idx := make([]int, len(vals))
-	for i := range idx {
-		idx[i] = i
-	}
-	return st.store(n, idx, vals, origin), nil
+	return st.mutate(func() ([]Change, error) { return st.applyTextLocked(text, origin) })
 }
 
 // ApplyLines applies many node lines as one batch of changes (scene loading).
 // Lines that cannot be applied are returned as errors; the others still apply.
 func (st *Store) ApplyLines(lines []string, origin string) []error {
-	var all []Change
 	var errs []error
-	for _, line := range lines {
-		ch, err := st.applyText(line, origin)
-		if err != nil {
-			errs = append(errs, err)
+	st.mutate(func() ([]Change, error) {
+		var all []Change
+		for _, line := range lines {
+			ch, err := st.applyTextLocked(line, origin)
+			if err != nil {
+				errs = append(errs, err)
+			}
+			all = append(all, ch...)
 		}
-		all = append(all, ch...)
-	}
-	st.publish(all)
+		return all, nil
+	})
 	return errs
 }
 
-func (st *Store) store(n *schema.Node, idx []int, vals []osc.Arg, origin string) []Change {
-	st.mu.Lock()
-	defer st.mu.Unlock()
+func (st *Store) applyTextLocked(text, origin string) ([]Change, error) {
+	path, rest := schema.SplitLine(strings.TrimLeft(text, " "))
+	if l := st.sch.Leaf(path); l != nil {
+		fs, ok := st.fieldsLocked(l.Node)
+		if !ok {
+			return nil, fmt.Errorf("%s: %w", l.Addr, ErrNotModelled)
+		}
+		v, err := fs[l.Index].Type.Parse(strings.TrimSpace(rest))
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", l.Addr, err)
+		}
+		return st.storeLocked(l.Node, []int{l.Index}, []osc.Arg{v}, origin), nil
+	}
+	n := st.sch.Resolve(path)
+	if n == nil {
+		return nil, fmt.Errorf("unknown node %s", path)
+	}
+	fs, ok := st.fieldsLocked(n)
+	if !ok {
+		st.raw[n] = rest
+		return nil, nil
+	}
+	var toks []string
+	if _, raw := fs[0].Type.(schema.Raw); raw && len(fs) == 1 {
+		toks = []string{rest}
+	} else {
+		toks = schema.Tokenize(rest)
+	}
+	vals, err := schema.ParseFields(n.Path, fs, toks)
+	if err != nil {
+		if n.Variant != nil {
+			st.raw[n] = rest // keep the text so scenes still round-trip
+			return nil, fmt.Errorf("%w (kept as text)", err)
+		}
+		return nil, err
+	}
+	delete(st.raw, n)
+	idx := make([]int, len(vals))
+	for i := range idx {
+		idx[i] = i
+	}
+	return st.storeLocked(n, idx, vals, origin), nil
+}
+
+func (st *Store) storeLocked(n *schema.Node, idx []int, vals []osc.Arg, origin string) []Change {
 	cur := st.vals[n]
 	var ch []Change
 	for k, i := range idx {
@@ -192,7 +265,33 @@ func (st *Store) store(n *schema.Node, idx []int, vals []osc.Arg, origin string)
 			continue
 		}
 		cur[i] = vals[k]
-		ch = append(ch, Change{Leaf: st.leafOf(n, i), Value: vals[k], Origin: origin})
+		l := st.leafOf(n, i)
+		ch = append(ch, Change{Leaf: l, Value: vals[k], Origin: origin})
+		for _, dep := range st.sch.Dependents(l.Addr) {
+			ch = append(ch, st.resetLocked(dep, origin)...)
+		}
+	}
+	return ch
+}
+
+// resetLocked gives a variant node the defaults of its current fields, as
+// the console does when another effect is loaded in a slot.
+func (st *Store) resetLocked(n *schema.Node, origin string) []Change {
+	fs, ok := st.fieldsLocked(n)
+	if !ok {
+		st.raw[n] = strings.TrimSpace(strings.Repeat("0 ", len(n.Fields)))
+		return nil
+	}
+	delete(st.raw, n)
+	var ch []Change
+	cur := st.vals[n]
+	for i, f := range fs {
+		v := f.Type.Default()
+		if cur[i].Equal(v) {
+			continue
+		}
+		cur[i] = v
+		ch = append(ch, Change{Leaf: st.leafOf(n, i), Value: v, Origin: origin})
 	}
 	return ch
 }
@@ -209,10 +308,21 @@ func (st *Store) Values(n *schema.Node) []osc.Arg {
 }
 
 // NodeLine renders a node as text, e.g. "/ch/01/mix ON   0.0 ON +0 OFF   -oo".
-func (st *Store) NodeLine(n *schema.Node) string { return n.FormatLine(st.Values(n)) }
+func (st *Store) NodeLine(n *schema.Node) string {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+	if raw, ok := st.raw[n]; ok {
+		return n.Path + " " + raw
+	}
+	fs, _ := st.fieldsLocked(n)
+	return schema.FormatFields(n.Path, fs, st.vals[n])
+}
 
 // LeafLine renders one parameter as node text, e.g. "/ch/01/mix/fader   0.0".
 func (st *Store) LeafLine(l *schema.Leaf) string {
-	v, _, _ := st.Get(l.Addr)
-	return l.Addr + " " + l.Type().Format(v)
+	v, _, err := st.Get(l.Addr)
+	if err != nil {
+		return l.Addr
+	}
+	return l.Addr + " " + st.TypeOf(l).Format(v)
 }

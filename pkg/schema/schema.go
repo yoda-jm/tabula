@@ -12,8 +12,9 @@ import (
 
 // Field is one parameter of a node; its OSC address is Node.Path + "/" + Name.
 type Field struct {
-	Name string
-	Type Type
+	Name  string
+	Type  Type
+	Label string // human name when Name is only a number (effect parameters)
 }
 
 // Node is a group of parameters written as one text line, e.g.
@@ -23,6 +24,18 @@ type Node struct {
 	Fields []Field
 	// InScene is true for nodes written in scene files.
 	InScene bool
+	// Variant, when set, makes the field types depend on another parameter.
+	Variant *Variant
+}
+
+// Variant makes a node's field types depend on the value of another
+// parameter, its selector: effect parameters depend on the effect type.
+type Variant struct {
+	Selector string // address of the selecting parameter, e.g. "/fx/1/type"
+	// Fields returns the node's fields for a selector value (same count and
+	// names as Node.Fields), or nil when that value is not modelled yet: the
+	// node text is then kept verbatim.
+	Fields func(sel osc.Arg) []Field
 }
 
 // Leaf is one addressable parameter.
@@ -41,10 +54,11 @@ type Schema struct {
 	nodes  map[string]*Node
 	leaves map[string]*Leaf
 	order  []*Leaf
+	deps   map[string][]*Node // selector address -> variant nodes
 }
 
 func newSchema(m Model) *Schema {
-	return &Schema{Model: m, nodes: map[string]*Node{}, leaves: map[string]*Leaf{}}
+	return &Schema{Model: m, nodes: map[string]*Node{}, leaves: map[string]*Leaf{}, deps: map[string][]*Node{}}
 }
 
 func (s *Schema) add(n *Node) {
@@ -61,7 +75,13 @@ func (s *Schema) add(n *Node) {
 		s.leaves[l.Addr] = l
 		s.order = append(s.order, l)
 	}
+	if n.Variant != nil {
+		s.deps[n.Variant.Selector] = append(s.deps[n.Variant.Selector], n)
+	}
 }
+
+// Dependents returns the variant nodes selected by the parameter at addr.
+func (s *Schema) Dependents(addr string) []*Node { return s.deps[addr] }
 
 func canon(path string) string {
 	if !strings.HasPrefix(path, "/") {
@@ -95,33 +115,41 @@ func (s *Schema) Resolve(path string) *Node {
 }
 
 // FormatLine renders a node line from its values.
-func (n *Node) FormatLine(vals []osc.Arg) string {
+func (n *Node) FormatLine(vals []osc.Arg) string { return FormatFields(n.Path, n.Fields, vals) }
+
+// ParseTokens parses node-text tokens. Fewer tokens than fields is allowed:
+// only the leading fields are returned, as the console does for "/" commands.
+func (n *Node) ParseTokens(toks []string) ([]osc.Arg, error) {
+	return ParseFields(n.Path, n.Fields, toks)
+}
+
+// FormatFields renders a node line from fields and values.
+func FormatFields(path string, fields []Field, vals []osc.Arg) string {
 	var b strings.Builder
-	b.WriteString(n.Path)
-	for i, f := range n.Fields {
+	b.WriteString(path)
+	for i, f := range fields {
 		b.WriteByte(' ')
 		b.WriteString(f.Type.Format(vals[i]))
 	}
 	return b.String()
 }
 
-// ParseTokens parses node-text tokens. Fewer tokens than fields is allowed:
-// only the leading fields are returned, as the console does for "/" commands.
-func (n *Node) ParseTokens(toks []string) ([]osc.Arg, error) {
-	if len(n.Fields) == 1 {
-		if _, raw := n.Fields[0].Type.(Raw); raw {
+// ParseFields parses node-text tokens for the given fields.
+func ParseFields(path string, fields []Field, toks []string) ([]osc.Arg, error) {
+	if len(fields) == 1 {
+		if _, raw := fields[0].Type.(Raw); raw {
 			v, _ := Raw{}.Parse(strings.Join(toks, " "))
 			return []osc.Arg{v}, nil
 		}
 	}
-	if len(toks) > len(n.Fields) {
-		return nil, fmt.Errorf("%s: %d values for %d fields", n.Path, len(toks), len(n.Fields))
+	if len(toks) > len(fields) {
+		return nil, fmt.Errorf("%s: %d values for %d fields", path, len(toks), len(fields))
 	}
 	vals := make([]osc.Arg, len(toks))
 	for i, tok := range toks {
-		v, err := n.Fields[i].Type.Parse(tok)
+		v, err := fields[i].Type.Parse(tok)
 		if err != nil {
-			return nil, fmt.Errorf("%s/%s: %w", n.Path, n.Fields[i].Name, err)
+			return nil, fmt.Errorf("%s/%s: %w", path, fields[i].Name, err)
 		}
 		vals[i] = v
 	}

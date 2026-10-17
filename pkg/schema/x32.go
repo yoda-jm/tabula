@@ -152,15 +152,7 @@ func Build(m Model) *Schema {
 		b.node(p+"/config", f("name", Str{Max: 12, Def: fmt.Sprintf("DCA %d", i)}), f("icon", Int{1, 74, 1}), f("color", colors))
 	}
 	for i := 1; i <= 8; i++ {
-		p := fmt.Sprintf("/fx/%d", i)
-		if i <= 4 {
-			b.node(p, f("type", fxType1))
-			b.node(p+"/source", f("l", fxSource), f("r", fxSource))
-		} else {
-			b.node(p, f("type", fxType2))
-		}
-		// Parameter formats depend on the effect type; kept as text for now.
-		b.node(p+"/par", f("raw", Raw{}))
+		b.fxSlot(i)
 	}
 	b.outputs()
 	for i := 0; i < 128; i++ {

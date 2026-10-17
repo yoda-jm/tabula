@@ -270,8 +270,8 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 	}
 
 	if l := s.store.Schema().Leaf(m.Address); l != nil {
-		if _, raw := l.Type().(schema.Raw); raw {
-			s.Unhandled.Record(m, c.Addr, ReasonUnimplemented, "effect parameters are not modelled yet")
+		if s.store.TypeOf(l) == nil {
+			s.Unhandled.Record(m, c.Addr, ReasonUnimplemented, "parameters of this effect are not modelled yet")
 			return
 		}
 		switch len(m.Args) {
@@ -338,9 +338,6 @@ func (s *Server) broadcast(changes []state.Change) {
 		origin := "udp " + c.Addr
 		for _, ch := range changes {
 			if ch.Origin == origin {
-				continue
-			}
-			if _, raw := ch.Leaf.Type().(schema.Raw); raw {
 				continue
 			}
 			s.send(c, osc.NewMessage(ch.Leaf.Addr, ch.Value))

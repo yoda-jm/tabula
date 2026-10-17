@@ -39,6 +39,9 @@ func TestSceneLinesRoundTrip(t *testing.T) {
 				t.Errorf("%s: unknown node %s", filepath.Base(file), path)
 				continue
 			}
+			if n.Variant != nil {
+				continue // effect parameters: checked through the store (pkg/scene)
+			}
 			vals, err := n.ParseTokens(tokensFor(n, rest))
 			if err != nil {
 				bad++

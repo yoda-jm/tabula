@@ -1,6 +1,7 @@
 package state
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/yoda-jm/tabula/pkg/osc"
@@ -58,5 +59,44 @@ func TestApplyText(t *testing.T) {
 	}
 	if got := st.NodeLine(st.Schema().Node("/ch/02/config")); got != `/ch/02/config "newname" 10 CY 2` {
 		t.Errorf("node line %q", got)
+	}
+}
+
+func TestEffectParameters(t *testing.T) {
+	st := New(schema.Build("M32C"))
+	errs := st.ApplyLines([]string{
+		"/fx/2 HALL",
+		"/fx/2/par 20 1.57 60 5k74 25 0.0 83 7k2 0.95 25 50 30 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+	}, "test")
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+	sch := st.Schema()
+	if got := st.LeafLine(sch.Leaf("/fx/2/par/04")); got != "/fx/2/par/04 5k74" {
+		t.Errorf("damping: %q", got)
+	}
+	if _, err := st.Set("/fx/2/par/06", osc.Float(0.75), "test"); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.LeafLine(sch.Leaf("/fx/2/par/06")); got != "/fx/2/par/06 6.0" {
+		t.Errorf("level: %q", got)
+	}
+
+	// Loading an effect that is not modelled keeps its parameters as text.
+	if _, err := st.Set("/fx/2/type", osc.String("PLAT"), "test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.Get("/fx/2/par/01"); !errors.Is(err, ErrNotModelled) {
+		t.Errorf("PLAT parameter: %v", err)
+	}
+	st.ApplyText("/fx/2/par 1 2 3", "test")
+	if got := st.NodeLine(sch.Node("/fx/2/par")); got != "/fx/2/par 1 2 3" {
+		t.Errorf("verbatim: %q", got)
+	}
+
+	// Back to HALL: the effect's defaults.
+	st.Set("/fx/2/type", osc.String("HALL"), "test")
+	if got := st.LeafLine(sch.Leaf("/fx/2/par/01")); got != "/fx/2/par/01 20" {
+		t.Errorf("default pre delay: %q", got)
 	}
 }

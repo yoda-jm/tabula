@@ -187,6 +187,17 @@ func (r Raw) Coerce(a osc.Arg) (osc.Arg, error) {
 	return a, nil
 }
 
+// Unused stands for parameter positions an effect does not use: it is written
+// as Text and accepts anything.
+type Unused struct{ Text string }
+
+func (Unused) Tag() byte                         { return 'f' }
+func (Unused) Default() osc.Arg                  { return osc.Float(0) }
+func (Unused) Describe() string                  { return "unused" }
+func (u Unused) Format(osc.Arg) string           { return u.Text }
+func (Unused) Parse(string) (osc.Arg, error)     { return osc.Float(0), nil }
+func (Unused) Coerce(a osc.Arg) (osc.Arg, error) { return osc.Float(0), nil }
+
 // Scale maps the normalized OSC float [0, 1] to the displayed value.
 type Scale interface {
 	Value(norm float64) float64
@@ -200,6 +211,9 @@ type Linf struct{ Min, Max float64 }
 func (l Linf) Value(n float64) float64 { return l.Min + n*(l.Max-l.Min) }
 func (l Linf) Norm(v float64) float64  { return (v - l.Min) / (l.Max - l.Min) }
 func (l Linf) Describe(steps int) string {
+	if steps == 0 {
+		return fmt.Sprintf("linf [%g, %g]", l.Min, l.Max)
+	}
 	return fmt.Sprintf("linf [%g, %g, %g]", l.Min, l.Max, (l.Max-l.Min)/float64(steps-1))
 }
 
@@ -209,6 +223,9 @@ type Logf struct{ Min, Max float64 }
 func (l Logf) Value(n float64) float64 { return l.Min * math.Exp(n*math.Log(l.Max/l.Min)) }
 func (l Logf) Norm(v float64) float64  { return math.Log(v/l.Min) / math.Log(l.Max/l.Min) }
 func (l Logf) Describe(steps int) string {
+	if steps == 0 {
+		return fmt.Sprintf("logf [%g, %g]", l.Min, l.Max)
+	}
 	return fmt.Sprintf("logf [%g, %g, %d]", l.Min, l.Max, steps)
 }
 
@@ -272,6 +289,9 @@ func (n Num) quantize(norm float64) float64 {
 	}
 	if norm >= 1 {
 		return 1
+	}
+	if n.Steps == 0 { // continuous
+		return float64(float32(norm))
 	}
 	last := float64(n.Steps - 1)
 	return math.Round(norm*last) / last
