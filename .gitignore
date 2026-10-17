@@ -9,9 +9,11 @@
 # redistribute): see docs/README.md for where to download it.
 /docs/reference/
 
-# Local runtime data
+# Local runtime data (access.json holds the access link secrets)
 /var/
 *.local.scn
+/access.json
+/sessions/
 
 # GUI build (Vite); dist/.gitkeep keeps the embed pattern valid
 /web/node_modules/
