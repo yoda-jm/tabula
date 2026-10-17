@@ -11,12 +11,19 @@ import (
 // hub fans events out to the browsers connected to /api/events.
 type hub struct {
 	mu        sync.Mutex
-	subs      map[chan []byte]map[meterKey]bool // meter groups each browser wants
+	subs      map[chan []byte]*sub
 	meterKick chan struct{}
 }
 
+// sub is one browser's event stream.
+type sub struct {
+	want  map[meterKey]bool // meter groups it asked for
+	grant string            // the access it was opened with, if any
+	quit  chan struct{}     // closed when that access is deleted
+}
+
 func (h *hub) init() {
-	h.subs = map[chan []byte]map[meterKey]bool{}
+	h.subs = map[chan []byte]*sub{}
 	h.meterKick = make(chan struct{}, 1)
 }
 
@@ -25,8 +32,8 @@ func (h *hub) publishMeters(key meterKey, data []byte) {
 	msg := []byte(fmt.Sprintf("event: meters\ndata: %s\n\n", data))
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for ch, want := range h.subs {
-		if want[key] {
+	for ch, sb := range h.subs {
+		if sb.want[key] {
 			select {
 			case ch <- msg:
 			default:
@@ -41,8 +48,8 @@ func (h *hub) wantedMeters() []meterKey {
 	defer h.mu.Unlock()
 	seen := map[meterKey]bool{}
 	var out []meterKey
-	for _, want := range h.subs {
-		for k := range want {
+	for _, sb := range h.subs {
+		for k := range sb.want {
 			if !seen[k] {
 				seen[k] = true
 				out = append(out, k)
@@ -68,14 +75,14 @@ func (h *hub) publish(event string, v any) {
 	}
 }
 
-func (h *hub) add(meters []meterKey) chan []byte {
+func (h *hub) add(meters []meterKey, grant string) (chan []byte, <-chan struct{}) {
 	ch := make(chan []byte, 256)
-	want := map[meterKey]bool{}
+	sb := &sub{want: map[meterKey]bool{}, grant: grant, quit: make(chan struct{})}
 	for _, k := range meters {
-		want[k] = true
+		sb.want[k] = true
 	}
 	h.mu.Lock()
-	h.subs[ch] = want
+	h.subs[ch] = sb
 	h.mu.Unlock()
 	if len(meters) > 0 {
 		select {
@@ -83,7 +90,19 @@ func (h *hub) add(meters []meterKey) chan []byte {
 		default:
 		}
 	}
-	return ch
+	return ch, sb.quit
+}
+
+// kick ends the event streams opened with the access grant.
+func (h *hub) kick(grant string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for ch, sb := range h.subs {
+		if sb.grant == grant {
+			close(sb.quit)
+			delete(h.subs, ch)
+		}
+	}
 }
 
 func (h *hub) remove(ch chan []byte) {
@@ -94,7 +113,8 @@ func (h *hub) remove(ch chan []byte) {
 
 // events streams Server-Sent Events: "status" (connection state), "change"
 // (an array of changed parameters), "resync" (reload the state), "record",
-// and "meters" for the groups named in ?meters=.
+// "access" (the musicians' write permission changed), and "meters" for the
+// groups named in ?meters=.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -104,7 +124,11 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	ch := s.hub.add(parseMeterKeys(r.URL.Query().Get("meters")))
+	grant := ""
+	if g := callerFrom(r).Grant; g != nil {
+		grant = g.ID
+	}
+	ch, quit := s.hub.add(parseMeterKeys(r.URL.Query().Get("meters")), grant)
 	defer s.hub.remove(ch)
 
 	first, _ := json.Marshal(s.status())
@@ -115,6 +139,8 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-r.Context().Done():
+			return
+		case <-quit:
 			return
 		case msg := <-ch:
 			w.Write(msg)
