@@ -37,10 +37,10 @@ func linToDB(v float64) float64 {
 // mixLevels is one snapshot of every metered point.
 type mixLevels struct {
 	in, gateGR, dynGR, post [48]float64 // channels 0-31, aux 32-39, fx returns 40-47
-	bus, busGR              [16]float64
-	mtx, mtxGR              [6]float64
-	main, mainGR            float64 // stereo L/R carry the same level
-	mono, monoGR            float64
+	bus, busGR, busIn       [16]float64 // busIn: the mix before dynamics and fader
+	mtx, mtxGR, mtxIn       [6]float64
+	main, mainGR, mainIn    float64 // stereo L/R carry the same level
+	mono, monoGR, monoIn    float64
 	dca                     [8]float64
 }
 
@@ -151,6 +151,7 @@ func (s *Server) levels(now time.Time) *mixLevels {
 		for b := 0; b < 16; b++ {
 			p := fmt.Sprintf("/bus/%02d", b+1)
 			x := math.Sqrt(busPow[b])
+			lv.busIn[b] = x
 			gate, comp := r.dynamics(p, x)
 			lv.busGR[b] = gate * comp
 			if r.on(p + "/mix/on") {
@@ -166,11 +167,13 @@ func (s *Server) levels(now time.Time) *mixLevels {
 	pass(40, 48)
 
 	x := math.Sqrt(mainPow)
+	lv.mainIn = x
 	_, lv.mainGR = r.dynamics("/main/st", x)
 	if r.on("/main/st/mix/on") {
 		lv.main = x * lv.mainGR * r.gain("/main/st/mix/fader")
 	}
 	x = math.Sqrt(monoPow)
+	lv.monoIn = x
 	_, lv.monoGR = r.dynamics("/main/m", x)
 	if r.on("/main/m/mix/on") {
 		lv.mono = x * lv.monoGR * r.gain("/main/m/mix/fader")
@@ -196,6 +199,7 @@ func (s *Server) levels(now time.Time) *mixLevels {
 		}
 		p := fmt.Sprintf("/mtx/%02d", m+1)
 		y := math.Sqrt(pow)
+		lv.mtxIn[m] = y
 		_, lv.mtxGR[m] = r.dynamics(p, y)
 		if r.on(p + "/mix/on") {
 			lv.mtx[m] = y * lv.mtxGR[m] * r.gain(p+"/mix/fader")
@@ -354,7 +358,7 @@ func (s *Server) meterValues(id int, params []int32, now time.Time) []uint32 {
 			add(0)
 		}
 	case 15:
-		out = rta(lv.main, s.started, now)
+		out = s.rta(lv, now)
 	case 16:
 		var shorts []float64
 		shorts = append(shorts, lv.gateGR[:32]...)
@@ -368,25 +372,6 @@ func (s *Server) meterValues(id int, params []int32, now time.Time) []uint32 {
 		for range 4 {
 			out = append(out, 0)
 		}
-	}
-	return out
-}
-
-// rta builds 100 packed RTA bands (dB × 256 as int16) shaped like music:
-// louder in the low-mids, rolling off in the highs.
-func rta(level float64, start, now time.Time) []uint32 {
-	t := now.Sub(start).Seconds()
-	base := linToDB(level)
-	out := make([]uint32, 50)
-	for i := 0; i < 100; i += 2 {
-		var pair [2]uint16
-		for k := range 2 {
-			band := float64(i + k)
-			db := base - 6 - 0.25*math.Abs(band-30) + 3*math.Sin(t*3+band/7)
-			db = math.Max(-128, math.Min(0, db))
-			pair[k] = uint16(int16(math.Round(db * 256)))
-		}
-		out[i/2] = uint32(pair[0]) | uint32(pair[1])<<16
 	}
 	return out
 }

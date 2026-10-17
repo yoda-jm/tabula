@@ -176,6 +176,8 @@ func (s *Server) action(addr string, v osc.Arg, origin string) {
 			run("snippet", int(sn))
 		}
 		s.store.Set("/-show/prepos/current", osc.Int(int32(n)), origin)
+	case "setrtasrc":
+		s.setInt("/-stat/rtasource", int32(n))
 	case "clearsolo":
 		if n == 1 {
 			for i := 1; i <= 80; i++ {

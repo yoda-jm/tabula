@@ -210,9 +210,12 @@ func (b builder) prefs() {
 		f("det", Enum{Names: []string{"RMS", "PEAK"}, Def: 1}),
 		f("decay", logf(0.25, 16, 19, fixed(2, false, 0), "s", 1)),
 		f("peakhold", Enum{Names: []string{"OFF", "1", "2", "3", "4", "5", "6", "7", "8"}}),
-		// Four more values written by the M32C, not in the document; the
-		// last is likely the RTA range (30 or 60 dB in M32-Edit's RTA window).
-		f("undoc11", anyInt(1)), f("undoc12", anyInt(1)), f("undoc13", OnOff), f("undoc14", anyInt(30)))
+		// Four more values written by the M32C, not in the document; names
+		// and ranges from M32-Edit. It shows the RTA behind the channel EQ
+		// when rtaoneq is set, and draws a 60 dB range with gain30 instead of
+		// a 30 dB range with gain when range is ON.
+		f("rtaoneq", Int{0, 1, 1}), f("rtaongeq", Int{0, 7, 1}), f("range", OnOff),
+		f("gain30", lin(0, 30, 3, whole, "dB", 30)))
 	// Maillot's emulator spells IQeqset and IQsound; the document's names are kept.
 	for i := 1; i <= 16; i++ {
 		b.status(fmt.Sprintf("/-prefs/iQ/%02d", i), f("iQmodel", iqSpeaker), f("iQeqset", iqEQ), f("iQsound", Int{0, 7, 0}))
@@ -243,7 +246,11 @@ func (b builder) stat() {
 		f("lock", Int{0, 2, 0}),
 		f("usbmounted", OnOff), f("remote", OnOff),
 		f("rtamodeeq", barSpec), f("rtamodegeq", barSpec), f("rtaeqpre", OnOff), f("rtageqpost", OnOff),
-		f("rtasource", Int{0, 170, 0}),
+		// RTA source, set with /-action/setrtasrc: 0-31 ch, 32-39 aux, 40-47
+		// FX returns, 48-63 buses, 64-69 matrices, 70 L/R, 71 M/C, 72
+		// monitor, 73 talkback, 74-89 dual GEQ A/B and 90-97 stereo GEQ of FX
+		// slots 1-8 (M32-Edit's list), pre EQ; 98 more for post EQ.
+		f("rtasource", Int{0, 195, 0}),
 		f("xcardtype", Int{0, 11, 6}), // computed by the console; DN32-USB is a guess matching /-prefs/card
 		f("xcardsync", OnOff), f("geqonfdr", OnOff),
 		f("geqpos", Int{0, 0x8ff, 0}), // FX slot << 8 | first band shown
@@ -306,7 +313,7 @@ func (b builder) actions() {
 		f("undopt", flag), f("doundo", flag),
 		f("playtrack", Int{-1, 1, 0}), // platrack in Maillot's emulator
 		f("newscreen", anyInt(0)), f("clearsolo", flag), f("setprebus", anyInt(0)),
-		f("setsrate", flag), f("setrtasrc", Int{0, 170, 0}), f("recselect", anyInt(0)),
+		f("setsrate", flag), f("setrtasrc", Int{0, 195, 0}), f("recselect", anyInt(0)),
 		f("gocue", idx), f("goscene", idx), f("gosnippet", idx),
 		f("selsession", slot), f("delsession", slot), f("selmarker", slot),
 		f("delmarker", slot), f("savemarker", slot), f("addmarker", flag),
