@@ -1,0 +1,13 @@
+# Build output
+/bin/
+/dist/
+*.test
+*.out
+
+# Third-party reference material kept locally only (copyrighted, not ours to
+# redistribute): see docs/README.md for where to download it.
+/docs/reference/
+
+# Local runtime data
+/var/
+*.local.scn
