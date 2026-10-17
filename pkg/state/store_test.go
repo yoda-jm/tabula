@@ -1,7 +1,7 @@
 package state
 
 import (
-	"errors"
+	"strings"
 	"testing"
 
 	"github.com/yoda-jm/tabula/pkg/osc"
@@ -82,15 +82,26 @@ func TestEffectParameters(t *testing.T) {
 		t.Errorf("level: %q", got)
 	}
 
-	// Loading an effect that is not modelled keeps its parameters as text.
-	if _, err := st.Set("/fx/2/type", osc.String("PLAT"), "test"); err != nil {
+	// Loading another effect gives its defaults and its parameter types: the
+	// stereo delay's mode is an enum.
+	if _, err := st.Set("/fx/2/type", osc.String("DLY"), "test"); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := st.Get("/fx/2/par/01"); !errors.Is(err, ErrNotModelled) {
-		t.Errorf("PLAT parameter: %v", err)
+	if got := st.NodeLine(sch.Node("/fx/2/par")); !strings.HasPrefix(got, "/fx/2/par 100 223 X 1 1 13 10 20k0 97 30 30 20k0 0 0 ") {
+		t.Errorf("DLY defaults: %q", got)
 	}
-	st.ApplyText("/fx/2/par 1 2 3", "test")
-	if got := st.NodeLine(sch.Node("/fx/2/par")); got != "/fx/2/par 1 2 3" {
+	if _, err := st.Set("/fx/2/par/03", osc.Int(0), "test"); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.LeafLine(sch.Leaf("/fx/2/par/03")); got != "/fx/2/par/03 ST" {
+		t.Errorf("mode: %q", got)
+	}
+
+	// Text that does not parse is kept verbatim, so scenes still round-trip.
+	if errs := st.ApplyLines([]string{"/fx/2/par 100 223 Y"}, "test"); len(errs) != 1 {
+		t.Errorf("bad mode accepted: %v", errs)
+	}
+	if got := st.NodeLine(sch.Node("/fx/2/par")); got != "/fx/2/par 100 223 Y" {
 		t.Errorf("verbatim: %q", got)
 	}
 
