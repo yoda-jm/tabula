@@ -6,6 +6,11 @@
 - Channel page: the headamp feeding a channel or aux input — which input it
   is (`AES50 A 12`), its gain and its phantom power (switched after a
   confirmation) — and the physical input next to the channel source.
+- New Routing page: the input routing and patch (each input with its headamp
+  and the channels using it), the outputs 1-16 with their sources and where
+  each one goes, and channel by channel what AES50 A and B (a DL32's outputs),
+  the card, P16, aux, AES/EBU and the local outputs carry, with the names of
+  the strips. Edited with the console's routing blocks.
 - New page describing [every page of the GUI](docs/gui.md).
 
 ### tabula-emu

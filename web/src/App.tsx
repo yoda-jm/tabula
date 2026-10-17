@@ -9,11 +9,13 @@ import { ChannelPage } from "./pages/ChannelPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { MixerPage } from "./pages/MixerPage";
 import { RecordPage } from "./pages/RecordPage";
+import { RoutingPage } from "./pages/RoutingPage";
 import { useSchema, useStatus, useValue } from "./store/hooks";
 
 const NAV: { page: Page; label: string }[] = [
   { page: "mixer", label: "Mixer" },
   { page: "channel", label: "Channel" },
+  { page: "routing", label: "Routing" },
   { page: "browser", label: "Browser" },
   { page: "record", label: "Record" },
   { page: "connect", label: "Connect" },
@@ -75,6 +77,8 @@ export function App() {
           <MixerPage selected={strip.path} onSelect={select} />
         ) : page === "channel" ? (
           <ChannelPage path={route?.strip ?? strip.path} onSelect={select} />
+        ) : page === "routing" ? (
+          <RoutingPage />
         ) : page === "browser" ? (
           <BrowserPage />
         ) : page === "record" ? (

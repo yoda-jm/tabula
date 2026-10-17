@@ -56,7 +56,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Web GUI (React + TypeScript, embedded in the binary): Connect, Mixer (banks, meters, faders, mutes, pans), Channel (config, preamp, gate, dynamics, EQ curve, sends), Browser (every parameter with an editor), Record.
 - [x] Server-Sent Events for state changes, status and meters.
 - [x] Headamp gain and phantom on the Channel page.
-- [ ] Routing: input routing and patch, outputs, AES50 A/B, card, P16, aux, AES/EBU, user routing, with names resolved.
+- [x] Routing: input routing and patch, outputs, AES50 A/B, card, P16, aux, AES/EBU, user routing, with names resolved.
 - [ ] FX pages: overview of the 8 slots, per-slot editor, graphic EQ with the RTA.
 - [ ] Scenes, snippets and presets: list, recall, save, rename.
 - [ ] Linked pairs shown as stereo strips in the mixer.

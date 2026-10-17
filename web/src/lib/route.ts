@@ -1,8 +1,8 @@
-// Hash routes: #/mixer, #/channel/ch/01, #/browser, #/record, #/connect.
+// Hash routes: #/mixer, #/channel/ch/01, #/routing, #/browser, #/record, #/connect.
 
 import { useCallback, useEffect, useState } from "react";
 
-export type Page = "mixer" | "channel" | "browser" | "record" | "connect";
+export type Page = "mixer" | "channel" | "routing" | "browser" | "record" | "connect";
 
 export interface Route {
   page: Page;
@@ -10,7 +10,7 @@ export interface Route {
   strip?: string;
 }
 
-const PAGES: Page[] = ["mixer", "channel", "browser", "record", "connect"];
+const PAGES: Page[] = ["mixer", "channel", "routing", "browser", "record", "connect"];
 
 export function parseRoute(hash: string): Route | null {
   const h = hash.replace(/^#\/?/, "");
