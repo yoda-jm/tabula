@@ -57,25 +57,6 @@ function Leave({ name }: { name?: string }) {
   );
 }
 
-/** NoAccess is shown to a device without an access link. */
-export function NoAccess() {
-  return (
-    <div className="app">
-      <header className="topbar">
-        <span className="brand">tabula</span>
-      </header>
-      <main className="main">
-        <div className="page">
-          <div className="card noaccess">
-            <h2>No access</h2>
-            <p>This device cannot see the console. Ask the engineer for an access link: a QR code to scan, or a link to open here.</p>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
-
 export function MixPage({ bus }: { bus?: number }) {
   const schema = useSchema();
   const who = useAccess();
