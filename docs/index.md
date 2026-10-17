@@ -100,6 +100,9 @@ tabula -console 192.168.1.62 -http :8033
   inserted on a strip), an editor per slot with the effect's parameters, and
   a graphic EQ editor with the RTA behind the bands; the RTA also shows
   behind a channel's EQ curve.
+- **Scenes**: the scenes, snippets and presets the console holds; recall
+  (after a confirmation), save, rename, copy and delete them, load channel
+  presets onto a strip and effect presets into a slot.
 - **Browser**: every parameter of the console, searchable by path or value,
   each with an editor; values can also be typed as on the console (`-6`,
   `1k20`, `GATE`).

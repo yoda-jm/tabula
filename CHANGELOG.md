@@ -29,6 +29,12 @@
   EQ only when writes are armed.
 - The Channel page draws the RTA behind the EQ curve when the RTA listens to
   that strip, and can point it there (before or after the EQ).
+- New Scenes page: the console's scenes, snippets and channel, effect,
+  routing and AES50 presets; recall after a confirmation, save (asking
+  before replacing), rename, copy, delete; channel presets load onto a strip
+  with a choice of sections, effect presets into an FX slot. New API
+  `POST /api/library`, which reads back what each command changed;
+  `console.Client` gained `Library` and `Refresh`.
 - The GUI asks for extra meter groups (the RTA) only while a page shows
   them, reopening its event stream without a gap.
 - New page describing [every page of the GUI](docs/gui.md).

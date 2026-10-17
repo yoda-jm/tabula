@@ -23,7 +23,7 @@ Both share the same library (`pkg/`).
 | `pkg/scene` | Scene file (`.scn`) read/write. |
 | `pkg/state` | In-memory state store with a change feed; used by the emulator (as the console's memory) and by the client (as a mirror of the console). |
 | `pkg/emu` | The emulator's protocol server and debug HTTP page. |
-| `pkg/console` | The client side of the protocol: discovery, full sync, `/xremote` keepalive, meters, rate-limited writes. |
+| `pkg/console` | The client side of the protocol: discovery, full sync, `/xremote` keepalive, meters, rate-limited writes, library commands. |
 | `pkg/session` *(later)* | Recording and replay. |
 
 ## Milestones
@@ -58,7 +58,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Headamp gain and phantom on the Channel page.
 - [x] Routing: input routing and patch, outputs, AES50 A/B, card, P16, aux, AES/EBU, user routing, with names resolved.
 - [x] FX pages: overview of the 8 slots, per-slot editor, graphic EQ with the RTA (also behind the channel EQ curve).
-- [ ] Scenes, snippets and presets: list, recall, save, rename.
+- [x] Scenes, snippets and presets: list, recall, save, rename, copy, delete (`POST /api/library`).
 - [ ] Linked pairs shown as stereo strips in the mixer.
 
 ### 4. Recording and replay *(in progress)*

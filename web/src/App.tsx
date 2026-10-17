@@ -15,6 +15,7 @@ import { MixPage, MusicianApp, NoAccess } from "./pages/MixPage";
 import { MixerPage } from "./pages/MixerPage";
 import { RecordPage } from "./pages/RecordPage";
 import { RoutingPage } from "./pages/RoutingPage";
+import { ScenesPage } from "./pages/ScenesPage";
 import { useAccess, useSchema, useStatus, useValue } from "./store/hooks";
 
 /** The pages, with the least role that sees them. */
@@ -23,6 +24,7 @@ const NAV: { page: Page; label: string; role: Role }[] = [
   { page: "channel", label: "Channel", role: "viewer" },
   { page: "routing", label: "Routing", role: "engineer" },
   { page: "fx", label: "FX", role: "engineer" },
+  { page: "scenes", label: "Scenes", role: "engineer" },
   { page: "browser", label: "Browser", role: "viewer" },
   { page: "mix", label: "In-ears", role: "engineer" },
   { page: "record", label: "Record", role: "engineer" },
@@ -103,6 +105,8 @@ function ConsoleApp({ role }: { role: Role }) {
           <RoutingPage />
         ) : page === "fx" && engineer ? (
           <FxPage slot={route?.slot} />
+        ) : page === "scenes" && engineer ? (
+          <ScenesPage />
         ) : page === "browser" ? (
           <BrowserPage />
         ) : page === "record" && engineer ? (

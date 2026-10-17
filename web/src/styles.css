@@ -1748,6 +1748,101 @@ div.scribble {
   font-size: 0.8rem;
 }
 
+/* ---------- scenes and library ---------- */
+
+.library {
+  max-width: 1100px;
+}
+.save-title {
+  margin-bottom: 10px;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.slots {
+  display: grid;
+}
+.slot {
+  border-bottom: 1px solid #20242d;
+}
+.slot.current {
+  background: rgba(242, 179, 61, 0.06);
+}
+.slot-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 4px 0;
+}
+.slot-num {
+  flex: none;
+  width: 2.6em;
+  color: var(--muted);
+  text-align: right;
+}
+.slot-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 6px 4px;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.slot.empty .slot-name strong {
+  font-weight: 400;
+  color: var(--muted);
+}
+.slot-note {
+  font-size: 0.85rem;
+}
+.btn.slot-more {
+  flex: none;
+  min-width: 40px;
+  padding: 6px 8px;
+}
+.slot-body {
+  display: grid;
+  gap: 10px;
+  padding: 4px 0 14px calc(2.6em + 10px);
+}
+.slot-load {
+  align-items: flex-end;
+}
+.scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.scope legend {
+  width: 100%;
+  padding: 0;
+}
+.lib-note {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+}
+
 /* ---------- narrow screens ---------- */
 
 @media (max-width: 720px) {
@@ -1850,5 +1945,8 @@ div.scribble {
   }
   .fx-params {
     grid-template-columns: minmax(96px, 36%) minmax(0, 1fr);
+  }
+  .slot-body {
+    padding-left: 0;
   }
 }

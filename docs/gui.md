@@ -17,7 +17,8 @@ accident. Disarm to go back to read-only.
 **Who sees what.** The machine running `tabula` is the engineer and sees
 every page. Other devices get a role from an access link: viewers see the
 Mixer, Channel and Browser pages read-only; musicians only get their in-ear
-mix. Routing, FX, In-ears, Record, Access and Connect are engineer pages. See
+mix. Routing, FX, Scenes, In-ears, Record, Access and Connect are engineer
+pages. See
 [access](access.md).
 
 ## Mixer
@@ -103,6 +104,30 @@ done only when writes are armed: opening the editor then points the RTA at
 this EQ. Read-only, the editor shows the RTA of whatever source the console
 has, and names it. The dB window follows the console's RTA settings
 (`/-prefs/rta`: 30 dB under the RTA gain, or 60 dB).
+
+## Scenes
+
+The console's library, in six tabs: scenes, snippets, channel presets,
+effect presets, routing presets and AES50/DP48 presets. Each tab lists the
+slots in use (tick *Empty slots* to see all 100), with their name and, for
+scenes, their note; the scene or snippet the console's scenes page
+highlights is marked *current* (when the console shows scenes or snippets
+there).
+
+- **Recall** a scene or snippet, or **load** a routing or AES50 preset, after
+  a confirmation that says what changes.
+- **Load…** a channel preset onto a strip, choosing the sections (headamp,
+  configuration, gate, compressor, EQ, sends), or an effect preset into an FX
+  slot.
+- **Save** the current settings in a slot, with a name (and a note for
+  scenes); a channel preset is saved from a strip, an effect preset from an
+  FX slot. Saving over a used slot asks first.
+- Open a slot (▾) to **rename**, **copy** it to another slot (not snippets:
+  the console cannot) or **delete** it.
+
+Every command changes the console, so the page needs armed writes. Recalls
+apply the scene safes and snippet filters on a console; the emulator does
+not apply them yet.
 
 ## Browser
 
