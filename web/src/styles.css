@@ -1331,6 +1331,204 @@ div.scribble {
   width: 100%;
 }
 
+/* ---------- in-ear mix (musicians) ---------- */
+
+.mix {
+  max-width: 760px;
+}
+.mix-who {
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mix-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.mix-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+.mix-title h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+.mix-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mix-label {
+  display: block;
+  margin-top: 10px;
+  font-weight: 600;
+}
+.mix-row .btn.mute {
+  width: auto;
+  min-width: 64px;
+  flex: none;
+}
+.mix-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 10px;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  cursor: pointer;
+}
+.check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.mix-sources {
+  display: grid;
+  gap: 8px;
+}
+.mix-source {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.mix-source.off {
+  opacity: 0.6;
+}
+.mix-source-head {
+  display: grid;
+  grid-template-columns: minmax(0, 12em) minmax(40px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.mix-source-head .scribble {
+  min-height: 36px;
+}
+.btn.pin {
+  min-width: var(--tap);
+  padding: 4px 8px;
+  color: var(--muted);
+}
+.btn.pin.lit {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.mix-slider {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.mix-slider input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  height: 40px; /* a big target for a thumb on stage */
+}
+.mix-slider .db {
+  flex: none;
+  width: 4.5em;
+  text-align: right;
+  font-family: var(--mono);
+}
+.mix-pan input[type="range"] {
+  height: 30px;
+}
+.levelbar {
+  height: 8px;
+  border-radius: 4px;
+  background: #0f1116;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.levelbar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ok) 0%, var(--ok) 70%, var(--busy) 88%, var(--danger) 100%);
+  background-size: 100% 100%;
+}
+.noaccess {
+  max-width: 520px;
+  margin: 10vh auto 0;
+}
+
+/* ---------- access links ---------- */
+
+.access {
+  max-width: 900px;
+}
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.form-field .field-label {
+  margin: 0;
+}
+.new-access {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+.new-access .form-field {
+  flex: 1 1 180px;
+}
+.access .section > .form-field {
+  margin-top: 10px;
+  max-width: 420px;
+}
+.grants {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.grant {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.grant:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.grant-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.grant-link code {
+  display: block;
+  margin: 6px 0;
+  word-break: break-all;
+  color: var(--muted);
+}
+.grant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.qr {
+  display: block;
+  width: min(280px, 100%);
+  margin-top: 10px;
+  border-radius: 6px;
+}
+
 /* ---------- narrow screens ---------- */
 
 @media (max-width: 720px) {
@@ -1418,5 +1616,8 @@ div.scribble {
   }
   .block-row {
     grid-template-columns: 4.5em minmax(100px, 8em) minmax(0, 1fr);
+  }
+  .mix-source-head {
+    grid-template-columns: minmax(0, 1fr) 60px auto;
   }
 }

@@ -1,7 +1,8 @@
 // The Server-Sent Events stream (/api/events): status, change, resync,
-// record and meters. The stream is reopened with a backoff if it drops, and
-// the whole state is reloaded after each (re)open, as changes may have been
-// missed in between.
+// record, access and meters. The stream is reopened with a backoff if it
+// drops, and the whole state is reloaded after each (re)open, as changes may
+// have been missed in between. A stream that drops because the access was
+// deleted is not reopened.
 
 import type { Status } from "../lib/api";
 import { api } from "../lib/api";
@@ -54,6 +55,9 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
     src.addEventListener("record", (e) => {
       store.setRecord(JSON.parse((e as MessageEvent).data));
     });
+    src.addEventListener("access", () => {
+      void store.loadAccess();
+    });
     src.addEventListener("meters", (e) => {
       const m = JSON.parse((e as MessageEvent).data) as { id: string; values: number[] };
       store.setMeters(String(m.id), m.values);
@@ -62,6 +66,9 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
       store.setStream("down");
       if (src.readyState === EventSource.CLOSED) {
         src.close();
+        void store.loadAccess().then((who) => {
+          if (who?.role === "none") stopped = true;
+        });
         timer = setTimeout(open, retry);
         retry = Math.min(retry * 2, 10000);
       }

@@ -11,7 +11,7 @@ export interface IntOption {
 
 export function IntSelect({ addr, options, label }: { addr: string; options: IntOption[]; label?: string }) {
   const val = useValue(addr);
-  const can = useCanWrite();
+  const can = useCanWrite(addr);
   const current = val === undefined ? "" : String(val.value);
   return (
     <select

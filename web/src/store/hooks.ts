@@ -49,10 +49,16 @@ export function useLeaf(addr: string | undefined): Leaf | undefined {
   return addr ? store.leaf(addr) : undefined;
 }
 
-/** useCanWrite is true when connected and armed: controls are enabled. */
-export function useCanWrite(): boolean {
-  const s = useStatus();
-  return !!(s.connected && s.console?.armed);
+export const useAccess = () => useKey("access", () => store.access);
+
+/**
+ * useCanWrite is true when controls are enabled: connected, and for the
+ * engineer armed; for addr, also when a musician's access covers it.
+ */
+export function useCanWrite(addr?: string): boolean {
+  useStatus();
+  useAccess();
+  return store.canWrite(addr);
 }
 
 /** useMeters returns a meter group's latest values (re-renders ~20 times per second). */

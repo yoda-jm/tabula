@@ -29,6 +29,8 @@ func main() {
 		webDir   = flag.String("web-dir", "", "serve the GUI from this directory instead of the embedded build")
 		sessions = flag.String("sessions", "sessions", "directory where recorded sessions are kept")
 		record   = flag.Bool("record", false, "start recording as soon as the console is connected and synced (stops on exit)")
+		accessF  = flag.String("access", "access.json", "file keeping the access links made on the Access page")
+		guest    = flag.String("guest", "none", "role of other devices without an access link: none, viewer or engineer")
 		showVer  = flag.Bool("version", false, "print the version and exit")
 	)
 	flag.Parse()
@@ -40,6 +42,19 @@ func main() {
 	log.Info("tabula", "version", version)
 
 	api := webapi.New(log)
+	guestRole, err := webapi.ParseRole(*guest)
+	if err == nil && guestRole == webapi.RoleMusician {
+		err = errors.New("a musician needs an access link (their mix)")
+	}
+	if err != nil {
+		log.Error("-guest", "err", err)
+		os.Exit(2)
+	}
+	api.SetGuestRole(guestRole)
+	if err := api.SetAccessFile(*accessF); err != nil {
+		log.Error("-access", "err", err)
+		os.Exit(1)
+	}
 	api.SetSessionsDir(*sessions)
 	api.RecordOnSync(*record)
 	defer api.StopRecording()
@@ -51,6 +66,7 @@ func main() {
 		log.Error("listen", "err", err)
 		os.Exit(1)
 	}
+	api.SetListenAddr(ln.Addr().String())
 	srv := &http.Server{Handler: api.Handler(web.Handler(*webDir)), ReadHeaderTimeout: 5 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

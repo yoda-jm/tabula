@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### tabula
+- Access for the band: the engineer makes access links (with QR codes) on a
+  new Access page. A musician's link opens their in-ear mix only, on a page
+  made for phones: their bus volume and mute, a send slider per source,
+  pins, stereo pan for linked buses. Viewer links see everything read-only.
+  The machine running tabula stays the engineer; other devices without a
+  link see nothing (`-guest` changes that). The server checks every write,
+  musicians change their mix without arming, and deleting a link ends it
+  at once. See [access](docs/access.md).
+- Changes are recorded with who made them through a link (`web Remy`).
 - Channel page: the headamp feeding a channel or aux input — which input it
   is (`AES50 A 12`), its gain and its phantom power (switched after a
   confirmation) — and the physical input next to the channel source.

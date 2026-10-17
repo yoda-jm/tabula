@@ -69,7 +69,8 @@ file order then status nodes.
 `POST /api/set` with `{"addr": "/ch/01/mix/fader", "text": "-6"}` (node text,
 as typed on the console: `-6`, `GATE`, `1k20`…) or
 `{"addr": "...", "value": 0.75 | 3 | "name"}` (floats normalized, enums by
-index or name). 204 on success, 403 if writes are not armed, 400 otherwise.
+index or name). 204 on success, 403 if writes are not armed (or the
+caller's access does not allow it, see [Access](#access)), 400 otherwise.
 The value is quantized like the console does; the resulting change comes
 back on the event stream.
 
@@ -79,8 +80,9 @@ back on the event stream.
 
 - `status`: a `Status` (sent on connect and on every state change of the connection);
 - `change`: `[{"addr", "text", "value", "origin"}]` with origin `console`
-  (made on the console or by another remote app) or `local` (made through
-  this server);
+  (made on the console or by another remote app), `local` (made through
+  this server from its machine) or `web <name>` (through an access link);
+- `access`: the musicians' permission changed — read `/api/whoami` again;
 - `resync`: the initial sync finished — reload `/api/state`;
 - `meters`: `{"id": "1", "values": [...]}` for the meter groups named when
   opening the stream, e.g. `/api/events?meters=1,2,6:12` (`N` is
@@ -90,6 +92,37 @@ back on the event stream.
   16. About 20 updates per second per group; see the protocol document for
   what each group holds (e.g. 1: 32 inputs, 32 gate and 32 compressor gains;
   2: 16 buses, 6 matrices, main L/R, mono, then their compressor gains).
+
+## Access
+
+Every API request is checked against the caller's role (see
+[access](access.md)): requests from the machine running `tabula` are the
+engineer's; other devices use an access link, which sets a cookie
+(`tabula_access`), or get the guest role (`-guest`, none by default).
+
+| Least role | Routes |
+|---|---|
+| none | `GET /api/whoami`, `POST /api/logout`, `GET /a/{token}` |
+| viewer | `GET /api/status`, `/api/schema`, `/api/state`, `/api/events`, `/api/record` |
+| musician | `POST /api/set`, only for the sends to their bus (and its linked partner) from channels, aux inputs and FX returns (`on`, `level`, `pan`), and their bus `fader` and `on`; allowed without arming when the musicians may change their mix |
+| engineer | everything else, including any route not listed here |
+
+A refused request gets 403 with `{"error": "..."}`.
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/a/{token}` | | sets the cookie and redirects to `/#/mix` (musician) or `/#/mixer`; 403 page if the link is not valid |
+| GET | `/api/whoami` | | `{"role", "name"?, "bus"?, "buses"?, "local", "link", "musicians_can_write"}` |
+| POST | `/api/logout` | | forgets the cookie; answers the new `whoami` |
+| GET | `/api/access` | | `{"grants": [Grant], "musicians_can_write", "guest", "urls", "reachable"}` |
+| POST | `/api/access` | `{"name": "Remy", "role": "musician", "bus": 3}` | 201 + `Grant` |
+| DELETE | `/api/access/{id}` | | 204; event streams opened with it end |
+| POST | `/api/access/settings` | `{"musicians_can_write": false}` | the access status |
+
+`Grant`: `{"id", "name", "role", "bus"?, "token", "created"}`; its link is
+one of `urls` + `/a/` + `token`. `urls` lists where other devices reach
+this `tabula` (one per address of the machine when it listens on all of
+them); `reachable` is false when it listens on the machine only.
 
 ## Recording and replay
 

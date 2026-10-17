@@ -48,16 +48,21 @@ type Server struct {
 	replayOf     string
 	replayAt     float64
 	recordOnSync bool
+
+	acc        access
+	listenAddr string
 }
 
 func New(log *slog.Logger) *Server {
 	s := &Server{log: log, model: "M32C", schema: schema.Build("M32C"), sessionsDir: "sessions"}
 	s.hub.init()
+	s.acc.init()
 	return s
 }
 
 // Handler returns the API routes (mounted under /api/) and serves ui for
-// everything else.
+// everything else. Every API request is checked against the caller's role
+// (see access.go).
 func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/status", s.getStatus)
@@ -77,8 +82,9 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/sessions/{name}", s.getSession)
 	mux.HandleFunc("POST /api/replay/start", s.replayStart)
 	mux.HandleFunc("POST /api/replay/stop", s.replayStop)
+	s.accessRoutes(mux)
 	mux.Handle("/", ui)
-	return gzipJSON(mux)
+	return gzipJSON(s.guard(mux))
 }
 
 // Connect connects to a console and starts syncing it (also used by -console).
@@ -433,6 +439,8 @@ func (s *Server) getState(w http.ResponseWriter, r *http.Request) {
 
 // set writes one parameter: {"addr": "...", "text": "-3.0"} or
 // {"addr": "...", "value": 0.75 | 3 | "name"} (floats normalized to [0, 1]).
+// A musician only writes their own mix, armed or not, when the engineer
+// lets musicians change their mix.
 func (s *Server) set(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Addr  string          `json:"addr"`
@@ -450,18 +458,34 @@ func (s *Server) set(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, errors.New("not connected"))
 		return
 	}
+	who := callerFrom(r)
+	unarmed := false
+	if who.Role != RoleEngineer {
+		switch {
+		case who.Grant == nil || who.Role != RoleMusician:
+			httpError(w, http.StatusForbidden, errors.New("this access cannot change anything"))
+			return
+		case !s.acc.snapshot().MusiciansCanWrite:
+			httpError(w, http.StatusForbidden, errors.New("the engineer has not let musicians change their mix"))
+			return
+		case !musicianMay(req.Addr, mixBuses(c.Mirror(), who.Grant.Bus)):
+			httpError(w, http.StatusForbidden, errors.New("your access only changes your own mix"))
+			return
+		}
+		unarmed = true
+	}
+	var arg osc.Arg
 	var err error
 	switch {
 	case req.Text != nil:
-		err = c.SetText(req.Addr, *req.Text)
+		arg, err = c.ParseText(req.Addr, *req.Text)
 	case len(req.Value) > 0:
-		var arg osc.Arg
 		arg, err = decodeValue(c.Mirror(), req.Addr, req.Value)
-		if err == nil {
-			err = c.Set(req.Addr, arg)
-		}
 	default:
 		err = errors.New(`"text" or "value" is required`)
+	}
+	if err == nil {
+		err = c.SetAs(req.Addr, arg, who.origin(), unarmed)
 	}
 	switch {
 	case errors.Is(err, console.ErrReadOnly):

@@ -22,7 +22,7 @@ export interface ControlProps {
 export function ParamControl(props: ControlProps) {
   const leaf = useLeaf(props.addr);
   const val = useValue(props.addr);
-  const can = useCanWrite();
+  const can = useCanWrite(props.addr);
   if (!leaf) return <span className="muted">—</span>;
   const t = leaf.field.type;
   const disabled = !can || val === undefined;
@@ -218,7 +218,7 @@ function NumSlider({ addr, t, val, disabled }: EditorProps) {
 
 /** TextSetter sends node text as typed on the console ("-6", "GATE", "1k20"). */
 export function TextSetter({ addr }: { addr: string }) {
-  const can = useCanWrite();
+  const can = useCanWrite(addr);
   const [text, setText] = useState("");
   const send = async () => {
     if (!text.trim()) return;

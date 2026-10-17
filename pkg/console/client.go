@@ -402,11 +402,16 @@ func (c *Client) OnStatus(fn func()) {
 
 // Set writes one parameter to the console and to the mirror (the console
 // does not echo changes back to the client that made them).
-func (c *Client) Set(addr string, v osc.Arg) error {
+func (c *Client) Set(addr string, v osc.Arg) error { return c.SetAs(addr, v, OriginLocal, false) }
+
+// SetAs is Set on behalf of origin, the name recorded with the change. With
+// unarmed, it writes even when writes are not armed: for a scoped access (a
+// musician's own mix) whose caller has checked the address.
+func (c *Client) SetAs(addr string, v osc.Arg, origin string, unarmed bool) error {
 	c.mu.Lock()
 	armed := c.status.Armed
 	c.mu.Unlock()
-	if !armed {
+	if !armed && !unarmed {
 		return ErrReadOnly
 	}
 	l := c.mirror.Schema().Leaf(addr)
@@ -424,25 +429,34 @@ func (c *Client) Set(addr string, v osc.Arg) error {
 	if err := c.send(osc.NewMessage(l.Addr, cv)); err != nil {
 		return err
 	}
-	_, err = c.mirror.Set(l.Addr, cv, OriginLocal)
+	_, err = c.mirror.Set(l.Addr, cv, origin)
 	return err
 }
 
 // SetText writes one parameter given as node text, e.g. "-3.5" or "GATE".
 func (c *Client) SetText(addr, text string) error {
+	v, err := c.ParseText(addr, text)
+	if err != nil {
+		return err
+	}
+	return c.Set(addr, v)
+}
+
+// ParseText reads node text ("-3.5", "GATE") as a value of the parameter at addr.
+func (c *Client) ParseText(addr, text string) (osc.Arg, error) {
 	l := c.mirror.Schema().Leaf(addr)
 	if l == nil {
-		return fmt.Errorf("unknown parameter %s", addr)
+		return osc.Arg{}, fmt.Errorf("unknown parameter %s", addr)
 	}
 	t := c.mirror.TypeOf(l)
 	if t == nil {
-		return fmt.Errorf("%s: %w", addr, state.ErrNotModelled)
+		return osc.Arg{}, fmt.Errorf("%s: %w", addr, state.ErrNotModelled)
 	}
 	v, err := t.Parse(text)
 	if err != nil {
-		return fmt.Errorf("%s: %w", addr, err)
+		return osc.Arg{}, fmt.Errorf("%s: %w", addr, err)
 	}
-	return c.Set(addr, v)
+	return v, nil
 }
 
 // Discover broadcasts /xinfo on the local network and returns the consoles

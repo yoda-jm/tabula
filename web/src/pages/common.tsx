@@ -4,12 +4,13 @@ import type { ReactNode } from "react";
 import { ParamControl } from "../components/controls";
 import { fieldLabel } from "../lib/labels";
 import { go } from "../lib/route";
-import { useLeaf, useStatus } from "../store/hooks";
+import { useAccess, useLeaf, useStatus } from "../store/hooks";
 import { store } from "../store/store";
 
 /** NotConnected explains why the controls are empty. */
 export function NotConnected() {
   const s = useStatus();
+  const who = useAccess();
   if (s.connected) return null;
   if (s.connecting) {
     const c = s.console;
@@ -19,6 +20,7 @@ export function NotConnected() {
       </p>
     );
   }
+  if (who?.role !== "engineer") return <p className="banner">tabula is not connected to the console yet.</p>;
   return (
     <p className="banner">
       Not connected.{" "}

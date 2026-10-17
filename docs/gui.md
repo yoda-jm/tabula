@@ -14,6 +14,12 @@ made in one shows in the others.
 (top right), after a confirmation. On a real console nothing moves by
 accident. Disarm to go back to read-only.
 
+**Who sees what.** The machine running `tabula` is the engineer and sees
+every page. Other devices get a role from an access link: viewers see the
+Mixer, Channel and Browser pages read-only; musicians only get their in-ear
+mix. Routing, In-ears, Record, Access and Connect are engineer pages. See
+[access](access.md).
+
 ## Mixer
 
 Banks of strips, as on the console: inputs 1-16 and 17-32, aux inputs and
@@ -73,6 +79,12 @@ or by value (`/ch/01/eq`, `Remy`, `GATE`). Each node opens into an editor of
 its fields; a value can also be typed as on the console (`-6`, `1k20`,
 `GATE`).
 
+## In-ears
+
+The in-ear mix of one bus as a musician sees it on their phone: the bus
+volume and mute, and a send slider per source. The engineer can open any
+bus here; musicians get only theirs. See [access](access.md).
+
 ## Record
 
 Record a show: a snapshot of the console when you start (a scene file
@@ -80,6 +92,11 @@ that opens in M32-Edit) plus every change with its time, and markers you add
 (press M). Replay a session onto the console or the emulator, from a time or
 a marker, at a chosen speed (writes must be armed). See the
 [API](API.md#recording-and-replay) for the session format.
+
+## Access
+
+Make access links (with QR codes) for musicians, viewers and other engineer
+devices, and delete them to end that access. See [access](access.md).
 
 ## Connect
 

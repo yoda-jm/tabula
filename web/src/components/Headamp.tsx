@@ -62,7 +62,7 @@ function NoHeadamp({ strip }: { strip: string }) {
 /** PhantomToggle switches +48 V after a confirmation: it pops through the PA. */
 function PhantomToggle({ addr, port }: { addr: string; port: string }) {
   const val = useValue(addr);
-  const can = useCanWrite();
+  const can = useCanWrite(addr);
   const [asking, setAsking] = useState(false);
   const on = Number(val?.value) === 1;
   return (
