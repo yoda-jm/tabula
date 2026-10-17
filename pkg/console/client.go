@@ -62,6 +62,10 @@ type Client struct {
 	status   Status
 	waiters  map[string][]chan osc.Message // by reply address, "node /path" for /node
 	listener []func(osc.Message)           // meters and other unsolicited messages
+
+	onReconnect, onStatus []func()
+
+	tick, probeAfter time.Duration // keepalive timing (shortened in tests)
 }
 
 // Dial connects to the console at addr ("host" or "host:port"), checks it
@@ -81,7 +85,8 @@ func Dial(ctx context.Context, addr string, mirror *state.Store, log *slog.Logge
 	if err != nil {
 		return nil, err
 	}
-	c := &Client{addr: ua, conn: conn, mirror: mirror, log: log, waiters: map[string][]chan osc.Message{}}
+	c := &Client{addr: ua, conn: conn, mirror: mirror, log: log, waiters: map[string][]chan osc.Message{},
+		tick: 2 * time.Second, probeAfter: 6 * time.Second}
 	c.status.Addr = ua.String()
 	go c.readLoop()
 
@@ -320,29 +325,79 @@ func (c *Client) Sync(ctx context.Context, progress func(done, total int)) error
 	return ctx.Err()
 }
 
-// Run keeps the connection alive (/xremote renewal) until ctx is done.
+// Run keeps the connection alive until ctx is done: /xremote renewal, and
+// a probe when the console has been silent for a while. When a lost
+// console answers again (rebooted, cable back), the mirror is synced again
+// and updates resume; OnReconnect handlers run after that sync.
 func (c *Client) Run(ctx context.Context) {
 	c.send(osc.NewMessage("/xremote"))
-	t := time.NewTicker(8 * time.Second)
+	t := time.NewTicker(c.tick)
 	defer t.Stop()
+	lastRemote := time.Now()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+		}
+		c.mu.Lock()
+		silent := time.Since(c.status.LastSeen)
+		connected := c.status.Connected
+		c.mu.Unlock()
+		if connected && silent < c.probeAfter {
+			if time.Since(lastRemote) > 8*time.Second {
+				c.send(osc.NewMessage("/xremote"))
+				lastRemote = time.Now()
+			}
+			continue
+		}
+		_, err := c.ask(ctx, osc.NewMessage("/xinfo"), "/xinfo", 1)
+		switch {
+		case err != nil && connected:
+			c.setConnected(false)
+			c.log.Warn("console lost", "console", c.addr.String())
+		case err == nil && !connected:
+			c.log.Info("console back, syncing again", "console", c.addr.String())
 			c.send(osc.NewMessage("/xremote"))
-			c.mu.Lock()
-			stale := time.Since(c.status.LastSeen) > 20*time.Second
-			c.mu.Unlock()
-			if stale {
-				if _, err := c.ask(ctx, osc.NewMessage("/xinfo"), "/xinfo", 1); err != nil {
-					c.mu.Lock()
-					c.status.Connected = false
-					c.mu.Unlock()
+			lastRemote = time.Now()
+			if c.Sync(ctx, nil) == nil {
+				c.setConnected(true)
+				c.mu.Lock()
+				fns := c.onReconnect
+				c.mu.Unlock()
+				for _, fn := range fns {
+					fn()
 				}
 			}
+		case err == nil:
+			c.send(osc.NewMessage("/xremote"))
+			lastRemote = time.Now()
 		}
 	}
+}
+
+func (c *Client) setConnected(on bool) {
+	c.mu.Lock()
+	c.status.Connected = on
+	fns := c.onStatus
+	c.mu.Unlock()
+	for _, fn := range fns {
+		fn()
+	}
+}
+
+// OnReconnect registers fn, called after the console came back and was synced again.
+func (c *Client) OnReconnect(fn func()) {
+	c.mu.Lock()
+	c.onReconnect = append(c.onReconnect, fn)
+	c.mu.Unlock()
+}
+
+// OnStatus registers fn, called when the connection is lost or regained.
+func (c *Client) OnStatus(fn func()) {
+	c.mu.Lock()
+	c.onStatus = append(c.onStatus, fn)
+	c.mu.Unlock()
 }
 
 // Set writes one parameter to the console and to the mirror (the console

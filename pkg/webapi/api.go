@@ -135,6 +135,15 @@ func (s *Server) Connect(addr string) error {
 			s.publishRecord()
 		}
 		go s.runMeters(ctx, c)
+		c.OnStatus(s.publishStatus)
+		c.OnReconnect(func() {
+			s.publishStatus()
+			s.hub.publish("resync", json.RawMessage(`{}`))
+			select { // subscribe the wanted meters again
+			case s.hub.meterKick <- struct{}{}:
+			default:
+			}
+		})
 		c.Run(ctx)
 	}()
 	return nil

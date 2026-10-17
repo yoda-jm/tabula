@@ -101,6 +101,7 @@ func (s *Server) runMeters(ctx context.Context, c *console.Client) {
 		case <-ctx.Done():
 			return
 		case <-s.hub.meterKick:
+			subscribed = map[meterKey]bool{} // new browser or reconnected console
 		case <-renew.C:
 			subscribed = map[meterKey]bool{} // renew all on the next round
 		}
