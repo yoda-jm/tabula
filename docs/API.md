@@ -143,7 +143,10 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console) |
 | POST | `/api/replay/stop` | | `Record` |
 
-`Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", …}, "replaying", "replay_of"?, "replay_at"?, "error"?}`.
+`Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", "audio"?, …}, "replaying", "replay_of"?, "replay_at"?, "error"?, "audio"?}`.
+`audio` is the state of the audio capture of the recording (or of the last
+one), an `AudioStatus` without `device` and `command` (viewers see the
+record status); `meta.audio` the audio section of the session (see Audio).
 A replay first sends the state at `from` (snapshot plus the changes up to
 then), then each later change at its time divided by `speed`.
 
@@ -152,3 +155,48 @@ every replay progress).
 
 `tabula -record -console <ip>` starts recording as soon as the console is
 synced and stops on exit — for unattended recording of a concert.
+
+## Audio
+
+When audio is enabled, starting a recording also records the tracks of the
+console's USB card into the session's `audio/` directory, one WAV file per
+track, and stopping the recording stops it (see
+[recording](recording.md)). An audio capture that fails is reported
+(`Record.audio.state` `failed`, `error`) and the recording of the changes
+goes on. Engineer only.
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/api/audio` | | `AudioView` |
+| POST | `/api/audio/config` | `AudioConfig` | `AudioView`; 400 if not valid. Used from the next recording, saved in `<sessions>/audio.json` |
+| GET | `/api/audio/devices` | | `[{"recorder", "id", "name", "channels"?, "format"?, "rates"?, "console"?}]`: what the recorders can record from (`id` is the device to use); `console` marks what looks like the console's card. Lists only, opens nothing |
+| POST | `/api/audio/test` | `AudioConfig` (optional: default the saved one) | `AudioStatus` after 3 s of capture, nothing written: the stream format, `peaks`, or `error`; 409 while recording |
+| GET | `/api/sessions/{name}/export?format=` | | a download: `reaper` (`<name>.rpp`), `audacity` (`<name> labels.txt`: `start⇥end⇥label` per marker, in seconds of the audio files), `csv` (`<name>.csv`: `time,audio_time,clock,type,address,text,value,origin,label`) |
+
+`AudioConfig`: `{"enabled", "recorder": "arecord"|"parecord"|"ffmpeg"|"custom",
+"device", "channels": 32, "rate": 48000, "tracks"?: "1-16", "bits": 24,
+"plain_names"?, "command"?, "input"?}` — `command` is the custom
+recorder's command line (`{device}`, `{channels}`, `{rate}` replaced),
+writing raw samples in the `input` format (`s16le`, `s24le`, `s24-32le`,
+`s32le`, `f32le`) or a WAV stream.
+
+`AudioView`: `{"config", "command"? (what the configuration runs), "error"?
+(what is wrong with it), "templates": {recorder: command}, "byte_rate",
+"dir", "free", "remaining", "status"?: AudioStatus, "testing"}` — `free`
+is the free space in the sessions directory (bytes, -1 unknown),
+`remaining` how many seconds of audio it holds at `byte_rate`.
+
+`AudioInfo` (the `audio` section of a session's `meta.json`): `{"rate",
+"bits", "channels", "tracks": [{"channel", "name"?, "file"}], "offset",
+"start", "drift_ppm"?, "frames", "device"?, "command"?, "overruns"?,
+"error"?}`. `file` is relative to the session; `offset` is the time of the
+first sample in seconds after the session start; a session time `t` is at
+`(t − offset) / (1 + drift_ppm·10⁻⁶)` in the files.
+
+`AudioStatus`: an `AudioInfo` plus `{"state": "starting"|"recording"|"stopped"|"failed",
+"warnings"?, "format"?, "seconds", "bytes", "byte_rate", "free",
+"remaining", "peaks"?}`: `remaining` is the audio the disk still holds
+before the capture stops itself (seconds), `peaks` the peak level of each
+track over the last second (linear, 1 = full scale). Warnings: the disk is
+almost full (under 20 minutes), the recorder lost samples, no audio for a
+while.

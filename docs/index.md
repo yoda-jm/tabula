@@ -95,7 +95,10 @@ tabula -console 192.168.1.62 -http :8033
   each with an editor; values can also be typed as on the console (`-6`,
   `1k20`, `GATE`).
 - **Record**: record a show (snapshot plus every change, with markers) and
-  replay it onto the console or the emulator.
+  replay it onto the console or the emulator. With the console's USB card,
+  the audio tracks are recorded too, one WAV file each, in sync with the
+  console moves, ready for Audacity or Reaper. See
+  [recording a show](recording.md).
 - **In-ear mixes for the band**: each musician scans a QR code and gets
   their own mix on their phone, and nothing else; viewers watch without
   touching. See [access](access.md).
@@ -103,7 +106,8 @@ tabula -console 192.168.1.62 -http :8033
 
 It is **read-only** until writes are armed, after a confirmation: on a real
 console, nothing moves by accident. `-record` starts recording as soon as
-the console is synced, for unattended recording of a concert.
+the console is synced, for unattended recording of a concert
+(`-audio-device hw:CARD=X32,DEV=0 -audio-tracks 1-16` adds the audio).
 
 Later: more band-specific screens.
 

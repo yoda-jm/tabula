@@ -32,6 +32,21 @@
   musicians change their mix without arming, and deleting a link ends it
   at once. See [access](docs/access.md).
 - Changes are recorded with who made them through a link (`web Remy`).
+- Records the audio of the console's USB card with each session, in the
+  same program, so the tracks line up with the console moves: one WAV file
+  per track (24-bit by default), named after what feeds it on the console
+  (`01 Hang.wav`), in the session's `audio/` folder. Choose the device, the
+  tracks (`1-16`) and the format on the Record page, test the input with
+  its levels, and watch the capture, the free space and the time left
+  while recording; or use `-audio-device`, `-audio-tracks`… with `-record`.
+  The files stay readable if the program dies, become RF64 past 4 GiB, and
+  the audio stops cleanly before the disk is full; a failing capture never
+  stops the session. The time of the first sample and the clock drift are
+  measured and kept in `meta.json`. Records through arecord, parecord or
+  ffmpeg (no driver, no build option). See [recording](docs/recording.md).
+- Sessions export as a Reaper project (tracks at their place, markers), an
+  Audacity label track and a CSV of every change and marker; a recording
+  with audio leaves the project and the labels in its folder.
 
 ### Downloads
 - A `latest` release is rebuilt from `main` after every change that passes
