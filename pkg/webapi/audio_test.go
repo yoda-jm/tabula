@@ -240,3 +240,33 @@ func TestAudioFailure(t *testing.T) {
 		t.Errorf("session: %v", err)
 	}
 }
+
+// An engineer link must not be a way to run programs on the machine running
+// tabula: only that machine chooses a custom recorder command.
+func TestCustomRecorderIsLocalOnly(t *testing.T) {
+	api := New(quiet)
+	h := api.Handler(http.NotFoundHandler())
+	g, _ := api.acc.add("FOH tablet", RoleEngineer, 0)
+	custom := `{"enabled":true,"recorder":"custom","command":"sh -c 'touch /tmp/owned'","tracks":"1-2","channels":2}`
+	if w := remote(h, "POST", "/api/audio/config", custom, g.Token); w.Code != http.StatusForbidden {
+		t.Errorf("remote engineer, custom command: %d %s", w.Code, w.Body)
+	}
+	if w := remote(h, "POST", "/api/audio/test", custom, g.Token); w.Code != http.StatusForbidden {
+		t.Errorf("remote engineer, custom test: %d %s", w.Code, w.Body)
+	}
+	if w := local(h, "POST", "/api/audio/config", custom); w.Code != http.StatusOK {
+		t.Fatalf("local, custom command: %d %s", w.Code, w.Body)
+	}
+	// The remote engineer may keep it (changing the tracks) but not change it.
+	same := strings.Replace(custom, `"1-2"`, `"1"`, 1)
+	if w := remote(h, "POST", "/api/audio/config", same, g.Token); w.Code != http.StatusOK {
+		t.Errorf("remote engineer, same command: %d %s", w.Code, w.Body)
+	}
+	other := strings.Replace(custom, "owned", "owned2", 1)
+	if w := remote(h, "POST", "/api/audio/config", other, g.Token); w.Code != http.StatusForbidden {
+		t.Errorf("remote engineer, other command: %d %s", w.Code, w.Body)
+	}
+	if w := remote(h, "POST", "/api/audio/config", `{"enabled":true,"recorder":"arecord","device":"hw:0","tracks":"1-16"}`, g.Token); w.Code != http.StatusOK {
+		t.Errorf("remote engineer, arecord: %d %s", w.Code, w.Body)
+	}
+}

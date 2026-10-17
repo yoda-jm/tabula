@@ -242,6 +242,11 @@ standard output, interleaved: raw in the `-audio-input` format, or a WAV
 stream, whose header `tabula` reads and checks (channels, rate). arecord
 writes raw samples on purpose: its WAV output to a pipe ends after 2 GiB.
 
+A custom command runs a program on the machine running `tabula`, so only
+that machine chooses one (the flag, or the GUI opened on it): an
+[engineer link](access.md) can change the device, tracks and format, and
+keep the current command, but not set a new one.
+
 On macOS and Windows, ffmpeg records the card (it must be on the PATH).
 These two have not been tried with the console's card yet; on Windows, the
 card's ASIO driver is not usable by ffmpeg, and its WDM inputs may offer
