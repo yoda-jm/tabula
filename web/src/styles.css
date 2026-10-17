@@ -1016,44 +1016,29 @@ div.scribble {
   flex: 1;
   min-width: min(100%, 280px);
 }
-.group {
-  margin-bottom: 6px;
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
-.group-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: var(--tap);
-  padding: 6px 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
+.tree .tree {
+  margin-left: 0.85em;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
 }
-.group-head code {
-  font-weight: 700;
-}
-.chev {
-  width: 1em;
-  color: var(--muted);
-}
-.group-body {
-  padding: 4px 0 8px 8px;
-}
-.node {
+.tree-item {
   border-bottom: 1px solid #1d2129;
 }
-.node-head {
-  display: grid;
-  grid-template-columns: minmax(150px, max-content) minmax(0, 1fr);
-  gap: 14px;
+.tree-item:last-child {
+  border-bottom: 0;
+}
+.tree-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   width: 100%;
   min-height: 36px;
-  padding: 6px 8px;
+  padding: 7px 8px;
   background: none;
   border: 0;
   color: var(--text);
@@ -1062,18 +1047,44 @@ div.scribble {
   text-align: left;
   cursor: pointer;
 }
-.node-head:hover,
-.node.open > .node-head {
+.tree-head:hover,
+.tree-item.open > .tree-head {
   background: var(--panel);
 }
-.node-path {
-  color: #9ecbff;
+.chev {
+  flex: none;
+  width: 1em;
+  color: var(--muted);
 }
-.node-line {
+.tree-label {
+  flex: none;
+  color: #9ecbff;
+  font-weight: 600;
+}
+.tree-name {
+  flex: none;
+  max-width: 14em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-line {
+  flex: 1;
+  min-width: 0;
   color: var(--muted);
   white-space: pre;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.tree-size {
+  margin-left: auto;
+  flex: none;
+  padding-left: 8px;
+  font-size: 0.8rem;
+}
+.tree-item.dim > .tree-head .tree-label,
+.tree-item.dim > .tree-head .tree-line {
+  opacity: 0.55;
 }
 .node-body {
   padding: 8px 12px 14px;
@@ -1114,9 +1125,6 @@ div.scribble {
 .fe-controls .numslider {
   flex: 1;
   min-width: 220px;
-}
-.btn.more {
-  margin: 8px 0;
 }
 
 /* ---------- record ---------- */
@@ -1983,9 +1991,14 @@ code.wrap {
   .field-editor {
     grid-template-columns: 1fr;
   }
-  .node-head {
-    grid-template-columns: 1fr;
-    gap: 2px;
+  .tree-head {
+    flex-wrap: wrap;
+    gap: 2px 10px;
+  }
+  .tree-line {
+    order: 1; /* below the label, name and size */
+    flex-basis: 100%;
+    padding-left: calc(1em + 10px);
   }
   .session-item {
     grid-template-columns: 1fr auto;

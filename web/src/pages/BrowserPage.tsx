@@ -1,53 +1,62 @@
-// Every node of the schema, grouped by section, filterable by path or by
-// current text, each expandable into a generic editor of its fields.
+// Every node of the schema as a tree of its paths (/ch → 01 → eq → 1),
+// filterable by path or by current text; a node opens into a generic editor
+// of its fields.
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { ParamControl, TextSetter } from "../components/controls";
 import type { TypeInfo } from "../lib/api";
 import { fieldLabel } from "../lib/labels";
+import { usePersistent } from "../lib/route";
 import type { Node } from "../lib/schema";
-import { sectionOf } from "../lib/schema";
-import { useLeaf, useLine, useNode, useSchema, useStateVersion } from "../store/hooks";
+import type { TreeItem } from "../lib/tree";
+import { autoOpen, buildTree, prune } from "../lib/tree";
+import { prettyText } from "../lib/values";
+import { useLeaf, useLine, useNode, useSchema, useStateVersion, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
 
-const PAGE = 150;
+/** Rows a filter may list by opening the tree itself. */
+const BUDGET = 200;
 
-interface Group {
-  section: string;
-  nodes: Node[];
-  total: number;
+interface TreeCtx {
+  isOpen(path: string): boolean;
+  toggle(path: string): void;
+  filtering: boolean;
 }
 
 export function BrowserPage() {
   const schema = useSchema();
   const version = useStateVersion();
   const [filter, setFilter] = useState("");
-  const [open, setOpen] = useState<Set<string>>(new Set());
   const deferred = useDeferredValue(filter.trim().toLowerCase());
+  // opened by hand: kept while browsing; while filtering, on top of what the filter opens
+  const [opened, setOpened] = usePersistent<string[]>("tabula.browser.open", []);
+  const [filterOpen, setFilterOpen] = useState<Map<string, boolean>>(new Map());
+  useEffect(() => setFilterOpen(new Map()), [deferred]);
 
-  const groups = useMemo<Group[]>(() => {
-    if (!schema) return [];
-    const by = new Map<string, Group>();
-    for (const s of schema.sections) by.set(s, { section: s, nodes: [], total: 0 });
-    for (const n of schema.nodes) {
-      const g = by.get(sectionOf(n.path))!;
-      g.total++;
-      if (!deferred || n.path.toLowerCase().includes(deferred) || store.lineOf(n.path).toLowerCase().includes(deferred)) {
-        g.nodes.push(n);
-      }
-    }
-    return [...by.values()].filter((g) => !deferred || g.nodes.length);
-  }, [schema, deferred, version]); // version: filter again on the text once the state (re)loads
+  const tree = useMemo(() => (schema ? buildTree(schema.nodes) : undefined), [schema]);
+  const shown = useMemo(() => {
+    if (!tree || !deferred) return tree;
+    return prune(tree, (n) => n.path.toLowerCase().includes(deferred) || store.lineOf(n.path).toLowerCase().includes(deferred));
+  }, [tree, deferred, version]); // version: filter again on the text once the state (re)loads
+  const auto = useMemo(() => (deferred && shown ? autoOpen(shown, BUDGET) : new Set<string>()), [shown, deferred]);
+  const openSet = useMemo(() => new Set(opened), [opened]);
 
-  if (!schema) return <div className="page">Loading the schema…</div>;
-  const toggle = (s: string) => {
-    const n = new Set(open);
-    if (n.has(s)) n.delete(s);
-    else n.add(s);
-    setOpen(n);
+  if (!schema || !tree || !shown) return <div className="page">Loading the schema…</div>;
+  const isOpen = (p: string) => (deferred ? (filterOpen.get(p) ?? auto.has(p)) : openSet.has(p));
+  const ctx: TreeCtx = {
+    isOpen,
+    filtering: !!deferred,
+    toggle(p) {
+      if (deferred) setFilterOpen(new Map(filterOpen).set(p, !isOpen(p)));
+      else setOpened(openSet.has(p) ? opened.filter((x) => x !== p) : [...opened, p]);
+    },
   };
-  const matches = groups.reduce((a, g) => a + g.nodes.length, 0);
+  const anyOpen = deferred ? [...auto, ...filterOpen.keys()].some(isOpen) : opened.length > 0;
+  const collapse = () => {
+    if (deferred) setFilterOpen(new Map([...auto, ...filterOpen.keys()].map((p) => [p, false])));
+    else setOpened([]);
+  };
   return (
     <div className="page browser">
       <div className="browser-head">
@@ -61,68 +70,74 @@ export function BrowserPage() {
           spellCheck={false}
         />
         <span className="muted">
-          {deferred ? `${matches} of ${schema.nodes.length} nodes` : `${schema.nodes.length} nodes`} · {schema.model}
+          {deferred ? `${shown.size} of ${tree.size} nodes` : `${tree.size} nodes`} · {schema.model}
         </span>
+        <button type="button" className="btn" onClick={collapse} disabled={!anyOpen}>
+          Collapse all
+        </button>
       </div>
       <NotConnected />
-      {groups.map((g) => (
-        <GroupView key={g.section} group={g} expanded={!!deferred || open.has(g.section)} onToggle={() => toggle(g.section)} />
+      <TreeList items={shown.children} ctx={ctx} />
+      {deferred && !shown.size && <p className="muted">Nothing matches “{filter}”.</p>}
+    </div>
+  );
+}
+
+function TreeList({ items, ctx }: { items: TreeItem[]; ctx: TreeCtx }) {
+  return (
+    <ul className="tree">
+      {items.map((it) => (
+        <TreeRow key={it.path} item={it} ctx={ctx} />
       ))}
-      {deferred && !matches && <p className="muted">Nothing matches “{filter}”.</p>}
-    </div>
+    </ul>
   );
 }
 
-function GroupView({ group, expanded, onToggle }: { group: Group; expanded: boolean; onToggle(): void }) {
-  const [limit, setLimit] = useState(PAGE);
-  const shown = group.nodes.slice(0, limit);
+function TreeRow({ item, ctx }: { item: TreeItem; ctx: TreeCtx }) {
+  const open = ctx.isOpen(item.path);
+  const branch = item.children.length > 0;
+  const unit = ctx.filtering ? (item.size === 1 ? "match" : "matches") : item.size === 1 ? "node" : "nodes";
   return (
-    <section className="group">
-      <button type="button" className="group-head" aria-expanded={expanded} onClick={onToggle}>
+    <li className={"tree-item" + (open ? " open" : "") + (ctx.filtering && item.node && !item.hit ? " dim" : "")}>
+      <button type="button" className="tree-head" aria-expanded={open} title={item.path} onClick={() => ctx.toggle(item.path)}>
         <span className="chev" aria-hidden>
-          {expanded ? "▾" : "▸"}
+          {open ? "▾" : "▸"}
         </span>
-        <code>{group.section}</code>
-        <span className="muted">
-          {group.nodes.length === group.total ? group.total : `${group.nodes.length} / ${group.total}`} nodes
-        </span>
+        <code className="tree-label">{item.label}</code>
+        <ItemName path={item.path} />
+        {item.node && <NodeLine path={item.node.path} />}
+        {branch && <span className="muted tree-size">{`${item.size} ${unit}`}</span>}
       </button>
-      {expanded && (
-        <div className="group-body">
-          {shown.map((n) => (
-            <NodeRow key={n.path} node={n} />
-          ))}
-          {group.nodes.length > limit && (
-            <button type="button" className="btn more" onClick={() => setLimit(limit + PAGE * 2)}>
-              Show more ({group.nodes.length - limit} left)
-            </button>
-          )}
-        </div>
-      )}
-    </section>
+      {open && item.node && <NodeEditor node={item.node} />}
+      {open && branch && <TreeList items={item.children} ctx={ctx} />}
+    </li>
   );
 }
 
-function NodeRow({ node }: { node: Node }) {
-  const [open, setOpen] = useState(false);
-  const line = useLine(node.path);
-  const rest = line.startsWith(node.path) ? line.slice(node.path.length) : line;
-  return (
-    <div className={"node" + (open ? " open" : "")}>
-      <button type="button" className="node-head" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <code className="node-path">{node.path}</code>
-        <code className="node-line">{rest}</code>
-      </button>
-      {open && <NodeEditor node={node} />}
-    </div>
-  );
+/** ItemName shows the name of a strip (/ch/01) or a DCA (/dca/1) next to its number. */
+function ItemName({ path }: { path: string }) {
+  const addr = path + "/config/name";
+  const name = prettyText(useValue(store.leaf(addr) ? addr : undefined)?.text);
+  return name ? <span className="tree-name">{name}</span> : null;
+}
+
+function NodeLine({ path }: { path: string }) {
+  const line = useLine(path);
+  const rest = line.startsWith(path) ? line.slice(path.length) : line;
+  return <code className="tree-line">{rest}</code>;
 }
 
 function NodeEditor({ node }: { node: Node }) {
   const st = useNode(node.path);
+  const path = (
+    <p className="muted">
+      <code>{node.path}</code>
+    </p>
+  );
   if (st?.text) {
     return (
       <div className="node-body">
+        {path}
         <p className="note">
           Kept as text: this effect is not modelled yet. <code className="readonly">{st.line}</code>
         </p>
@@ -133,6 +148,7 @@ function NodeEditor({ node }: { node: Node }) {
   const used = fields.filter((f) => f.type.kind !== "unused");
   return (
     <div className="node-body">
+      {path}
       {node.variant && <p className="muted">Fields follow {node.variant} (effect type).</p>}
       {!node.scene && <p className="muted">Not part of a scene file (console status or preferences).</p>}
       {used.map((f) => (

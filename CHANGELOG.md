@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### tabula
+- The Browser page is a tree of the OSC paths (`ch` → `01` → `eq` → `1`)
+  instead of one long list per section, with the strip names, the current
+  values on every row and subtree counts; a filter opens the tree down to
+  its matches.
 - Access for the band: the engineer makes access links (with QR codes) on a
   new Access page. A musician's link opens their in-ear mix only, on a page
   made for phones: their bus volume and mute, a send slider per source,

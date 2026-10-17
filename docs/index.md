@@ -103,8 +103,9 @@ tabula -console 192.168.1.62 -http :8033
 - **Scenes**: the scenes, snippets and presets the console holds; recall
   (after a confirmation), save, rename, copy and delete them, load channel
   presets onto a strip and effect presets into a slot.
-- **Browser**: every parameter of the console, searchable by path or value,
-  each with an editor; values can also be typed as on the console (`-6`,
+- **Browser**: every parameter of the console as a tree of its paths
+  (`ch` → `01` → `eq` → `1`), searchable by path or value, each with an
+  editor; values can also be typed as on the console (`-6`,
   `1k20`, `GATE`).
 - **Record**: record a show (snapshot plus every change, with markers) and
   replay it onto the console or the emulator. With the console's USB card,

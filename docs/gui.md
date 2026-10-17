@@ -151,10 +151,16 @@ not apply them yet.
 
 ## Browser
 
-Every parameter of the console, grouped by section and searchable by path
-or by value (`/ch/01/eq`, `Remy`, `GATE`). Each node opens into an editor of
-its fields; a value can also be typed as on the console (`-6`, `1k20`,
-`GATE`).
+Every parameter of the console as a tree of its OSC paths: `ch`, then
+`01` (with the channel's name), then `config`, `eq`, `mix`…, then the EQ
+bands or the sends. Each row shows the node's current values as the console
+writes them, and opens into an editor of its fields and the nodes below it;
+a value can also be typed as on the console (`-6`, `1k20`, `GATE`). The
+branches you open are remembered.
+
+The filter searches paths and values (`/ch/01/eq`, `Remy`, `GATE`): the tree
+keeps only the matches and opens down to them, as far as a couple of
+hundred rows; the counts tell where the other matches are.
 
 ## In-ears
 
