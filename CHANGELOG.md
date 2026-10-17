@@ -22,6 +22,17 @@
   `range`, `gain30`) and RTA sources go up to 195 (98 sources, before or
   after the EQ).
 
+### tabula
+- Access for the band: the engineer makes access links (with QR codes) on a
+  new Access page. A musician's link opens their in-ear mix only, on a page
+  made for phones: their bus volume and mute, a send slider per source,
+  pins, stereo pan for linked buses. Viewer links see everything read-only.
+  The machine running tabula stays the engineer; other devices without a
+  link see nothing (`-guest` changes that). The server checks every write,
+  musicians change their mix without arming, and deleting a link ends it
+  at once. See [access](docs/access.md).
+- Changes are recorded with who made them through a link (`web Remy`).
+
 ### Downloads
 - A `latest` release is rebuilt from `main` after every change that passes
   CI, with archive names that never change

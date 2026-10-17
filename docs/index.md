@@ -96,13 +96,16 @@ tabula -console 192.168.1.62 -http :8033
   `1k20`, `GATE`).
 - **Record**: record a show (snapshot plus every change, with markers) and
   replay it onto the console or the emulator.
+- **In-ear mixes for the band**: each musician scans a QR code and gets
+  their own mix on their phone, and nothing else; viewers watch without
+  touching. See [access](access.md).
 - **Connect**: find consoles on the network or type an address.
 
 It is **read-only** until writes are armed, after a confirmation: on a real
 console, nothing moves by accident. `-record` starts recording as soon as
 the console is synced, for unattended recording of a concert.
 
-Later: live viewers and band-specific screens (in-ear mixes from a phone…).
+Later: more band-specific screens.
 
 ## Reference
 

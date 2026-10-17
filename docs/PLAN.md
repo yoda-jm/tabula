@@ -63,10 +63,10 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] GUI for recording, markers, session browsing and replay.
 - Later: USB audio capture in the same process for exact sync (RF64 or one file per track: a 32-track set exceeds the 4 GB WAV limit).
 
-### 5. Live viewers, roles, band screens
-- One console connection shared by any number of browsers.
-- Roles: engineer (read/write), musician (own IEM bus only, phone-friendly "my mix"), viewer (read-only).
-- Board-mix audio streaming (WebRTC), per-singer IEM pages, setlist, PA calibration.
+### 5. Live viewers, roles, band screens *(in progress)*
+- [x] One console connection shared by any number of browsers.
+- [x] Roles checked by the server: engineer (this machine, or an engineer link), musician (own in-ear bus only, phone page "In-ears", works without arming when allowed), viewer (read-only); access links with QR codes on the Access page, kept in `access.json`, revocable at once (`docs/access.md`).
+- [ ] Board-mix audio streaming (WebRTC), setlist, PA calibration.
 
 ## Protocol notes
 
