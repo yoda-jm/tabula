@@ -32,6 +32,13 @@ func TestAudioFlags(t *testing.T) {
 	if c := parseAudio(t, "-audio=false", "-audio-device", "x").config(saved); c.Enabled {
 		t.Errorf("-audio=false: %+v", c)
 	}
+	off := audio.DefaultConfig()
+	if c := parseAudio(t, "-audio-tracks", "1-16").config(off); !c.Enabled {
+		t.Errorf("-audio-tracks: not enabled")
+	}
+	if c := parseAudio(t, "-audio").config(off); !c.Enabled || c.Device != "" {
+		t.Errorf("-audio: %+v", c)
+	}
 	c = parseAudio(t, "-audio-cmd", "rec -c {channels}", "-audio-input", "f32le").config(saved)
 	if c.Recorder != "custom" || c.Command != "rec -c {channels}" || c.Input != "f32le" || c.Device != "saved" {
 		t.Errorf("custom: %+v", c)

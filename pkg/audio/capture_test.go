@@ -15,7 +15,9 @@ import (
 )
 
 // The test binary doubles as a fake recorder (TABULA_FAKE_RECORDER set):
-// "fake CHANNELS RATE [overrun|fail]" writes raw s32le at real-time pace.
+// "fake CHANNELS RATE MODE" writes raw s32le at real-time pace (MODE: ok,
+// overrun: reports an overrun; fail: cannot open the device; silent: sends
+// nothing).
 func TestMain(m *testing.M) {
 	if os.Getenv("TABULA_FAKE_RECORDER") != "" {
 		fakeRecorder(os.Args[len(os.Args)-3:])
@@ -28,9 +30,13 @@ func fakeRecorder(args []string) {
 	channels, _ := strconv.Atoi(args[0])
 	rate, _ := strconv.Atoi(args[1])
 	mode := args[2]
-	if mode == "fail" {
+	switch mode {
+	case "fail":
 		fmt.Fprintln(os.Stderr, "arecord: main:850: audio open error: Device or resource busy")
 		os.Exit(1)
+	case "silent":
+		fmt.Fprintln(os.Stderr, "waiting for the device")
+		time.Sleep(time.Minute)
 	}
 	fmt.Fprintf(os.Stderr, "Recording raw data 'stdin' : Signed 32 bit Little Endian, Rate %d Hz, Channels %d\n", rate, channels)
 	period := rate / 100
@@ -319,6 +325,19 @@ func TestCaptureCommand(t *testing.T) {
 	checkTrack(t, filepath.Join(dir, "Track 02.wav"), 2, st.Frames)
 	if !strings.Contains(st.Command, " fake 8 48000 overrun") {
 		t.Errorf("command %q", st.Command)
+	}
+}
+
+// Stopped before any sample: said so, with what the recorder said.
+func TestCaptureNothing(t *testing.T) {
+	c, err := Start(fakeCommand(t, "silent"), "", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(300 * time.Millisecond)
+	st := c.Stop()
+	if st.State != Stopped || len(st.Warnings) != 1 || !strings.Contains(st.Warnings[0], "no audio received; the recorder said: waiting for the device") {
+		t.Errorf("%+v", st)
 	}
 }
 

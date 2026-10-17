@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/yoda-jm/tabula/pkg/audio"
@@ -13,7 +14,8 @@ import (
 
 // audioFlags record the console's USB audio with every session. The
 // settings made in the GUI are kept in <sessions>/audio.json; the flags
-// given on the command line override them.
+// given on the command line override them, and turn audio on (unless
+// -audio=false).
 type audioFlags struct {
 	fs       *flag.FlagSet
 	on       *bool
@@ -32,8 +34,8 @@ type audioFlags struct {
 func addAudioFlags(fs *flag.FlagSet) *audioFlags {
 	return &audioFlags{
 		fs:       fs,
-		on:       fs.Bool("audio", false, "record the audio tracks with every session (-audio=false: not this time)"),
-		device:   fs.String("audio-device", "", "audio device: ALSA device for arecord (hw:CARD=X32,DEV=0), source for parecord, device for ffmpeg; implies -audio"),
+		on:       fs.Bool("audio", false, "record the audio tracks with every session; any -audio-… flag implies it (-audio=false: not this time)"),
+		device:   fs.String("audio-device", "", "audio device: ALSA device for arecord (hw:CARD=X32,DEV=0), source for parecord, device for ffmpeg"),
 		channels: fs.Int("audio-channels", 32, "channels the audio device delivers"),
 		tracks:   fs.String("audio-tracks", "", `channels to record, e.g. "1-16" or "1-8,12" (default all)`),
 		bits:     fs.Int("audio-bits", 24, "bits per sample of the WAV files: 16, 24 or 32"),
@@ -50,9 +52,12 @@ func addAudioFlags(fs *flag.FlagSet) *audioFlags {
 func (f *audioFlags) config(base audio.Config) audio.Config {
 	c := base
 	f.fs.Visit(func(fl *flag.Flag) {
+		if strings.HasPrefix(fl.Name, "audio-") && fl.Name != "audio-list" {
+			c.Enabled = true
+		}
 		switch fl.Name {
 		case "audio-device":
-			c.Device, c.Enabled = *f.device, true
+			c.Device = *f.device
 		case "audio-channels":
 			c.Channels = *f.channels
 		case "audio-tracks":

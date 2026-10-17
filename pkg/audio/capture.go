@@ -699,6 +699,13 @@ func (c *Capture) Status() Status {
 		}
 		s.Warnings = append(s.Warnings, w+"; from then on the tracks lag behind the session")
 	}
+	if c.finished && c.err == nil && c.frames == 0 {
+		w := "no audio received"
+		if len(c.stderr) > 0 {
+			w += "; the recorder said: " + strings.Join(c.stderr, " / ")
+		}
+		s.Warnings = append(s.Warnings, w)
+	}
 	if !c.finished && c.err == nil {
 		switch {
 		case c.state == Starting && time.Since(c.started) > 10*time.Second:
