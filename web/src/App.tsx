@@ -1,41 +1,61 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { ArmControl, ConnectionPill, RecIndicator, Toasts } from "./components/shell";
+import { atLeast } from "./lib/access";
+import type { Role } from "./lib/api";
 import type { Page } from "./lib/route";
 import { go, useHashRoute, usePersistent } from "./lib/route";
 import { stripByPath } from "./lib/strips";
 import { prettyText } from "./lib/values";
+import { AccessPage } from "./pages/AccessPage";
 import { BrowserPage } from "./pages/BrowserPage";
 import { ChannelPage } from "./pages/ChannelPage";
 import { ConnectPage } from "./pages/ConnectPage";
+import { MixPage, MusicianApp, NoAccess } from "./pages/MixPage";
 import { MixerPage } from "./pages/MixerPage";
 import { RecordPage } from "./pages/RecordPage";
-import { useSchema, useStatus, useValue } from "./store/hooks";
+import { useAccess, useSchema, useStatus, useValue } from "./store/hooks";
 
-const NAV: { page: Page; label: string }[] = [
-  { page: "mixer", label: "Mixer" },
-  { page: "channel", label: "Channel" },
-  { page: "browser", label: "Browser" },
-  { page: "record", label: "Record" },
-  { page: "connect", label: "Connect" },
+/** The pages, with the least role that sees them. */
+const NAV: { page: Page; label: string; role: Role }[] = [
+  { page: "mixer", label: "Mixer", role: "viewer" },
+  { page: "channel", label: "Channel", role: "viewer" },
+  { page: "browser", label: "Browser", role: "viewer" },
+  { page: "mix", label: "In-ears", role: "engineer" },
+  { page: "record", label: "Record", role: "engineer" },
+  { page: "access", label: "Access", role: "engineer" },
+  { page: "connect", label: "Connect", role: "engineer" },
 ];
 
 export function App() {
+  const who = useAccess();
+  if (!who) return <p className="banner">Reaching tabula…</p>;
+  if (who.role === "none") return <NoAccess />;
+  if (who.role === "musician") return <MusicianApp />;
+  return <ConsoleApp role={who.role} />;
+}
+
+function ConsoleApp({ role }: { role: Role }) {
   const route = useHashRoute();
   const status = useStatus();
   const schema = useSchema();
   const [selected, setSelected] = usePersistent("tabula.strip", "/ch/01");
+  const engineer = role === "engineer";
+  const nav = useMemo(() => NAV.filter((n) => atLeast(role, n.role)), [role]);
 
-  // no route yet: the mixer when connected, else the connection page
+  // no route yet (or a page this role does not see): the mixer when
+  // connected, else the connection page
   useEffect(() => {
-    if (!route) go({ page: status.connected || status.connecting ? "mixer" : "connect" });
-  }, [route, status.connected, status.connecting]);
+    if (!route || !nav.some((n) => n.page === route.page)) {
+      go({ page: !engineer || status.connected || status.connecting ? "mixer" : "connect" });
+    }
+  }, [route, nav, engineer, status.connected, status.connecting]);
 
   // the Channel page's route carries the strip; keep the selection in sync
   useEffect(() => {
     if (route?.page === "channel" && route.strip && stripByPath(route.strip) && route.strip !== selected) setSelected(route.strip);
   }, [route, selected, setSelected]);
 
-  const page = route?.page ?? "connect";
+  const page = route?.page ?? (engineer ? "connect" : "mixer");
   const select = (path: string) => {
     setSelected(path);
     if (page === "channel") go({ page: "channel", strip: path });
@@ -49,13 +69,13 @@ export function App() {
           <a className="brand" href="#/mixer" aria-label="tabula: mixer">
             tabula
           </a>
-          <ConnectionPill onClick={() => go({ page: "connect" })} />
+          <ConnectionPill onClick={() => engineer && go({ page: "connect" })} />
           <span className="topbar-gap" />
-          <RecIndicator onClick={() => go({ page: "record" })} />
-          <ArmControl />
+          <RecIndicator onClick={() => engineer && go({ page: "record" })} />
+          {engineer ? <ArmControl /> : <span className="pill readonly">read-only</span>}
         </header>
         <nav className="nav" aria-label="Pages">
-          {NAV.map((n) => (
+          {nav.map((n) => (
             <a
               key={n.page}
               href={n.page === "channel" ? `#/channel${strip.path}` : `#/${n.page}`}
@@ -77,10 +97,16 @@ export function App() {
           <ChannelPage path={route?.strip ?? strip.path} onSelect={select} />
         ) : page === "browser" ? (
           <BrowserPage />
-        ) : page === "record" ? (
+        ) : page === "record" && engineer ? (
           <RecordPage />
-        ) : (
+        ) : page === "mix" && engineer ? (
+          <MixPage bus={route?.bus} />
+        ) : page === "access" && engineer ? (
+          <AccessPage />
+        ) : engineer ? (
           <ConnectPage />
+        ) : (
+          <MixerPage selected={strip.path} onSelect={select} />
         )}
       </main>
       <Toasts />

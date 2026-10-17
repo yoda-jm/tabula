@@ -77,7 +77,42 @@ export interface StateNode {
 }
 
 export interface Change extends ValueView {
-  origin: "console" | "local";
+  /** "console", "local" (this tabula's engineer) or "web <name>" (an access link) */
+  origin: string;
+}
+
+export type Role = "none" | "viewer" | "musician" | "engineer";
+
+/** Who the browser is for tabula (/api/whoami). */
+export interface Whoami {
+  role: Role;
+  name?: string;
+  /** a musician's mix: their bus, and its linked partner for a stereo mix */
+  bus?: number;
+  buses?: number[];
+  local: boolean;
+  /** signed in with an access link */
+  link: boolean;
+  musicians_can_write: boolean;
+}
+
+export interface Grant {
+  id: string;
+  name: string;
+  role: Role;
+  bus?: number;
+  token: string;
+  created: string;
+}
+
+export interface AccessStatus {
+  grants: Grant[];
+  musicians_can_write: boolean;
+  guest: Role;
+  /** where other devices reach this tabula */
+  urls: string[];
+  /** false when tabula listens on this machine only */
+  reachable: boolean;
 }
 
 export interface Discovered {
@@ -98,7 +133,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function call<T>(method: "GET" | "POST", url: string, body?: unknown): Promise<T> {
+export async function call<T>(method: "GET" | "POST" | "DELETE", url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
@@ -128,4 +163,13 @@ export const api = {
   state: (prefix?: string) =>
     call<StateNode[]>("GET", "/api/state" + (prefix ? "?prefix=" + encodeURIComponent(prefix) : "")),
   set: (body: SetBody) => call<void>("POST", "/api/set", body),
+  whoami: () => call<Whoami>("GET", "/api/whoami"),
+  logout: () => call<Whoami>("POST", "/api/logout", {}),
+};
+
+export const accessApi = {
+  list: () => call<AccessStatus>("GET", "/api/access"),
+  add: (name: string, role: Role, bus?: number) => call<Grant>("POST", "/api/access", { name, role, bus }),
+  remove: (id: string) => call<void>("DELETE", "/api/access/" + encodeURIComponent(id)),
+  settings: (musicians_can_write: boolean) => call<AccessStatus>("POST", "/api/access/settings", { musicians_can_write }),
 };

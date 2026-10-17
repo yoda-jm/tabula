@@ -10,8 +10,9 @@
 // are held back until the console confirms the last value sent, or a hold
 // time passes.
 
+import { mayWrite } from "../lib/access";
 import { ApiError, api as realApi } from "../lib/api";
-import type { Change, RawValue, StateNode, Status } from "../lib/api";
+import type { Change, RawValue, StateNode, Status, Whoami } from "../lib/api";
 import { indexSchema, parentOf, resolveFields } from "../lib/schema";
 import type { Field, Leaf, Schema } from "../lib/schema";
 import { KeyedThrottle } from "../lib/throttle";
@@ -57,6 +58,8 @@ export class Store {
   schema: Schema | null = null;
   schemaError = "";
   status: Status = { connected: false, connecting: false };
+  /** who this browser is for tabula; null until known */
+  access: Whoami | null = null;
   stream: StreamState = "connecting";
   record: RecordStatus | null = null;
   private recordAt = 0;
@@ -157,8 +160,37 @@ export class Store {
     return path + " " + texts.join(" ");
   }
 
-  canWrite(): boolean {
-    return !!(this.status.connected && this.status.console?.armed);
+  /** canWrite tells whether addr can be written now (any engineer write when addr is omitted). */
+  canWrite(addr?: string): boolean {
+    if (!this.status.connected) return false;
+    const armed = !!this.status.console?.armed;
+    if (addr === undefined) return this.access?.role === "engineer" && armed;
+    return mayWrite(this.access, armed, addr);
+  }
+
+  /** whyReadOnly explains a refused write. */
+  private whyReadOnly(): string {
+    if (!this.status.connected) return "Not connected.";
+    if (this.access?.role === "musician") {
+      return this.access.musicians_can_write ? "Your access only changes your own mix." : "The engineer has not let musicians change their mix.";
+    }
+    if (this.access?.role !== "engineer") return "This access is read-only.";
+    return "Writes are not armed.";
+  }
+
+  setAccess(w: Whoami | null) {
+    this.access = w;
+    this.notify(["access"]);
+  }
+
+  /** loadAccess asks the server who this browser is. */
+  async loadAccess(): Promise<Whoami | null> {
+    try {
+      this.setAccess(await this.api.whoami());
+    } catch {
+      // tabula not reachable: keep what we knew
+    }
+    return this.access;
   }
 
   // --- schema and state loading ---
@@ -342,8 +374,8 @@ export class Store {
    * new value at once.
    */
   set(addr: string, value: RawValue) {
-    if (!this.canWrite()) {
-      this.toast(this.status.connected ? "Writes are not armed." : "Not connected.", "warn");
+    if (!this.canWrite(addr)) {
+      this.toast(this.whyReadOnly(), "warn");
       return;
     }
     const leaf = this.leaf(addr);
@@ -369,8 +401,8 @@ export class Store {
 
   /** setText writes node text as typed on the console ("-6", "GATE", "1k20"). */
   async setText(addr: string, text: string): Promise<boolean> {
-    if (!this.canWrite()) {
-      this.toast("Writes are not armed.", "warn");
+    if (!this.canWrite(addr)) {
+      this.toast(this.whyReadOnly(), "warn");
       return false;
     }
     try {

@@ -25,6 +25,14 @@ const SCHEMA: SchemaResponse = {
         { name: "pan", type: 2 },
       ],
     },
+    {
+      path: "/ch/01/mix/03",
+      scene: true,
+      fields: [
+        { name: "on", type: 0 },
+        { name: "level", type: 1 },
+      ],
+    },
     { path: "/fx/1", scene: true, fields: [{ name: "type", type: 4 }] },
     { path: "/fx/1/par", scene: true, variant: "/fx/1/type", fields: [{ name: "01", type: 5 }] },
   ],
@@ -75,10 +83,13 @@ function fakeApi() {
 
 let now = 0;
 
+const ENGINEER = { role: "engineer", local: true, link: false, musicians_can_write: true } as const;
+
 async function ready() {
   const f = fakeApi();
   const s = new Store(f.api, () => now);
   await s.loadSchema();
+  s.setAccess(ENGINEER);
   s.setStatus(CONNECTED);
   await s.reloadState();
   return { s, ...f };
@@ -176,6 +187,21 @@ describe("store", () => {
     s.set("/ch/01/mix/on", 0);
     expect(sets).toHaveLength(0);
     expect(s.getValue("/ch/01/mix/on")?.value).toBe(1);
+  });
+
+  it("lets a musician write their own mix only, armed or not", async () => {
+    const { s, sets } = await ready();
+    s.setAccess({ role: "musician", name: "Remy", bus: 3, buses: [3], local: false, link: true, musicians_can_write: true });
+    s.setStatus({ ...CONNECTED, console: { ...CONNECTED.console!, armed: false } });
+    s.set("/ch/01/mix/03/on", 0);
+    expect(sets).toEqual([{ addr: "/ch/01/mix/03/on", value: 0 }]);
+    s.set("/ch/01/mix/fader", 0.5);
+    expect(sets).toHaveLength(1);
+    expect(s.toasts.at(-1)?.text).toContain("own mix");
+    s.setAccess({ ...s.access!, musicians_can_write: false });
+    s.set("/ch/01/mix/03/on", 1);
+    expect(sets).toHaveLength(1);
+    expect(s.toasts.at(-1)?.text).toContain("has not let musicians");
   });
 
   it("buffers changes that arrive while the state loads", async () => {
