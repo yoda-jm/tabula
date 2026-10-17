@@ -1,0 +1,24 @@
+-prefs "" 10 0 10 10 OFF 48K INT ON ON ON OFF OFF OFF OFF %0000 OFF CUES 24h OFF OFF NORM "M32C-0A-EB-1A" USB
+-prefs/ip OFF
+-prefs/ip/addr 0 0 0 0
+-prefs/ip/mask 0 0 0 0
+-prefs/ip/gateway 0 0 0 0
+-prefs/remote OFF MC MIDI %00000000000000
+-prefs/card USB 32/32 32/32 IN WC 64 1-32 1-32 BOTH 32Ch USB AUTO SD1
+-prefs/rta 70% 18 ON 1 POST BAR %000000 PEAK 1.00 OFF 1 1 OFF 30
+-show/prepos -1
+-libs/ch/001 1 "BBM Bass 2" 0 %0011111100010100 1
+-libs/ch/002 2 "BBM Bass" 0 %0011111100110100 1
+-libs/ch/003 3 "BBM Clean GTR 2" 0 %0011111100111100 1
+-libs/ch/004 4 "BBM Clean GTR" 0 %0011111100111100 1
+-libs/ch/005 5 "BBM Drm Mid Side" 0 %0011111100110100 1
+-libs/fx/001 1 "Sound Stage" 1 %0000000000000101 1
+-libs/fx/002 2 "BBM #1 E7" 1 %0000000000011111 1
+-libs/fx/003 3 "BBM 80s Nvr End" 1 %0000000000000110 1
+-libs/fx/004 4 "BBM Ballad Snare" 1 %0000000000001000 1
+-libs/fx/005 5 "BBM Cutting D6" 1 %0000000000100010 1
+-libs/r/001 1 "Local IO" 2 %0000000000000000 1
+-libs/r/002 2 "AES50 A Inputs" 2 %0000000000000000 1
+-libs/r/003 3 "AES50 B Inputs" 2 %0000000000000000 1
+-libs/r/004 4 "Card Playback" 2 %0000000000000000 1
+-libs/r/005 5 "" 2 %0000000000000000 0
