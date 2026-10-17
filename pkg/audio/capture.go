@@ -328,10 +328,10 @@ func (c *Capture) run() {
 	go c.read(chunks, 64<<10)
 	c.write(chunks)
 	exit := c.wait()
+	c.finishFiles()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.finishFilesLocked()
 	switch {
 	case c.err != nil:
 		c.state = Failed
@@ -597,31 +597,40 @@ func (c *Capture) fail(err error) {
 		return
 	}
 	c.err = err
-	c.finishFilesLocked()
 	c.mu.Unlock()
 	c.log.Error("audio", "err", err)
+	c.finishFiles()
 	c.stopFn()
 }
 
-// finishFilesLocked ends every file at the same sample: the last one all of
-// them hold.
-func (c *Capture) finishFilesLocked() {
-	if c.finished || len(c.files) == 0 {
-		c.finished = true
+// finishFiles ends every file at the same sample: the last one all of them
+// hold. Like every file operation, it runs on the writing goroutine; the
+// status stays readable meanwhile (a sync may take a while).
+func (c *Capture) finishFiles() {
+	c.mu.Lock()
+	done := c.finished
+	c.finished = true
+	c.mu.Unlock()
+	if done || len(c.files) == 0 {
 		return
 	}
-	c.finished = true
 	frames := int64(math.MaxInt64)
 	for _, w := range c.files {
 		w.flush()
 		frames = min(frames, w.frames())
 	}
+	var err error
 	for _, w := range c.files {
-		if err := w.finish(frames); err != nil && c.err == nil {
-			c.err = err
+		if e := w.finish(frames); e != nil && err == nil {
+			err = e
 		}
 	}
+	c.mu.Lock()
 	c.frames = frames
+	if err != nil && c.err == nil {
+		c.err = err
+	}
+	c.mu.Unlock()
 }
 
 func (c *Capture) closeFiles() {
