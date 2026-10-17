@@ -37,6 +37,7 @@ func main() {
 		firmware  = flag.String("firmware", "4.06", "console firmware version to report")
 		sceneFile = flag.String("scene", "", "scene file (.scn) to load at start")
 		save      = flag.String("save", "", "scene file to write the state to on exit")
+		libDir    = flag.String("library", "", "directory keeping the saved scenes, snippets and presets (/save, /copy…)")
 		httpAddr  = flag.String("http", "", "address of the read-only debug page, e.g. :8032 (disabled if empty)")
 		unhandled = flag.String("unhandled-log", "", "append every unhandled request to this JSON lines file")
 		verbose   = flag.Bool("v", false, "log every unhandled request, not only the first of each kind")
@@ -54,13 +55,13 @@ func main() {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 	log.Info("tabula-emu", "version", version)
-	if err := run(log, *listen, *model, *name, *firmware, *sceneFile, *save, *httpAddr, *unhandled); err != nil {
+	if err := run(log, *listen, *model, *name, *firmware, *sceneFile, *save, *libDir, *httpAddr, *unhandled); err != nil {
 		log.Error("tabula-emu", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(log *slog.Logger, listen, model, name, firmware, sceneFile, save, httpAddr, unhandled string) error {
+func run(log *slog.Logger, listen, model, name, firmware, sceneFile, save, libDir, httpAddr, unhandled string) error {
 	model = strings.ToUpper(model)
 	if !contains(models, model) {
 		return fmt.Errorf("unknown model %q (known: %s)", model, strings.Join(models, ", "))
@@ -88,6 +89,13 @@ func run(log *slog.Logger, listen, model, name, firmware, sceneFile, save, httpA
 	}
 
 	srv := emu.New(emu.Config{Model: schema.Model(model), Name: name, Firmware: firmware, UnhandledLog: jsonl, Logger: log}, st)
+	if libDir != "" {
+		n, err := srv.LoadLibrary(libDir)
+		if err != nil {
+			return err
+		}
+		log.Info("library", "dir", libDir, "items", n)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

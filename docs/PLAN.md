@@ -43,7 +43,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] `/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-action`, `/-undo`, `/-usb`, `/-urec`, `/-insert`, `/-ha` (1126 nodes; formats checked against a real M32C's values cached by M32-Edit).
 - [x] `/meters/0…16` with synthetic levels following the mix, `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
 - [ ] Effect parameters (`/fx/N/par/NN`): the framework is there (fields depend on the effect type; switching effect loads its defaults); HALL is modelled, the other effects are kept as text until their tables land.
-- [ ] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/showdump`.
+- [x] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/add` (cues), `/showdump`, with listings in `/-show` and `/-libs`, optionally kept in a directory (`-library`). Scene safes and snippet filters are not applied yet.
 - [ ] Side effects of `/-action/*` and computed status (`/-insert`, `/-ha`, `/-stat/solo`).
 - [ ] Connect X32-Edit and M32-Edit, work through the unhandled-request log.
 

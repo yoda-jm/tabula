@@ -61,6 +61,7 @@ type Server struct {
 	Unhandled *Unhandleds
 	traffic   *traffic
 	subs      subscriptions
+	lib       *library
 }
 
 func New(cfg Config, st *state.Store) *Server {
@@ -84,6 +85,7 @@ func New(cfg Config, st *state.Store) *Server {
 		clients:   map[string]*Client{},
 		Unhandled: newUnhandleds(cfg.Logger, cfg.UnhandledLog),
 		traffic:   newTraffic(cfg.Traffic),
+		lib:       newLibrary(),
 	}
 	// The network name is a preference: /xinfo and /status report it.
 	st.Set("/-prefs/name", osc.String(cfg.Name), "config")
@@ -275,8 +277,11 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			s.subs.remove(c, name)
 		}
 		return
-	case "/showdump", "/load", "/save", "/copy", "/delete", "/rename", "/add":
-		s.Unhandled.Record(m, c.Addr, ReasonUnimplemented, "")
+	case "/showdump":
+		s.showdump(c)
+		return
+	case "/load", "/save", "/copy", "/delete", "/rename", "/add":
+		s.library(m, c)
 		return
 	}
 
