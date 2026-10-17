@@ -268,12 +268,15 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, "expects one string")
 			return
 		}
-		if _, err := s.store.ApplyText(text, origin); err != nil {
+		changes, err := s.store.ApplyText(text, origin)
+		if err != nil {
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
 		} else if path, _ := schema.SplitLine(strings.TrimLeft(text, " /")); strings.HasPrefix(path, "-action/") {
 			if v, l, err := s.store.Get("/" + path); err == nil {
 				s.action(l.Addr, v, origin)
 			}
+		} else {
+			s.link(changes)
 		}
 		s.send(c, m) // the console echoes "/" commands
 		return
@@ -316,11 +319,15 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			v, _, _ := s.store.Get(l.Addr)
 			s.send(c, osc.NewMessage(l.Addr, v))
 		case 1:
-			if _, err := s.store.Set(l.Addr, m.Args[0], origin); err != nil {
+			changed, err := s.store.Set(l.Addr, m.Args[0], origin)
+			v, _, _ := s.store.Get(l.Addr)
+			switch {
+			case err != nil:
 				s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
-			} else if strings.HasPrefix(l.Addr, "/-action/") {
-				v, _, _ := s.store.Get(l.Addr)
+			case strings.HasPrefix(l.Addr, "/-action/"):
 				s.action(l.Addr, v, origin)
+			case changed:
+				s.link([]state.Change{{Leaf: l, Value: v, Origin: origin}})
 			}
 		default:
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, "one value expected")
@@ -336,8 +343,10 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 				return
 			}
 		}
-		if _, err := s.store.SetNode(n, m.Args, origin); err != nil {
+		if changes, err := s.store.SetNode(n, m.Args, origin); err != nil {
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
+		} else {
+			s.link(changes)
 		}
 		return
 	}
