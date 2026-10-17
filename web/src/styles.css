@@ -2209,3 +2209,20 @@ code.wrap {
     padding-left: 0;
   }
 }
+
+/* ---------- sign in ---------- */
+
+.signin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  margin: 12px 0;
+}
+.signin .form-field {
+  flex: 1 1 220px;
+}
+.banner.error {
+  color: var(--danger);
+  border-color: var(--danger);
+}

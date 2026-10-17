@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { ArmControl, ConnectionPill, RecIndicator, Toasts } from "./components/shell";
 import { atLeast } from "./lib/access";
 import type { Role } from "./lib/api";
+import { api } from "./lib/api";
 import type { Page } from "./lib/route";
 import { go, useHashRoute, usePersistent } from "./lib/route";
 import { stripByPath } from "./lib/strips";
@@ -11,8 +12,9 @@ import { BrowserPage } from "./pages/BrowserPage";
 import { ChannelPage } from "./pages/ChannelPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { FxPage } from "./pages/FxPage";
-import { MixPage, MusicianApp, NoAccess } from "./pages/MixPage";
+import { MixPage, MusicianApp } from "./pages/MixPage";
 import { MixerPage } from "./pages/MixerPage";
+import { NoAccess } from "./pages/NoAccess";
 import { RecordPage } from "./pages/RecordPage";
 import { RoutingPage } from "./pages/RoutingPage";
 import { ScenesPage } from "./pages/ScenesPage";
@@ -44,6 +46,7 @@ function ConsoleApp({ role }: { role: Role }) {
   const route = useHashRoute();
   const status = useStatus();
   const schema = useSchema();
+  const who = useAccess();
   const [selected, setSelected] = usePersistent("tabula.strip", "/ch/01");
   const engineer = role === "engineer";
   const nav = useMemo(() => NAV.filter((n) => atLeast(role, n.role)), [role]);
@@ -79,6 +82,7 @@ function ConsoleApp({ role }: { role: Role }) {
           <span className="topbar-gap" />
           <RecIndicator onClick={() => engineer && go({ page: "record" })} />
           {engineer ? <ArmControl /> : <span className="pill readonly">read-only</span>}
+          {who?.session && <SignOut />}
         </header>
         <nav className="nav" aria-label="Pages">
           {nav.map((n) => (
@@ -123,6 +127,19 @@ function ConsoleApp({ role }: { role: Role }) {
       </main>
       <Toasts />
     </div>
+  );
+}
+
+/** SignOut ends this browser's session (signed in with the engineer password). */
+function SignOut() {
+  const out = async () => {
+    await api.logout().catch(() => undefined);
+    window.location.reload();
+  };
+  return (
+    <button type="button" className="btn" onClick={out} title="Sign out of tabula on this device">
+      Sign out
+    </button>
   );
 }
 

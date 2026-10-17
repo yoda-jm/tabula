@@ -29,10 +29,11 @@ import (
 // nothing), musician (also changes their own in-ear mix: the sends to their
 // bus from the channels, aux inputs and FX returns, and that bus's fader and
 // mute) and engineer (everything). Requests from this machine are the
-// engineer's. Other devices get the guest role (none by default) unless they
-// opened an access link, /a/<token>, made by the engineer on the Access page:
-// the link sets a cookie holding the token. Deleting an access ends it at
-// once, open pages included.
+// engineer's, unless an engineer password is set (password.go): then every
+// browser signs in with it. Other devices get the guest role (none by
+// default) unless they opened an access link, /a/<token>, made by the
+// engineer on the Access page: the link sets a cookie holding the token.
+// Deleting an access ends it at once, open pages included.
 
 type Role string
 
@@ -61,6 +62,7 @@ func ParseRole(s string) (Role, error) {
 var routeRoles = map[string]Role{
 	"GET /api/whoami":  RoleNone,
 	"POST /api/logout": RoleNone,
+	"POST /api/login":  RoleNone,
 	"GET /api/status":  RoleViewer,
 	"GET /api/schema":  RoleViewer,
 	"GET /api/state":   RoleViewer,
@@ -76,14 +78,16 @@ type Grant struct {
 	ID      string    `json:"id"`
 	Name    string    `json:"name"`
 	Role    Role      `json:"role"`
-	Bus     int       `json:"bus,omitempty"` // musician: their in-ear mix, bus 1-16
+	Bus     int       `json:"bus,omitempty"`     // musician: their in-ear mix, bus 1-16
+	Session bool      `json:"session,omitempty"` // signed in with the engineer password
 	Token   string    `json:"token"`
 	Created time.Time `json:"created"`
 }
 
 type accessData struct {
-	MusiciansCanWrite bool    `json:"musicians_can_write"`
-	Grants            []Grant `json:"grants"`
+	MusiciansCanWrite bool          `json:"musicians_can_write"`
+	Password          *passwordHash `json:"password,omitempty"`
+	Grants            []Grant       `json:"grants"`
 }
 
 type access struct {
@@ -258,12 +262,12 @@ func (s *Server) callerOf(r *http.Request) caller {
 			return caller{Role: g.Role, Grant: &g, Local: local}
 		}
 	}
-	if local {
-		return caller{Role: RoleEngineer, Local: true}
-	}
 	s.acc.mu.Lock()
 	defer s.acc.mu.Unlock()
-	return caller{Role: s.acc.guest}
+	if local && s.acc.data.Password == nil {
+		return caller{Role: RoleEngineer, Local: true}
+	}
+	return caller{Role: s.acc.guest, Local: local}
 }
 
 func callerFrom(r *http.Request) caller {
@@ -338,13 +342,19 @@ type whoView struct {
 	Bus               int    `json:"bus,omitempty"`
 	Buses             []int  `json:"buses,omitempty"` // the musician's mix: bus and linked partner
 	Local             bool   `json:"local"`
-	Link              bool   `json:"link"` // signed in with an access link
+	Link              bool   `json:"link"`     // signed in with an access link
+	Session           bool   `json:"session"`  // signed in with the engineer password
+	Password          bool   `json:"password"` // an engineer password is set
 	MusiciansCanWrite bool   `json:"musicians_can_write"`
 }
 
 func (s *Server) whoami(r *http.Request) whoView {
 	c := s.callerOf(r)
-	v := whoView{Role: c.Role, Local: c.Local, Link: c.Grant != nil, MusiciansCanWrite: s.acc.snapshot().MusiciansCanWrite}
+	d := s.acc.snapshot()
+	v := whoView{Role: c.Role, Local: c.Local, MusiciansCanWrite: d.MusiciansCanWrite, Password: d.Password != nil}
+	if c.Grant != nil {
+		v.Session, v.Link = c.Grant.Session, !c.Grant.Session
+	}
 	if c.Grant != nil {
 		v.Name, v.Bus = c.Grant.Name, c.Grant.Bus
 		if c.Role == RoleMusician {
@@ -372,8 +382,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 			`<p style="font:16px system-ui;margin:2em">This access link is not valid any more. Ask the engineer for a new one.</p>`)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: accessCookie, Value: g.Token, Path: "/", MaxAge: 365 * 24 * 3600,
-		HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	setAccessCookie(w, g.Token)
 	target := "/#/mixer"
 	if g.Role == RoleMusician {
 		target = "/#/mix"
@@ -381,7 +390,16 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
+// logout forgets the access on this device; a session ends.
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
+	if c := callerFrom(r); c.Grant != nil && c.Grant.Session {
+		if _, err := s.acc.remove(c.Grant.ID); err != nil {
+			httpError(w, http.StatusInternalServerError, err)
+			return
+		}
+		s.log.Info("signed out", "device", c.Grant.Name)
+		s.hub.kick(c.Grant.ID)
+	}
 	http.SetCookie(w, &http.Cookie{Name: accessCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 	r.Header.Del("Cookie")
 	writeJSON(w, http.StatusOK, s.whoami(r))
@@ -389,15 +407,26 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 
 // accessView is what /api/access returns.
 type accessView struct {
-	Grants            []Grant  `json:"grants"`
+	Grants            []Grant  `json:"grants"` // links and sessions (without their token)
 	MusiciansCanWrite bool     `json:"musicians_can_write"`
+	Password          bool     `json:"password"`          // an engineer password is set
+	Current           string   `json:"current,omitempty"` // the caller's access
 	Guest             Role     `json:"guest"`
 	URLs              []string `json:"urls"`      // where other devices reach this tabula
 	Reachable         bool     `json:"reachable"` // false when listening on this machine only
 }
 
-func (s *Server) accessStatus() accessView {
+func (s *Server) accessStatus(r *http.Request) accessView {
 	d := s.acc.snapshot()
+	for i := range d.Grants {
+		if d.Grants[i].Session {
+			d.Grants[i].Token = "" // a session's token is its device's only
+		}
+	}
+	current := ""
+	if c := s.callerOf(r); c.Grant != nil { // not callerFrom: signing in changes it
+		current = c.Grant.ID
+	}
 	s.acc.mu.Lock()
 	guest := s.acc.guest
 	s.acc.mu.Unlock()
@@ -405,7 +434,8 @@ func (s *Server) accessStatus() accessView {
 	listen := s.listenAddr
 	s.mu.Unlock()
 	urls, reachable := baseURLs(listen)
-	return accessView{Grants: d.Grants, MusiciansCanWrite: d.MusiciansCanWrite, Guest: guest, URLs: urls, Reachable: reachable}
+	return accessView{Grants: d.Grants, MusiciansCanWrite: d.MusiciansCanWrite, Password: d.Password != nil, Current: current,
+		Guest: guest, URLs: urls, Reachable: reachable}
 }
 
 // baseURLs lists the URLs other devices can use to reach a server listening
@@ -435,7 +465,7 @@ func baseURLs(addr string) ([]string, bool) {
 }
 
 func (s *Server) getAccess(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.accessStatus())
+	writeJSON(w, http.StatusOK, s.accessStatus(r))
 }
 
 func (s *Server) addAccess(w http.ResponseWriter, r *http.Request) {
@@ -491,7 +521,7 @@ func (s *Server) accessSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.hub.publish("access", map[string]bool{"musicians_can_write": *req.MusiciansCanWrite})
-	writeJSON(w, http.StatusOK, s.accessStatus())
+	writeJSON(w, http.StatusOK, s.accessStatus(r))
 }
 
 // accessRoutes adds the access routes; guard checks the roles.
@@ -499,6 +529,8 @@ func (s *Server) accessRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /a/{token}", s.login)
 	mux.HandleFunc("GET /api/whoami", s.getWhoami)
 	mux.HandleFunc("POST /api/logout", s.logout)
+	mux.HandleFunc("POST /api/login", s.postLogin)
+	mux.HandleFunc("POST /api/access/password", s.setPassword)
 	mux.HandleFunc("GET /api/access", s.getAccess)
 	mux.HandleFunc("POST /api/access", s.addAccess)
 	mux.HandleFunc("DELETE /api/access/{id}", s.deleteAccess)

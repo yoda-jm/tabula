@@ -93,6 +93,10 @@ export interface Whoami {
   local: boolean;
   /** signed in with an access link */
   link: boolean;
+  /** signed in with the engineer password */
+  session?: boolean;
+  /** an engineer password is set: this machine signs in too */
+  password?: boolean;
   musicians_can_write: boolean;
 }
 
@@ -101,13 +105,20 @@ export interface Grant {
   name: string;
   role: Role;
   bus?: number;
+  /** a device signed in with the engineer password (its token is not shown) */
+  session?: boolean;
   token: string;
   created: string;
 }
 
 export interface AccessStatus {
+  /** access links and signed-in devices */
   grants: Grant[];
   musicians_can_write: boolean;
+  /** an engineer password is set */
+  password: boolean;
+  /** the access of this browser, if any */
+  current?: string;
   guest: Role;
   /** where other devices reach this tabula */
   urls: string[];
@@ -165,6 +176,7 @@ export const api = {
   set: (body: SetBody) => call<void>("POST", "/api/set", body),
   whoami: () => call<Whoami>("GET", "/api/whoami"),
   logout: () => call<Whoami>("POST", "/api/logout", {}),
+  login: (password: string) => call<Whoami>("POST", "/api/login", { password }),
 };
 
 export const accessApi = {
@@ -172,4 +184,6 @@ export const accessApi = {
   add: (name: string, role: Role, bus?: number) => call<Grant>("POST", "/api/access", { name, role, bus }),
   remove: (id: string) => call<void>("DELETE", "/api/access/" + encodeURIComponent(id)),
   settings: (musicians_can_write: boolean) => call<AccessStatus>("POST", "/api/access/settings", { musicians_can_write }),
+  /** password sets, changes or (empty) removes the engineer password; current is needed when one is set */
+  password: (current: string, password: string) => call<AccessStatus>("POST", "/api/access/password", { current, password }),
 };

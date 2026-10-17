@@ -269,4 +269,19 @@ func TestCustomRecorderIsLocalOnly(t *testing.T) {
 	if w := remote(h, "POST", "/api/audio/config", `{"enabled":true,"recorder":"arecord","device":"hw:0","tracks":"1-16"}`, g.Token); w.Code != http.StatusOK {
 		t.Errorf("remote engineer, arecord: %d %s", w.Code, w.Body)
 	}
+
+	// With a password, the engineer signs in on this machine to choose one;
+	// a session from another device cannot.
+	mine := cookieOf(from(h, here, "POST", "/api/access/password", `{"password":"correct horse"}`, ""))
+	tab := cookieOf(from(h, phone, "POST", "/api/login", `{"password":"correct horse"}`, ""))
+	third := strings.Replace(custom, "owned", "owned3", 1)
+	if w := from(h, here, "POST", "/api/audio/config", third, ""); w.Code != http.StatusForbidden {
+		t.Errorf("this machine, not signed in: %d %s", w.Code, w.Body)
+	}
+	if w := from(h, phone, "POST", "/api/audio/config", third, tab); w.Code != http.StatusForbidden {
+		t.Errorf("remote session, custom command: %d %s", w.Code, w.Body)
+	}
+	if w := from(h, here, "POST", "/api/audio/config", third, mine); w.Code != http.StatusOK {
+		t.Errorf("signed in on this machine, custom command: %d %s", w.Code, w.Body)
+	}
 }

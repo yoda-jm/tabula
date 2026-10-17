@@ -31,6 +31,7 @@ func main() {
 		record   = flag.Bool("record", false, "start recording as soon as the console is connected and synced (stops on exit)")
 		accessF  = flag.String("access", "access.json", "file keeping the access links made on the Access page")
 		guest    = flag.String("guest", "none", "role of other devices without an access link: none, viewer or engineer")
+		resetPw  = flag.Bool("reset-password", false, "remove the engineer password (and its sessions) from the access file, then exit")
 		showVer  = flag.Bool("version", false, "print the version and exit")
 		audioF   = addAudioFlags(flag.CommandLine) // audio.go
 	)
@@ -47,6 +48,23 @@ func main() {
 	log.Info("tabula", "version", version)
 
 	api := webapi.New(log)
+	if *resetPw {
+		if err := api.SetAccessFile(*accessF); err != nil {
+			log.Error("-access", "err", err)
+			os.Exit(1)
+		}
+		had, err := api.ResetPassword()
+		if err != nil {
+			log.Error("-reset-password", "err", err)
+			os.Exit(1)
+		}
+		if had {
+			fmt.Println("engineer password removed from", *accessF)
+		} else {
+			fmt.Println("no engineer password in", *accessF)
+		}
+		return
+	}
 	guestRole, err := webapi.ParseRole(*guest)
 	if err == nil && guestRole == webapi.RoleMusician {
 		err = errors.New("a musician needs an access link (their mix)")
@@ -59,6 +77,10 @@ func main() {
 	if err := api.SetAccessFile(*accessF); err != nil {
 		log.Error("-access", "err", err)
 		os.Exit(1)
+	}
+	if guestRole == webapi.RoleEngineer && api.HasPassword() {
+		log.Error("-guest engineer makes every device the engineer, but an engineer password is set: choose another guest role, or remove the password with -reset-password")
+		os.Exit(2)
 	}
 	api.SetSessionsDir(*sessions)
 	audioCfg, audioFile, err := audioF.load(*sessions)
