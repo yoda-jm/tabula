@@ -53,9 +53,10 @@ Driven by the unknown-request log while connecting the real editors:
 - Web GUI (embedded in the binary): connection page, generic parameter browser generated from the schema (all menus early), then console-like screens (Home, Gate, Dyn, EQ, Sends, Routing, Outputs, FX, Scenes).
 - WebSocket for state changes, binary frames for meters.
 
-### 4. Recording and replay
-- Session = start snapshot (`.scn`, opens in M32-Edit) + time-stamped log of every change (who/what/when) + markers.
-- Replay to the emulator or a console, with seek; replaying to a real console asks for confirmation.
+### 4. Recording and replay *(in progress)*
+- [x] Session = start snapshot (`.scn`, opens in M32-Edit) + time-stamped log of every change (who/what/when) + markers (`pkg/session`).
+- [x] Replay to the emulator or a console, with seek and speed; refused unless writes are armed. API in `docs/API.md`; `tabula -record` records unattended.
+- [ ] GUI for recording, markers, session browsing and replay.
 - Later: USB audio capture in the same process for exact sync (RF64 or one file per track: a 32-track set exceeds the 4 GB WAV limit).
 
 ### 5. Live viewers, roles, band screens

@@ -437,3 +437,19 @@ func Discover(ctx context.Context, wait time.Duration) ([]Info, error) {
 	}
 	return out, nil
 }
+
+// ApplyText sends node text with the "/" command (a whole or partial node
+// line, or "address value") and applies it to the mirror. Replays use it.
+func (c *Client) ApplyText(line string) error {
+	c.mu.Lock()
+	armed := c.status.Armed
+	c.mu.Unlock()
+	if !armed {
+		return ErrReadOnly
+	}
+	if err := c.send(osc.NewMessage("/", osc.String(line))); err != nil {
+		return err
+	}
+	_, err := c.mirror.ApplyText(line, OriginLocal)
+	return err
+}

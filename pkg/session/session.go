@@ -1,0 +1,318 @@
+// Package session records a show: a snapshot of the console when recording
+// starts, then every change with its time, plus markers. A session is a
+// directory:
+//
+//	meta.json     what was recorded, from which console, when
+//	start.scn     the scene part of the snapshot (opens in M32-Edit)
+//	start.nodes   the other nodes of the snapshot (preferences, status…)
+//	events.jsonl  one JSON object per change or marker, in time order
+//
+// Sessions replay into a state.Store (seek, inspection) or, through a
+// Target, onto a console or the emulator.
+package session
+
+import (
+	"bufio"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/yoda-jm/tabula/pkg/scene"
+	"github.com/yoda-jm/tabula/pkg/state"
+)
+
+// Meta describes a session.
+type Meta struct {
+	Format   int       `json:"format"`
+	Start    time.Time `json:"start"`
+	End      time.Time `json:"end,omitempty"`
+	Console  string    `json:"console,omitempty"` // model and name, e.g. "M32C M32C-0A-EB-1A"
+	Note     string    `json:"note,omitempty"`
+	Events   int       `json:"events"`
+	Markers  int       `json:"markers"`
+	Duration float64   `json:"duration"` // seconds
+}
+
+// Event is a change or a marker, at T seconds after the start.
+type Event struct {
+	T      float64 `json:"t"`
+	Addr   string  `json:"addr,omitempty"`
+	Text   string  `json:"text,omitempty"`  // node text of the value
+	Value  any     `json:"value,omitempty"` // normalized float, int or string
+	Origin string  `json:"origin,omitempty"`
+	Marker string  `json:"marker,omitempty"`
+}
+
+// Recorder writes a session while a store changes.
+type Recorder struct {
+	dir   string
+	store *state.Store
+	start time.Time
+
+	mu     sync.Mutex
+	events *os.File
+	w      *bufio.Writer
+	meta   Meta
+	cancel func()
+	closed bool
+}
+
+// Start snapshots the store into dir (created, must not hold a session)
+// and records its changes until Stop.
+func Start(dir string, st *state.Store, consoleName, note string) (*Recorder, error) {
+	if _, err := os.Stat(filepath.Join(dir, "meta.json")); err == nil {
+		return nil, fmt.Errorf("%s already holds a session", dir)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	r := &Recorder{dir: dir, store: st}
+	f, err := os.Create(filepath.Join(dir, "events.jsonl"))
+	if err != nil {
+		return nil, err
+	}
+	r.events, r.w = f, bufio.NewWriter(f)
+
+	// Subscribe before the snapshot: a change made meanwhile is in both, and
+	// replaying it after the snapshot gives the right state either way.
+	r.start = time.Now()
+	r.meta = Meta{Format: 1, Start: r.start, Console: consoleName, Note: note}
+	r.cancel = st.Subscribe(r.record)
+	if err := r.snapshot(); err != nil {
+		r.Stop()
+		return nil, err
+	}
+	if err := r.writeMeta(); err != nil {
+		r.Stop()
+		return nil, err
+	}
+	return r, nil
+}
+
+func (r *Recorder) snapshot() error {
+	sc, err := os.Create(filepath.Join(r.dir, "start.scn"))
+	if err != nil {
+		return err
+	}
+	header := scene.Header("tabula "+r.start.Format("2006-01-02 15:04"), r.meta.Note)
+	if err := scene.Write(sc, r.store, header); err != nil {
+		sc.Close()
+		return err
+	}
+	if err := sc.Close(); err != nil {
+		return err
+	}
+	var b strings.Builder
+	for _, n := range r.store.Schema().Nodes {
+		if !n.InScene {
+			b.WriteString(r.store.NodeLine(n))
+			b.WriteByte('\n')
+		}
+	}
+	return os.WriteFile(filepath.Join(r.dir, "start.nodes"), []byte(b.String()), 0o644)
+}
+
+func (r *Recorder) record(changes []state.Change) {
+	t := time.Since(r.start).Seconds()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return
+	}
+	for _, c := range changes {
+		e := Event{T: t, Addr: c.Leaf.Addr, Origin: c.Origin}
+		if typ := r.store.TypeOf(c.Leaf); typ != nil {
+			e.Text = typ.Format(c.Value)
+		}
+		switch c.Value.Tag {
+		case 'i':
+			e.Value = c.Value.Int
+		case 'f':
+			e.Value = c.Value.Float
+		case 's':
+			e.Value = c.Value.Str
+		}
+		r.writeEvent(e)
+	}
+	r.w.Flush() // keep the file usable if the program dies mid-show
+}
+
+func (r *Recorder) writeEvent(e Event) {
+	line, _ := json.Marshal(e)
+	r.w.Write(line)
+	r.w.WriteByte('\n')
+	if e.Marker != "" {
+		r.meta.Markers++
+	} else {
+		r.meta.Events++
+	}
+}
+
+// Mark adds a marker (song start, incident…) at the current time.
+func (r *Recorder) Mark(label string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return
+	}
+	r.writeEvent(Event{T: time.Since(r.start).Seconds(), Marker: label})
+	r.w.Flush()
+}
+
+// Elapsed is the time since the recording started.
+func (r *Recorder) Elapsed() time.Duration { return time.Since(r.start) }
+
+// Meta returns the session description so far.
+func (r *Recorder) Meta() Meta {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	m := r.meta
+	m.Duration = time.Since(r.start).Seconds()
+	return m
+}
+
+func (r *Recorder) Dir() string { return r.dir }
+
+// Stop ends the recording.
+func (r *Recorder) Stop() error {
+	if r.cancel != nil {
+		r.cancel()
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return nil
+	}
+	r.closed = true
+	r.meta.End = time.Now()
+	r.meta.Duration = r.meta.End.Sub(r.start).Seconds()
+	err := errors.Join(r.w.Flush(), r.events.Close())
+	return errors.Join(err, r.writeMeta())
+}
+
+func (r *Recorder) writeMeta() error {
+	data, _ := json.MarshalIndent(r.meta, "", "  ")
+	return os.WriteFile(filepath.Join(r.dir, "meta.json"), append(data, '\n'), 0o644)
+}
+
+// Session is a recorded session, loaded in memory.
+type Session struct {
+	Dir    string
+	Meta   Meta
+	Start  []string // snapshot node lines (scene, then other nodes)
+	Events []Event  // in time order
+}
+
+// Open loads a session directory.
+func Open(dir string) (*Session, error) {
+	s := &Session{Dir: dir}
+	data, err := os.ReadFile(filepath.Join(dir, "meta.json"))
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &s.Meta); err != nil {
+		return nil, fmt.Errorf("meta.json: %w", err)
+	}
+	for _, name := range []string{"start.scn", "start.nodes"} {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, "/") {
+				s.Start = append(s.Start, line)
+			}
+		}
+	}
+	f, err := os.Open(filepath.Join(dir, "events.jsonl"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 1<<16), 1<<20)
+	for n := 1; sc.Scan(); n++ {
+		var e Event
+		if err := json.Unmarshal(sc.Bytes(), &e); err != nil {
+			// A recording cut short may end with a partial line.
+			if n > 1 {
+				break
+			}
+			return nil, fmt.Errorf("events.jsonl line %d: %w", n, err)
+		}
+		s.Events = append(s.Events, e)
+	}
+	sort.SliceStable(s.Events, func(i, j int) bool { return s.Events[i].T < s.Events[j].T })
+	if s.Meta.Duration == 0 && len(s.Events) > 0 {
+		s.Meta.Duration = s.Events[len(s.Events)-1].T
+	}
+	return s, nil
+}
+
+// Markers returns the session's markers.
+func (s *Session) Markers() []Event {
+	var out []Event
+	for _, e := range s.Events {
+		if e.Marker != "" {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// StateAt fills st with the console state t seconds into the session: the
+// snapshot, then every change up to t.
+func (s *Session) StateAt(st *state.Store, t float64) []error {
+	lines := append([]string(nil), s.Start...)
+	for _, e := range s.Events {
+		if e.T > t {
+			break
+		}
+		if e.Addr != "" {
+			lines = append(lines, e.Addr+" "+e.Text)
+		}
+	}
+	return st.ApplyLines(lines, "replay")
+}
+
+// List returns the sessions found in the subdirectories of root, newest first.
+func List(root string) ([]Meta, []string, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+	type item struct {
+		m   Meta
+		dir string
+	}
+	var items []item
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		dir := filepath.Join(root, e.Name())
+		data, err := os.ReadFile(filepath.Join(dir, "meta.json"))
+		if err != nil {
+			continue
+		}
+		var m Meta
+		if json.Unmarshal(data, &m) == nil {
+			items = append(items, item{m, dir})
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].m.Start.After(items[j].m.Start) })
+	metas, dirs := make([]Meta, len(items)), make([]string, len(items))
+	for i, it := range items {
+		metas[i], dirs[i] = it.m, it.dir
+	}
+	return metas, dirs, nil
+}

@@ -82,3 +82,32 @@ back on the event stream.
   (made on the console or by another remote app) or `local` (made through
   this server);
 - `resync`: the initial sync finished — reload `/api/state`.
+
+## Recording and replay
+
+Sessions are directories under `-sessions` (default `./sessions`), named by
+their start time (`2026-10-17_203000`): `meta.json`, `start.scn` (the
+snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
+(one change or marker per line: `{"t": seconds, "addr", "text", "value",
+"origin"}` or `{"t", "marker"}`).
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/api/record` | | `Record` |
+| POST | `/api/record/start` | `{"note": "set 1"}` | `Record` (409 if not connected or already recording) |
+| POST | `/api/record/mark` | `{"label": "Song 2"}` (default: elapsed time) | `Record` |
+| POST | `/api/record/stop` | | `Record` |
+| GET | `/api/sessions` | | `[{"name", "meta"}]`, newest first |
+| GET | `/api/sessions/{name}` | | `{"name", "meta", "markers": [Event]}` |
+| POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console) |
+| POST | `/api/replay/stop` | | `Record` |
+
+`Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", …}, "replaying", "replay_of"?, "replay_at"?, "error"?}`.
+A replay first sends the state at `from` (snapshot plus the changes up to
+then), then each later change at its time divided by `speed`.
+
+Events: `record` carries a `Record` (every second while recording, and on
+every replay progress).
+
+`tabula -record -console <ip>` starts recording as soon as the console is
+synced and stops on exit — for unattended recording of a concert.

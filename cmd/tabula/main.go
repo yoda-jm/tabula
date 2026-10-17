@@ -27,6 +27,8 @@ func main() {
 		httpAddr = flag.String("http", "localhost:8080", "address to serve the GUI on (use :8080 to reach it from other devices)")
 		consoleA = flag.String("console", "", "console (or tabula-emu) to connect to at start, e.g. 192.168.1.62")
 		webDir   = flag.String("web-dir", "", "serve the GUI from this directory instead of the embedded build")
+		sessions = flag.String("sessions", "sessions", "directory where recorded sessions are kept")
+		record   = flag.Bool("record", false, "start recording as soon as the console is connected and synced (stops on exit)")
 		showVer  = flag.Bool("version", false, "print the version and exit")
 	)
 	flag.Parse()
@@ -38,6 +40,9 @@ func main() {
 	log.Info("tabula", "version", version)
 
 	api := webapi.New(log)
+	api.SetSessionsDir(*sessions)
+	api.RecordOnSync(*record)
+	defer api.StopRecording()
 	if *consoleA != "" {
 		api.Connect(*consoleA)
 	}
