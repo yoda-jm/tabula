@@ -44,7 +44,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] `/meters/0…16` with synthetic levels following the mix, `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
 - [ ] Effect parameters (`/fx/N/par/NN`): the framework is there (fields depend on the effect type; switching effect loads its defaults); HALL is modelled, the other effects are kept as text until their tables land.
 - [x] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/add` (cues), `/showdump`, with listings in `/-show` and `/-libs`, optionally kept in a directory (`-library`). Scene safes and snippet filters are not applied yet.
-- [ ] Side effects of `/-action/*` and computed status (`/-insert`, `/-ha`, `/-stat/solo`).
+- [x] Side effects of `/-action/*` (go scene/snippet/cue, clear solo, undo checkpoint and undo, init) and computed status (`/-insert`, `/-ha/NN/index` from sources and input routing, `/-stat/solo`).
 - [ ] Connect X32-Edit and M32-Edit, work through the unhandled-request log.
 
 ### 3. Client — connection and GUI v1 *(in progress)*

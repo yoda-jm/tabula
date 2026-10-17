@@ -49,8 +49,7 @@ Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases)
 ### Not yet
 
 Most effect parameters (only HALL is modelled; other effects are kept as
-text), scene safes and snippet filters, and the side effects of actions:
-see the [plan](PLAN.md).
+text), scene safes and snippet filters: see the [plan](PLAN.md).
 
 ## tabula — the client *(coming)*
 
