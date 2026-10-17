@@ -8,6 +8,7 @@ import type { Record as RecordStatus, SessionDetail, SessionSummary } from "../l
 import { formatDuration, parseTime, sessionApi } from "../lib/session";
 import { useCanWrite, useRecord, useStatus } from "../store/hooks";
 import { store } from "../store/store";
+import { AudioPanel, SessionAudio } from "./AudioPanel";
 
 const SPEEDS = [0.5, 1, 2, 4, 8];
 
@@ -42,6 +43,7 @@ export function RecordPage() {
   return (
     <div className="page record">
       <Recorder rec={rec} />
+      <AudioPanel rec={rec} />
       <section className="card">
         <div className="section-head">
           <h2>Sessions</h2>
@@ -230,7 +232,7 @@ function Session({ name, rec }: { name: string; rec: RecordStatus | null }) {
 
   useEffect(() => {
     sessionApi.session(name).then(setDetail, (e: Error) => setError(e.message));
-  }, [name, recordingThis ? markers : 0]);
+  }, [name, recordingThis, recordingThis ? markers : 0]);
 
   const replayingThis = !!rec?.replaying && rec.replay_of === name;
   const replayingOther = !!rec?.replaying && rec.replay_of !== name;
@@ -300,6 +302,8 @@ function Session({ name, rec }: { name: string; rec: RecordStatus | null }) {
           </ul>
         </>
       )}
+
+      {detail && <SessionAudio detail={detail} />}
 
       <h4>Replay</h4>
       {!can && (

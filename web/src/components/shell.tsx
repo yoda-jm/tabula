@@ -144,10 +144,13 @@ export function RecIndicator({ onClick }: { onClick(): void }) {
   if (!r) return null;
   if (r.recording) {
     const elapsed = store.recordElapsed();
+    const a = r.audio;
+    const trouble = a && (a.state === "failed" || a.warnings?.length) ? a.error || a.warnings?.[0] : "";
     return (
-      <button type="button" className="rec" onClick={onClick} title="Recording">
+      <button type="button" className="rec" onClick={onClick} title={trouble ? `Recording. Audio: ${trouble}` : "Recording"}>
         <span className="rec-dot" aria-hidden />
         REC <span className="rec-time">{formatDuration(elapsed)}</span>
+        {trouble && <span aria-label={`audio: ${trouble}`}> ⚠</span>}
       </button>
     );
   }

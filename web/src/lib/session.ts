@@ -1,6 +1,7 @@
 // Recording and replay (docs/API.md, "Recording and replay").
 
 import { call } from "./api";
+import type { AudioInfo, AudioStatus } from "./audio";
 
 export interface SessionMeta {
   format?: number;
@@ -11,6 +12,8 @@ export interface SessionMeta {
   events: number;
   markers: number;
   duration: number; // seconds
+  /** the audio tracks recorded with the session */
+  audio?: AudioInfo;
 }
 
 export interface Record {
@@ -21,6 +24,8 @@ export interface Record {
   replay_of?: string;
   replay_at?: number;
   error?: string;
+  /** the audio capture of the recording (or of the last one) */
+  audio?: AudioStatus;
 }
 
 export interface SessionEvent {

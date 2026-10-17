@@ -1,0 +1,444 @@
+// Audio tracks recorded with the sessions: the settings (device, channels,
+// tracks, format), a test of the input, the live state of the capture
+// while recording, and the exports of a session for audio editors.
+
+import { useCallback, useEffect, useState } from "react";
+import type { AudioConfig, AudioDevice, AudioStatus, AudioTrack, AudioView, ExportFormat, Recorder } from "../lib/audio";
+import { LOW_DISK_SECONDS, audioApi, byteRate, exportUrl, formatBytes, formatHours, parseTracks, trackLabel } from "../lib/audio";
+import { meterFraction, toDbfs } from "../lib/meters";
+import type { Record as RecordStatus, SessionDetail } from "../lib/session";
+import { formatDuration } from "../lib/session";
+
+const RECORDERS: { id: Recorder; label: string }[] = [
+  { id: "arecord", label: "arecord (ALSA)" },
+  { id: "parecord", label: "parecord (PulseAudio, PipeWire)" },
+  { id: "ffmpeg", label: "ffmpeg" },
+  { id: "custom", label: "Custom command" },
+];
+const BITS = [16, 24, 32];
+const RATES = [44100, 48000, 96000];
+const INPUTS = ["s32le", "s24-32le", "s24le", "s16le", "f32le"];
+
+/** AudioPanel is the Record page's audio card. */
+export function AudioPanel({ rec }: { rec: RecordStatus | null }) {
+  const [view, setView] = useState<AudioView | null>(null);
+  const [error, setError] = useState("");
+  const recording = !!rec?.recording;
+
+  const load = useCallback(async () => {
+    try {
+      setView(await audioApi.get());
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, []);
+  // reload when a recording starts or stops (free space, last capture)
+  useEffect(() => {
+    void load();
+  }, [load, recording]);
+
+  if (!view) {
+    return error ? (
+      <section className="card">
+        <h2>Audio tracks</h2>
+        <p className="error">{error}</p>
+      </section>
+    ) : null;
+  }
+  const live = recording ? rec?.audio : undefined;
+  return (
+    <section className="card audio">
+      <div className="section-head">
+        <h2>Audio tracks</h2>
+        {!recording && <span className="muted">{view.config.enabled ? "recorded with every session" : "not recorded"}</span>}
+      </div>
+      {recording ? (
+        live ? (
+          <AudioLive st={live} />
+        ) : (
+          <p className="muted">This recording has no audio (enable it below, for the next one).</p>
+        )
+      ) : (
+        <>
+          {rec?.audio && <LastCapture st={rec.audio} />}
+          <AudioSettings key={JSON.stringify(view.config)} view={view} onSaved={setView} />
+        </>
+      )}
+    </section>
+  );
+}
+
+/** AudioLive is the capture while recording: state, sizes, disk, levels. */
+function AudioLive({ st }: { st: AudioStatus }) {
+  const low = st.remaining >= 0 && st.remaining < LOW_DISK_SECONDS;
+  return (
+    <>
+      <div className="rec-stats audio-stats">
+        <AudioState st={st} />
+        <span className="mono">{formatDuration(st.seconds)}</span>
+        <span>{st.tracks?.length ?? 0} tracks</span>
+        <span>{formatBytes(st.bytes)}</span>
+        <span>{formatBytes(st.byte_rate)}/s</span>
+        <span className={low ? "danger-text" : ""}>
+          {formatBytes(st.free)} free · {formatHours(st.remaining)} left
+        </span>
+      </div>
+      {st.error && (
+        <p className="error" role="alert">
+          {st.error}
+        </p>
+      )}
+      {st.warnings?.map((w) => (
+        <p key={w} className="warn-box" role="status">
+          {w}
+        </p>
+      ))}
+      {st.state !== "starting" && (
+        <p className="muted">
+          First sample {st.offset >= 0 ? "+" : ""}
+          {st.offset.toFixed(3)} s after the start of the session{st.format ? ` · ${st.format}` : ""}
+        </p>
+      )}
+      <TrackLevels tracks={st.tracks ?? []} peaks={st.peaks} />
+    </>
+  );
+}
+
+function AudioState({ st }: { st: AudioStatus }) {
+  switch (st.state) {
+    case "recording":
+      return (
+        <span className="danger-text">
+          <strong>● AUDIO</strong>
+        </span>
+      );
+    case "starting":
+      return <span className="note">starting…</span>;
+    case "failed":
+      return (
+        <span className="danger-text">
+          <strong>⚠ audio stopped</strong>
+        </span>
+      );
+  }
+  return <span className="muted">stopped</span>;
+}
+
+/** TrackLevels shows the peak of each track over the last second. */
+function TrackLevels({ tracks, peaks }: { tracks: AudioTrack[]; peaks?: number[] }) {
+  if (!tracks.length) return null;
+  return (
+    <div className="track-levels">
+      {tracks.map((t, i) => {
+        const db = peaks?.[i] === undefined ? -Infinity : toDbfs(peaks[i]);
+        return (
+          <div key={t.channel} className="track-level">
+            <span className="track-name" title={t.file}>
+              {trackLabel(t)}
+            </span>
+            <span className="track-bar" aria-hidden>
+              <span className={"track-fill" + (db >= -0.5 ? " clip" : "")} style={{ width: `${meterFraction(db) * 100}%` }} />
+            </span>
+            <span className="track-db mono">{Number.isFinite(db) ? db.toFixed(0) : "−∞"}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** LastCapture is how the audio of the last recording ended. */
+function LastCapture({ st }: { st: AudioStatus }) {
+  if (st.state !== "failed") return null;
+  return (
+    <p className="error" role="alert">
+      Last recording: {st.error || "the audio stopped"}
+      {st.seconds > 0 && ` (after ${formatDuration(st.seconds)} of audio)`}
+    </p>
+  );
+}
+
+function AudioSettings({ view, onSaved }: { view: AudioView; onSaved(v: AudioView): void }) {
+  const [cfg, setCfg] = useState<AudioConfig>(view.config);
+  const [devices, setDevices] = useState<AudioDevice[] | null>(null);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [test, setTest] = useState<AudioStatus | null>(null);
+  const set = (patch: Partial<AudioConfig>) => setCfg((c) => ({ ...c, ...patch }));
+  const dirty = JSON.stringify(cfg) !== JSON.stringify(view.config);
+
+  const tracks = parseTracks(cfg.tracks ?? "", cfg.channels);
+  const rate = byteRate(cfg);
+  const reserve = Math.max(256 * 2 ** 20, 60 * rate);
+  const fits = view.free >= 0 && rate > 0 ? Math.max(0, (view.free - reserve) / rate) : -1;
+
+  const run = async (what: string, f: () => Promise<void>) => {
+    setBusy(what);
+    setError("");
+    try {
+      await f();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  };
+  const save = () =>
+    run("save", async () => {
+      const v = await audioApi.save(cfg);
+      setCfg(v.config);
+      onSaved(v);
+    });
+  const find = () => run("find", async () => setDevices(await audioApi.devices()));
+  const probe = () =>
+    run("test", async () => {
+      setTest(null);
+      setTest(await audioApi.test(cfg));
+    });
+  const pick = (id: string) => {
+    const d = devices?.find((x) => `${x.recorder} ${x.id}` === id);
+    if (d) set({ recorder: d.recorder, device: d.id, ...(d.channels ? { channels: d.channels } : {}) });
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <label className="check">
+        <input type="checkbox" checked={cfg.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
+        Record the audio tracks with every recording
+      </label>
+      <div className="row">
+        <label>
+          <span className="field-label">Recorder</span>
+          <select className="select" value={cfg.recorder} onChange={(e) => set({ recorder: e.target.value as Recorder })}>
+            {RECORDERS.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grow">
+          <span className="field-label">Device</span>
+          <input
+            className="input mono"
+            type="text"
+            value={cfg.device}
+            placeholder={cfg.recorder === "arecord" ? "hw:CARD=X32,DEV=0" : "default"}
+            onChange={(e) => set({ device: e.target.value })}
+          />
+        </label>
+        <button type="button" className="btn" disabled={!!busy} onClick={() => void find()}>
+          {busy === "find" ? "Looking…" : "Find devices"}
+        </button>
+      </div>
+      {devices && (
+        <div className="row">
+          {devices.length ? (
+            <label className="grow">
+              <span className="field-label">Devices found</span>
+              <select className="select" value="" onChange={(e) => pick(e.target.value)}>
+                <option value="">Choose…</option>
+                {devices.map((d) => (
+                  <option key={`${d.recorder} ${d.id}`} value={`${d.recorder} ${d.id}`}>
+                    {d.console ? "★ " : ""}
+                    {d.name} — {d.id} ({d.recorder}
+                    {d.channels ? `, ${d.channels} channels` : ""}
+                    {d.format ? `, ${d.format}` : ""})
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p className="muted">No capture device found: type its name.</p>
+          )}
+        </div>
+      )}
+      <div className="row">
+        <label>
+          <span className="field-label">Channels of the device</span>
+          <input
+            className="input num"
+            type="number"
+            min={1}
+            max={128}
+            value={cfg.channels}
+            onChange={(e) => set({ channels: Number(e.target.value) || 0 })}
+          />
+        </label>
+        <label>
+          <span className="field-label">Tracks to record</span>
+          <input
+            className="input"
+            type="text"
+            value={cfg.tracks ?? ""}
+            placeholder={`all (1-${cfg.channels})`}
+            aria-invalid={typeof tracks === "string"}
+            onChange={(e) => set({ tracks: e.target.value })}
+          />
+        </label>
+        <label>
+          <span className="field-label">Bits</span>
+          <select className="select" value={cfg.bits} onChange={(e) => set({ bits: Number(e.target.value) })}>
+            {BITS.map((b) => (
+              <option key={b} value={b}>
+                {b}-bit
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="field-label">Rate</span>
+          <select className="select" value={cfg.rate} onChange={(e) => set({ rate: Number(e.target.value) })}>
+            {[...new Set([...RATES, cfg.rate])].map((r) => (
+              <option key={r} value={r}>
+                {r / 1000} kHz
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {typeof tracks === "string" ? (
+        <p className="error">Tracks: {tracks}</p>
+      ) : (
+        <p className="muted">
+          {tracks.length} WAV files ({cfg.bits}-bit), {formatBytes(rate)}/s: {formatBytes(rate * 3600)} per hour.{" "}
+          {view.free >= 0 && (
+            <span className={fits >= 0 && fits < 2 * 3600 ? "danger-text" : ""}>
+              {formatBytes(view.free)} free in <code>{view.dir}</code>: about {formatHours(fits)} of audio.
+            </span>
+          )}
+        </p>
+      )}
+      {cfg.recorder === "custom" && (
+        <div className="row">
+          <label className="grow">
+            <span className="field-label">Command ({"{device}"}, {"{channels}"}, {"{rate}"} are replaced)</span>
+            <input
+              className="input mono"
+              type="text"
+              value={cfg.command ?? ""}
+              placeholder={view.templates.arecord}
+              onChange={(e) => set({ command: e.target.value })}
+            />
+          </label>
+          <label>
+            <span className="field-label">Raw samples (unless WAV)</span>
+            <select className="select" value={cfg.input || "s32le"} onChange={(e) => set({ input: e.target.value })}>
+              {INPUTS.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+      <label className="check">
+        <input type="checkbox" checked={!!cfg.plain_names} onChange={(e) => set({ plain_names: e.target.checked })} />
+        Name the files “Track 01”…, not after the console's routing (a device that is not the console's card)
+      </label>
+      {!dirty && view.command && (
+        <p className="muted">
+          Runs <code className="wrap">{view.command}</code>
+        </p>
+      )}
+      <div className="row">
+        <button type="submit" className="btn primary" disabled={!!busy || !dirty || typeof tracks === "string"}>
+          {busy === "save" ? "Saving…" : dirty ? "Save" : "Saved"}
+        </button>
+        <button type="button" className="btn" disabled={!!busy || view.testing || typeof tracks === "string"} onClick={() => void probe()}>
+          {busy === "test" ? "Listening for 3 s…" : "Test the input"}
+        </button>
+      </div>
+      {(error || view.error) && (
+        <p className="error" role="alert">
+          {error || view.error}
+        </p>
+      )}
+      {test && <TestResult st={test} />}
+    </form>
+  );
+}
+
+function TestResult({ st }: { st: AudioStatus }) {
+  const nothing = st.seconds === 0; // the warnings say why
+  const silent = !nothing && st.peaks?.every((p) => p === 0);
+  return (
+    <div className="audio-test">
+      <h4>Test of the input</h4>
+      {st.error ? (
+        <p className="error" role="alert">
+          {st.error}
+        </p>
+      ) : (
+        !nothing && (
+          <p>
+          {st.format || "no stream"} · {formatDuration(st.seconds)} received
+            {silent && <span className="note"> · silence on every track</span>}
+          </p>
+        )
+      )}
+      {st.warnings?.map((w) => (
+        <p key={w} className="warn-box">
+          {w}
+        </p>
+      ))}
+      <TrackLevels tracks={st.tracks ?? []} peaks={st.peaks} />
+    </div>
+  );
+}
+
+const EXPORTS: { format: ExportFormat; label: string; title: string }[] = [
+  { format: "reaper", label: "Reaper project", title: "A .rpp with one track per audio file, and the markers" },
+  { format: "audacity", label: "Audacity labels", title: "A label track: File › Import › Labels…" },
+  { format: "csv", label: "CSV", title: "Every change and marker, with its time in the audio" },
+];
+
+/** SessionAudio describes a session's audio and offers its exports. */
+export function SessionAudio({ detail }: { detail: SessionDetail }) {
+  const a = detail.meta.audio;
+  return (
+    <>
+      <h4>Audio</h4>
+      {a ? (
+        <>
+          <dl className="facts">
+            <dt>Tracks</dt>
+            <dd>
+              {a.tracks?.length ?? 0} files in <code>audio/</code> ({a.bits}-bit, {a.rate / 1000} kHz)
+              {a.frames > 0 && `, ${formatDuration(a.frames / a.rate)}`}
+            </dd>
+            <dt>Sync</dt>
+            <dd>
+              first sample at {a.offset.toFixed(3)} s{a.drift_ppm ? `, clock drift ${a.drift_ppm.toFixed(1)} ppm (corrected)` : ""}
+              {a.overruns ? <span className="danger-text"> · {a.overruns} overrun(s): samples were lost</span> : null}
+            </dd>
+          </dl>
+          {a.error && <p className="error">{a.error}</p>}
+        </>
+      ) : (
+        <p className="muted">No audio recorded with this session.</p>
+      )}
+      <div className="row exports">
+        {EXPORTS.map((e) => (
+          <a key={e.format} className="btn" href={exportUrl(detail.name, e.format)} download title={e.title}>
+            ⤓ {e.label}
+          </a>
+        ))}
+      </div>
+      {a && (
+        <p className="muted">
+          The session folder already holds <code>{detail.name}.rpp</code> and <code>labels.txt</code>, next to{" "}
+          <code>audio/</code>: open the project from there, or import the WAV files in Audacity, then the labels (see the{" "}
+          <a href="https://yoda-jm.github.io/tabula/recording.html">recording guide</a>).
+        </p>
+      )}
+    </>
+  );
+}

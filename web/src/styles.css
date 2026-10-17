@@ -1861,6 +1861,77 @@ div.scribble {
   font-size: 0.85rem;
 }
 
+/* ---------- audio tracks (Record page) ---------- */
+
+.audio form {
+  display: grid;
+  gap: 10px;
+}
+.audio form p {
+  margin: 0;
+}
+.audio form .check {
+  justify-self: start;
+}
+.audio-stats {
+  margin-bottom: 8px;
+}
+.track-levels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 4px 16px;
+  margin-top: 10px;
+}
+.track-level {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 2.5em;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.track-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.track-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: #0f1116;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.track-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--ok);
+  transition: width 0.2s;
+}
+.track-fill.clip {
+  background: var(--danger);
+}
+.track-db {
+  text-align: right;
+  color: var(--muted);
+}
+.audio-test {
+  margin-top: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.exports {
+  margin-bottom: 8px;
+}
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+code.wrap {
+  overflow-wrap: anywhere;
+}
+
 /* ---------- narrow screens ---------- */
 
 @media (max-width: 720px) {

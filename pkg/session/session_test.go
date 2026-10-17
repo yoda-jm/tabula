@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yoda-jm/tabula/pkg/audio"
 	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/scene"
 	"github.com/yoda-jm/tabula/pkg/schema"
@@ -101,5 +102,33 @@ func TestRecordAndReplay(t *testing.T) {
 	metas, dirs, err := List(filepath.Dir(dir))
 	if err != nil || len(metas) != 1 || dirs[0] != dir {
 		t.Errorf("list: %v %v %v", metas, dirs, err)
+	}
+}
+
+// The audio section of meta.json is updated while recording.
+func TestRecordAudioMeta(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "concert")
+	rec, err := Start(dir, gvo(t), "M32C test", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &audio.Info{Rate: 48000, Bits: 24, Channels: 32, Offset: 0.42, Tracks: []audio.Track{{Channel: 1, Name: "Hang", File: "audio/01 Hang.wav"}}}
+	if err := rec.SetAudio(a); err != nil {
+		t.Fatal(err)
+	}
+	// Readable at once, as if the program died here.
+	metas, _, err := List(filepath.Dir(dir))
+	if err != nil || len(metas) != 1 || metas[0].Audio == nil || metas[0].Audio.Offset != 0.42 {
+		t.Fatalf("meta while recording: %+v %v", metas, err)
+	}
+	a.Frames = 4800
+	rec.SetAudio(a)
+	rec.Stop()
+	s, err := Open(dir)
+	if err != nil || s.Meta.Audio == nil || s.Meta.Audio.Frames != 4800 || s.Meta.Audio.Tracks[0].Name != "Hang" {
+		t.Errorf("meta: %+v %v", s.Meta, err)
+	}
+	if !rec.Started().Equal(s.Meta.Start) {
+		t.Errorf("start %v, meta %v", rec.Started(), s.Meta.Start)
 	}
 }

@@ -6,6 +6,7 @@
 //	start.scn     the scene part of the snapshot (opens in M32-Edit)
 //	start.nodes   the other nodes of the snapshot (preferences, status…)
 //	events.jsonl  one JSON object per change or marker, in time order
+//	audio/        the audio tracks, when recorded with the session (pkg/audio)
 //
 // Sessions replay into a state.Store (seek, inspection) or, through a
 // Target, onto a console or the emulator.
@@ -23,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yoda-jm/tabula/pkg/audio"
 	"github.com/yoda-jm/tabula/pkg/scene"
 	"github.com/yoda-jm/tabula/pkg/state"
 )
@@ -37,6 +39,8 @@ type Meta struct {
 	Events   int       `json:"events"`
 	Markers  int       `json:"markers"`
 	Duration float64   `json:"duration"` // seconds
+	// Audio describes the audio tracks recorded with the session.
+	Audio *audio.Info `json:"audio,omitempty"`
 }
 
 // Event is a change or a marker, at T seconds after the start.
@@ -88,7 +92,7 @@ func Start(dir string, st *state.Store, consoleName, note string) (*Recorder, er
 		r.Stop()
 		return nil, err
 	}
-	if err := r.writeMeta(); err != nil {
+	if err := writeMeta(r.dir, r.meta); err != nil {
 		r.Stop()
 		return nil, err
 	}
@@ -165,6 +169,23 @@ func (r *Recorder) Mark(label string) {
 	r.w.Flush()
 }
 
+// Started is when the recording started: session times count from it.
+func (r *Recorder) Started() time.Time { return r.start }
+
+// SetAudio records what the audio capture running with the session wrote
+// so far (nil: no audio) in meta.json.
+func (r *Recorder) SetAudio(a *audio.Info) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.meta.Audio = a
+	if r.closed {
+		return nil
+	}
+	m := r.meta
+	m.Duration = time.Since(r.start).Seconds()
+	return writeMeta(r.dir, m)
+}
+
 // Elapsed is the time since the recording started.
 func (r *Recorder) Elapsed() time.Duration { return time.Since(r.start) }
 
@@ -193,12 +214,17 @@ func (r *Recorder) Stop() error {
 	r.meta.End = time.Now()
 	r.meta.Duration = r.meta.End.Sub(r.start).Seconds()
 	err := errors.Join(r.w.Flush(), r.events.Close())
-	return errors.Join(err, r.writeMeta())
+	return errors.Join(err, writeMeta(r.dir, r.meta))
 }
 
-func (r *Recorder) writeMeta() error {
-	data, _ := json.MarshalIndent(r.meta, "", "  ")
-	return os.WriteFile(filepath.Join(r.dir, "meta.json"), append(data, '\n'), 0o644)
+// writeMeta replaces meta.json at once: it is rewritten while recording.
+func writeMeta(dir string, m Meta) error {
+	data, _ := json.MarshalIndent(m, "", "  ")
+	tmp := filepath.Join(dir, "meta.json.tmp")
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, filepath.Join(dir, "meta.json"))
 }
 
 // Session is a recorded session, loaded in memory.

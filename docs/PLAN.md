@@ -24,7 +24,8 @@ Both share the same library (`pkg/`).
 | `pkg/state` | In-memory state store with a change feed; used by the emulator (as the console's memory) and by the client (as a mirror of the console). |
 | `pkg/emu` | The emulator's protocol server and debug HTTP page. |
 | `pkg/console` | The client side of the protocol: discovery, full sync, `/xremote` keepalive, meters, rate-limited writes, library commands. |
-| `pkg/session` *(later)* | Recording and replay. |
+| `pkg/session` | Recording and replay; exports for audio editors. |
+| `pkg/audio` | Audio capture of the console's USB card: one WAV file per track, sync with the session. |
 
 ## Milestones
 
@@ -65,7 +66,9 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Session = start snapshot (`.scn`, opens in M32-Edit) + time-stamped log of every change (who/what/when) + markers (`pkg/session`).
 - [x] Replay to the emulator or a console, with seek and speed; refused unless writes are armed. API in `docs/API.md`; `tabula -record` records unattended.
 - [x] GUI for recording, markers, session browsing and replay.
-- Later: USB audio capture in the same process for exact sync (RF64 or one file per track: a 32-track set exceeds the 4 GB WAV limit).
+- [x] Audio of the console's USB card recorded with the session, in the same process (`pkg/audio`): an external recorder (arecord, parecord, ffmpeg or a custom command; no cgo) streams the card, one WAV file per track (24-bit by default, RF64 past 4 GiB, headers refreshed every 2 s), named from the console's routing; first-sample time and clock drift measured from the arrival of the samples and kept in `meta.json`; free space watched, clean stop before the disk is full; device listing; `-audio-*` flags (`docs/recording.md`).
+- [x] Exports for audio editors: Reaper project, Audacity label track, CSV of changes and markers.
+- [ ] Try the audio capture with the real DN32-USB card (Linux, then macOS/Windows through ffmpeg).
 
 ### 5. Live viewers, roles, band screens *(in progress)*
 - [x] One console connection shared by any number of browsers.
