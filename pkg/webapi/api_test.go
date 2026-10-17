@@ -139,9 +139,15 @@ func TestAPI(t *testing.T) {
 			t.Fatal("no change event")
 		}
 	}
-	v, _, _ := emuSrv.Store().Get("/ch/12/mix/on")
-	if v.Int != 0 {
-		t.Errorf("emulator mute not set: %v", v)
+	// The write reaches the emulator over UDP: give it a moment.
+	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		v, _, _ := emuSrv.Store().Get("/ch/12/mix/on")
+		if v.Int == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("emulator mute not set: %v", v)
+		}
 	}
 }
 
