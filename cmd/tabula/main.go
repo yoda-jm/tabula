@@ -24,7 +24,7 @@ var version = "dev"
 
 func main() {
 	var (
-		httpAddr = flag.String("http", "localhost:8080", "address to serve the GUI on (use :8080 to reach it from other devices)")
+		httpAddr = flag.String("http", "localhost:8033", "address to serve the GUI on (use :8033 to reach it from other devices)")
 		consoleA = flag.String("console", "", "console (or tabula-emu) to connect to at start, e.g. 192.168.1.62")
 		webDir   = flag.String("web-dir", "", "serve the GUI from this directory instead of the embedded build")
 		sessions = flag.String("sessions", "sessions", "directory where recorded sessions are kept")

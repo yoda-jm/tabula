@@ -1,7 +1,7 @@
 # tabula client HTTP API
 
 `tabula` serves its GUI and this API on one HTTP port (default
-`localhost:8080`). It holds at most one console connection, shared by every
+`localhost:8033`). It holds at most one console connection, shared by every
 browser. JSON everywhere; `/api/schema` and `/api/state` are gzipped when the
 client accepts it.
 

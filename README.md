@@ -34,10 +34,10 @@ To drive it (or a real console) from a browser:
 
 ```sh
 make build                      # GUI (needs Node 22) + binaries in bin/
-./bin/tabula -console 127.0.0.1 # or the console's IP; -http :8080 to reach it from a phone
+./bin/tabula -console 127.0.0.1 # or the console's IP; -http :8033 to reach it from a phone
 ```
 
-and open <http://localhost:8080>. tabula starts **read-only**: arm writes
+and open <http://localhost:8033>. tabula starts **read-only**: arm writes
 (top right) to move faders on the console.
 
 ## Build

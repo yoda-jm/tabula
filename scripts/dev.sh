@@ -3,10 +3,10 @@
 # to the emulator) and the Vite dev server with hot reload, which forwards
 # /api to tabula. Open http://localhost:5173. Ctrl-C stops everything.
 #
-#   TABULA_HTTP=127.0.0.1:8081 SCENE=my.scn ./scripts/dev.sh
+#   TABULA_HTTP=127.0.0.1:8034 SCENE=my.scn ./scripts/dev.sh
 set -eu
 cd "$(dirname "$0")/.."
-HTTP=${TABULA_HTTP:-127.0.0.1:8080}
+HTTP=${TABULA_HTTP:-127.0.0.1:8033}
 SCENE=${SCENE:-testdata/scenes/GVO-2026.scn}
 
 go build -o bin/ ./cmd/...

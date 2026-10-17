@@ -24,6 +24,9 @@
 ### tabula, the client
 - Connects to a console or the emulator, mirrors its full state, follows
   changes, survives a console reboot; writes refused until armed.
+- Web GUI embedded in the binary (React): Mixer with meters, Channel (with
+  an EQ curve), Browser for every parameter, Record (sessions, markers,
+  replay), Connect; usable on a laptop or a phone.
 - HTTP API with a live event stream (changes, status, meters), see
   `docs/API.md`.
 - Records shows (snapshot that opens in M32-Edit + every change with its

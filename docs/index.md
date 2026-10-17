@@ -57,7 +57,7 @@ from the same binary, to any browser on the network — a laptop at the desk
 or a phone on stage.
 
 ```sh
-tabula -console 192.168.1.62 -http :8080
+tabula -console 192.168.1.62 -http :8033
 ```
 
 - **Mixer**: banks of strips (inputs, aux and FX returns, buses, matrices
