@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SchemaResponse } from "./api";
 import { indexSchema, parentOf, sectionOf } from "./schema";
-import { ALL_STRIPS, BANKS, colourOf, eqBandsOf, sectionsOf, sendsOf, sourceLabel, stripAddrs, stripByPath } from "./strips";
+import { ALL_STRIPS, BANKS, colourOf, eqBandsOf, linkOf, pairLabel, pairStrips, sectionsOf, sendsOf, sourceLabel, stripAddrs, stripByPath } from "./strips";
 
 const t = { kind: "enum" as const, describe: "" };
 const node = (path: string, ...fields: string[]) => ({ path, scene: true, fields: fields.map((name) => ({ name, type: 0 })) });
@@ -80,5 +80,29 @@ describe("strips", () => {
     expect(sectionOf("/-prefs/style")).toBe("/-prefs");
     expect(parentOf("/ch/01/mix/fader")).toBe("/ch/01/mix");
     expect(schema.sections).toEqual(["/ch", "/mtx", "/bus", "/dca"]);
+  });
+
+  it("finds linked pairs", () => {
+    expect(linkOf(stripByPath("/ch/02")!)).toEqual({ flag: "/config/chlink/1-2", odd: "/ch/01", even: "/ch/02" });
+    expect(linkOf(stripByPath("/auxin/07")!)).toEqual({ flag: "/config/auxlink/7-8", odd: "/auxin/07", even: "/auxin/08" });
+    expect(linkOf(stripByPath("/fxrtn/04")!)?.flag).toBe("/config/fxlink/3-4");
+    expect(linkOf(stripByPath("/bus/16")!)?.flag).toBe("/config/buslink/15-16");
+    expect(linkOf(stripByPath("/mtx/05")!)?.flag).toBe("/config/mtxlink/5-6");
+    expect(linkOf(stripByPath("/main/st")!)).toBeNull();
+    expect(linkOf(stripByPath("/dca/1")!)).toBeNull();
+    expect(pairLabel(stripByPath("/fxrtn/03")!)).toBe("FX 2");
+    expect(pairLabel(stripByPath("/ch/31")!)).toBe("Ch 31-32");
+    expect(pairLabel(stripByPath("/mtx/03")!)).toBe("Mtx 3-4");
+  });
+
+  it("merges linked pairs of a bank into stereo strips", () => {
+    // GVO-2026: matrices 1-2 and 3-4 linked, aux 7-8, the FX returns
+    const on = new Set(["/config/mtxlink/1-2", "/config/mtxlink/3-4", "/config/auxlink/7-8", "/config/fxlink/1-2", "/config/fxlink/3-4"]);
+    const main = pairStrips(BANKS[4].strips, (f) => on.has(f));
+    expect(main.map((m) => m.label)).toEqual(["Mtx 1-2", "Mtx 3-4", "Mtx 5", "Mtx 6", "LR", "M/C"]);
+    expect(main[0].partner?.path).toBe("/mtx/02");
+    const aux = pairStrips(BANKS[2].strips, (f) => on.has(f));
+    expect(aux.map((m) => m.label)).toEqual(["Aux 1", "Aux 2", "Aux 3", "Aux 4", "Aux 5", "Aux 6", "Aux 7-8", "FX 1", "FX 2", "FX 3L", "FX 3R", "FX 4L", "FX 4R"]);
+    expect(pairStrips(BANKS[0].strips, () => false)).toHaveLength(16);
   });
 });

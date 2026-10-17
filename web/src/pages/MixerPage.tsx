@@ -1,19 +1,23 @@
 // The mixer: banks of strips with scribble strip, meter, fader, mute and pan.
+// Linked pairs show as one stereo strip: its fader and mute drive the odd
+// strip, which the console mirrors to the even one.
 
 import { Fader } from "../components/Fader";
 import { StripMeter } from "../components/Meter";
 import { Scribble } from "../components/Scribble";
 import { usePersistent } from "../lib/route";
-import type { Strip } from "../lib/strips";
-import { BANKS, stripAddrs } from "../lib/strips";
+import type { MixerStrip } from "../lib/strips";
+import { BANKS, pairStrips, stripAddrs } from "../lib/strips";
 import { prettyText } from "../lib/values";
-import { useCanWrite, useLeaf, useSchema, useValue } from "../store/hooks";
+import { useCanWrite, useLeaf, useNodes, useSchema, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
 
 export function MixerPage({ selected, onSelect }: { selected?: string; onSelect(path: string): void }) {
   const [bankId, setBank] = usePersistent("tabula.bank", BANKS[0].id);
   const bank = BANKS.find((b) => b.id === bankId) ?? BANKS[0];
+  useNodes(LINK_NODES);
+  const strips = pairStrips(bank.strips, linked);
   return (
     <div className="page mixer">
       <div className="banks" role="tablist" aria-label="Banks">
@@ -32,26 +36,47 @@ export function MixerPage({ selected, onSelect }: { selected?: string; onSelect(
       </div>
       <NotConnected />
       <div className="strips" role="tabpanel" aria-label={bank.label}>
-        {bank.strips.map((s) => (
-          <StripView key={s.path} strip={s} selected={s.path === selected} onSelect={() => onSelect(s.path)} />
+        {strips.map((m) => (
+          <StripView
+            key={m.strip.path}
+            m={m}
+            selected={m.strip.path === selected || m.partner?.path === selected}
+            onSelect={() => onSelect(m.strip.path)}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function StripView({ strip, selected, onSelect }: { strip: Strip; selected: boolean; onSelect(): void }) {
+/** The link switches and options: a linked pair whose faders and mutes follow shows as one strip. */
+const LINK_NODES = ["/config/chlink", "/config/auxlink", "/config/fxlink", "/config/buslink", "/config/mtxlink", "/config/linkcfg"];
+
+const linked = (flag: string) =>
+  Number(store.getValue(flag)?.value) === 1 && Number(store.getValue("/config/linkcfg/fdrmute")?.value) === 1;
+
+function StripView({ m, selected, onSelect }: { m: MixerStrip; selected: boolean; onSelect(): void }) {
   const schema = useSchema();
   const can = useCanWrite();
   if (!schema) return null;
+  const { strip, partner } = m;
   const a = stripAddrs(schema, strip);
+  const shown = partner ? { ...strip, label: m.label } : strip;
   return (
-    <div className={"strip" + (selected ? " selected" : "")}>
-      <Scribble strip={strip} nameAddr={a.name} colorAddr={a.color} selected={selected} onClick={onSelect} />
-      {a.pan ? <Pan addr={a.pan} disabled={!can} /> : <div className="pan-slot" />}
+    <div className={"strip" + (partner ? " pair" : "") + (selected ? " selected" : "")}>
+      <Scribble strip={shown} nameAddr={a.name} colorAddr={a.color} selected={selected} onClick={onSelect} />
+      {partner ? (
+        <div className="pan-slot link-slot" title={`${strip.label} and ${partner.label} are linked: the console moves both`}>
+          <span className="link-badge">LINKED</span>
+        </div>
+      ) : a.pan ? (
+        <Pan addr={a.pan} disabled={!can} />
+      ) : (
+        <div className="pan-slot" />
+      )}
       <div className="strip-fader">
-        <StripMeter strip={strip} />
-        {a.fader && <StripFader addr={a.fader} label={strip.label} disabled={!can} />}
+        <StripMeter strip={strip} partner={partner} />
+        {a.fader && <StripFader addr={a.fader} label={shown.label} disabled={!can} />}
       </div>
       {a.on && <Mute addr={a.on} disabled={!can} />}
     </div>

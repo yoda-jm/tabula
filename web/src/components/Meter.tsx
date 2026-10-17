@@ -7,10 +7,13 @@ import type { Peak } from "../lib/meters";
 import type { Strip } from "../lib/strips";
 import { useMeters } from "../store/hooks";
 
-export function StripMeter({ strip }: { strip: Strip }) {
+/** StripMeter shows a strip's level, and its partner's beside it for a linked pair. */
+export function StripMeter({ strip, partner }: { strip: Strip; partner?: Strip }) {
   const src = meterSource(strip);
   if (!src) return <div className="meter-slot" />;
-  return <MeterBars group={src.group} indexes={src.indexes} />;
+  const other = partner ? meterSource(partner) : null;
+  const indexes = other && other.group === src.group ? [...src.indexes, ...other.indexes] : src.indexes;
+  return <MeterBars group={src.group} indexes={indexes} />;
 }
 
 function MeterBars({ group, indexes }: { group: string; indexes: number[] }) {

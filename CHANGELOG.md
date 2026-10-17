@@ -35,6 +35,10 @@
   with a choice of sections, effect presets into an FX slot. New API
   `POST /api/library`, which reads back what each command changed;
   `console.Client` gained `Library` and `Refresh`.
+- Mixer: linked pairs of channels, aux inputs, FX returns, buses and
+  matrices show as one stereo strip (both meters, one fader and mute, written
+  to the odd strip, which the console mirrors) when their faders and mutes
+  are linked. The Channel page says which strip a strip is linked with.
 - The GUI asks for extra meter groups (the RTA) only while a page shows
   them, reopening its event stream without a gap.
 - New page describing [every page of the GUI](docs/gui.md).

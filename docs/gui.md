@@ -28,6 +28,15 @@ FX returns, buses, matrices and mains, DCAs. Each strip has its scribble
 strip (name and colour), meter, fader, mute and pan. Tap a scribble strip to
 select it for the Channel page.
 
+**Linked pairs** (`/config/chlink`, `auxlink`, `fxlink`, `buslink`,
+`mtxlink`) show as one stereo strip, `Mtx 1-2` or `FX 1`, with the meters of
+both sides, when their faders and mutes follow each other (the link option
+`/config/linkcfg/fdrmute`). Its fader and mute write to the odd strip, and
+the console moves the even one with it, as it does for a linked pair on
+its surface; pans stay per strip, on the Channel page. With the fader and
+mute option off, the two strips stay separate. The Channel page of a linked
+strip says which strip it is linked with.
+
 ## Channel
 
 Everything about one strip: configuration, preamp, delay, gate, dynamics,

@@ -59,7 +59,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Routing: input routing and patch, outputs, AES50 A/B, card, P16, aux, AES/EBU, user routing, with names resolved.
 - [x] FX pages: overview of the 8 slots, per-slot editor, graphic EQ with the RTA (also behind the channel EQ curve).
 - [x] Scenes, snippets and presets: list, recall, save, rename, copy, delete (`POST /api/library`).
-- [ ] Linked pairs shown as stereo strips in the mixer.
+- [x] Linked pairs shown as stereo strips in the mixer.
 
 ### 4. Recording and replay *(in progress)*
 - [x] Session = start snapshot (`.scn`, opens in M32-Edit) + time-stamped log of every change (who/what/when) + markers (`pkg/session`).

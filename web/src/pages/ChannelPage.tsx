@@ -8,7 +8,7 @@ import { Scribble } from "../components/Scribble";
 import { inputSource, portLabel } from "../lib/routing";
 import { RTA_POST, rtaSourceLabel, stripRtaSource } from "../lib/rta";
 import type { Strip } from "../lib/strips";
-import { ALL_STRIPS, BANKS, eqBandsOf, sectionsOf, sendsOf, sourceLabel, stripAddrs, stripByPath } from "../lib/strips";
+import { ALL_STRIPS, BANKS, eqBandsOf, linkOf, sectionsOf, sendsOf, sourceLabel, stripAddrs, stripByPath } from "../lib/strips";
 import type { Send } from "../lib/strips";
 import { prettyText } from "../lib/values";
 import { useCanWrite, useLeaf, useMeterGroup, useNodes, useSchema, useValue } from "../store/hooks";
@@ -46,6 +46,7 @@ export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: 
         <button type="button" className="btn" onClick={() => onSelect(next.path)} aria-label={`Next: ${next.label}`}>
           ›
         </button>
+        <LinkNote strip={strip} />
         {a.on && (
           <span className="channel-mute">
             <ParamControl addr={a.on} mute />
@@ -133,6 +134,15 @@ export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: 
       </div>
     </div>
   );
+}
+
+/** LinkNote says when the strip is linked to its partner (/config/chlink…). */
+function LinkNote({ strip }: { strip: Strip }) {
+  const l = linkOf(strip);
+  const on = useValue(l?.flag);
+  if (!l || Number(on?.value) !== 1) return null;
+  const other = stripByPath(l.odd === strip.path ? l.even : l.odd);
+  return <span className="badge link-note">linked with {other?.label}</span>;
 }
 
 function StripOption({ strip }: { strip: Strip }) {

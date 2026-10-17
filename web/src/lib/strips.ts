@@ -157,3 +157,77 @@ export function sourceLabel(n: number): string {
   if (n <= 64) return `Bus ${two(n - 48)}`;
   return String(n);
 }
+
+// --- linked pairs ---
+
+const LINK_FLAGS: Partial<Record<StripKind, string>> = {
+  ch: "/config/chlink",
+  auxin: "/config/auxlink",
+  fxrtn: "/config/fxlink",
+  bus: "/config/buslink",
+  mtx: "/config/mtxlink",
+};
+
+export interface Link {
+  /** the link switch of the pair, e.g. /config/chlink/1-2 */
+  flag: string;
+  odd: string;
+  even: string;
+}
+
+/** linkOf tells which pair a strip belongs to (channels, aux ins, FX returns, buses, matrices). */
+export function linkOf(strip: Strip): Link | null {
+  const group = LINK_FLAGS[strip.kind];
+  if (!group) return null;
+  const n = Number(strip.path.slice(strip.path.lastIndexOf("/") + 1));
+  const odd = n % 2 ? n : n - 1;
+  const base = strip.path.slice(0, strip.path.lastIndexOf("/") + 1);
+  return { flag: `${group}/${odd}-${odd + 1}`, odd: base + two(odd), even: base + two(odd + 1) };
+}
+
+/** pairLabel names a linked pair: "Ch 01-02", "Aux 7-8", "FX 1", "Bus 07-08", "Mtx 1-2". */
+export function pairLabel(odd: Strip): string {
+  const n = Number(odd.path.slice(odd.path.lastIndexOf("/") + 1));
+  switch (odd.kind) {
+    case "ch":
+      return `Ch ${two(n)}-${two(n + 1)}`;
+    case "auxin":
+      return `Aux ${n}-${n + 1}`;
+    case "fxrtn":
+      return `FX ${Math.ceil(n / 2)}`;
+    case "bus":
+      return `Bus ${two(n)}-${two(n + 1)}`;
+    case "mtx":
+      return `Mtx ${n}-${n + 1}`;
+  }
+  return odd.label;
+}
+
+/** A mixer strip: one strip, or a linked pair shown as one stereo strip. */
+export interface MixerStrip {
+  strip: Strip; // the odd strip of a pair: its controls drive both
+  partner?: Strip;
+  label: string;
+}
+
+/**
+ * pairStrips merges each linked pair of a bank into one stereo strip.
+ * linked tells whether a pair's link switch is on and its faders and mutes
+ * follow each other (/config/linkcfg/fdrmute): the console then mirrors the
+ * odd strip's fader and mute to the even one.
+ */
+export function pairStrips(strips: Strip[], linked: (flag: string) => boolean): MixerStrip[] {
+  const out: MixerStrip[] = [];
+  for (let i = 0; i < strips.length; i++) {
+    const s = strips[i];
+    const l = linkOf(s);
+    const next = strips[i + 1];
+    if (l && l.odd === s.path && next?.path === l.even && linked(l.flag)) {
+      out.push({ strip: s, partner: next, label: pairLabel(s) });
+      i++;
+    } else {
+      out.push({ strip: s, label: s.label });
+    }
+  }
+  return out;
+}

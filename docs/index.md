@@ -88,7 +88,7 @@ tabula -console 192.168.1.62 -http :8033
 
 - **Mixer**: banks of strips (inputs, aux and FX returns, buses, matrices
   and mains, DCAs) with scribble strips in the console colours, meters,
-  faders, mutes and pans.
+  faders, mutes and pans; linked pairs show as one stereo strip.
 - **Channel**: everything about one strip — config, preamp with the headamp
   feeding it (which input, gain, phantom power), gate, dynamics, EQ with its
   (approximate) response curve and the RTA, sends with the bus names.
