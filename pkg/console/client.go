@@ -251,7 +251,7 @@ func (c *Client) handle(m osc.Message) {
 // replies, a window of requests at a time so the network is not flooded.
 // Variant nodes (effect parameters) are requested after the rest, once the
 // values selecting their fields (effect types) are known. progress, if set,
-// is called after each reply.
+// is called after each reply, never concurrently.
 func (c *Client) Sync(ctx context.Context, progress func(done, total int)) error {
 	var regular, variants []*schema.Node
 	for _, n := range c.mirror.Schema().Nodes {
@@ -286,18 +286,17 @@ func (c *Client) Sync(ctx context.Context, progress func(done, total int)) error
 				defer func() { <-sem }()
 				_, err := c.ask(ctx, osc.NewMessage("/node", osc.String(strings.TrimPrefix(n.Path, "/"))), "node "+n.Path, 3)
 				mu.Lock()
+				defer mu.Unlock()
 				if err != nil {
 					missing = append(missing, n.Path)
 				} else {
 					done++
 				}
-				d := done
-				mu.Unlock()
 				c.mu.Lock()
-				c.status.Synced = d
+				c.status.Synced = done
 				c.mu.Unlock()
 				if progress != nil {
-					progress(d, total)
+					progress(done, total) // one call at a time
 				}
 			}(n)
 		}

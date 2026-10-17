@@ -11,3 +11,8 @@
 # Local runtime data
 /var/
 *.local.scn
+
+# GUI build (Vite); dist/.gitkeep keeps the embed pattern valid
+/web/node_modules/
+/web/dist/*
+!/web/dist/.gitkeep

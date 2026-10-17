@@ -37,7 +37,6 @@ Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases)
   are pushed to the other connected clients.
 - Real scenes round-trip byte for byte, also when dumped over the network
   with Patrick-Gilles Maillot's `X32GetScene`.
-
 - Preferences and status (`/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-usb`,
   `/-urec`, `/-action`…), as the editors query them when connecting.
 - Meters (`/meters/0…16`) with synthetic levels that follow the mix, and
