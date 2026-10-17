@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/yoda-jm/tabula/pkg/audio"
@@ -220,6 +221,25 @@ func (s *Server) getAudio(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.audioView())
 }
 
+// checkCustom refuses a new custom recorder command unless the request comes
+// from the machine running tabula itself: an engineer link must not be a
+// way to run programs on that machine. Keeping the current command is fine.
+func (s *Server) checkCustom(r *http.Request, cfg audio.Config) error {
+	if cfg.Recorder != "custom" {
+		return nil
+	}
+	if c := callerFrom(r); c.Local && c.Grant == nil {
+		return nil
+	}
+	s.mu.Lock()
+	cur := s.audio.cfg
+	s.mu.Unlock()
+	if cur.Recorder == "custom" && strings.TrimSpace(cur.Command) == strings.TrimSpace(cfg.Command) {
+		return nil
+	}
+	return errors.New("a custom recorder command can only be chosen on the machine running tabula")
+}
+
 // setAudioConfig replaces the configuration, used from the next recording.
 func (s *Server) setAudioConfig(w http.ResponseWriter, r *http.Request) {
 	var cfg audio.Config
@@ -230,6 +250,10 @@ func (s *Server) setAudioConfig(w http.ResponseWriter, r *http.Request) {
 	cfg = cfg.Normalized()
 	if err := cfg.Validate(); err != nil {
 		httpError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := s.checkCustom(r, cfg); err != nil {
+		httpError(w, http.StatusForbidden, err)
 		return
 	}
 	s.mu.Lock()
@@ -277,6 +301,10 @@ func (s *Server) audioTest(w http.ResponseWriter, r *http.Request) {
 	if body, _ := io.ReadAll(r.Body); len(body) > 0 {
 		if err := json.Unmarshal(body, &cfg); err != nil {
 			httpError(w, http.StatusBadRequest, err)
+			return
+		}
+		if err := s.checkCustom(r, cfg.Normalized()); err != nil {
+			httpError(w, http.StatusForbidden, err)
 			return
 		}
 	}

@@ -84,6 +84,9 @@ write, so this holds for anything talking to its API, not only its pages.
 `tabula` uses plain HTTP on the local network. Anyone holding a link, or
 able to read the network traffic, has that access; delete a link to revoke
 it. Every request from the machine itself is the engineer's: do not expose
-`tabula` beyond the band's network (no port forwarding).
+`tabula` beyond the band's network (no port forwarding). An engineer link
+controls the console and the recordings but cannot make `tabula` run a
+program of its choice: a custom audio recorder command is only accepted
+from the machine itself.
 
 See the [HTTP API](API.md#access) for the endpoints.
