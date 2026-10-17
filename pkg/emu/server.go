@@ -60,6 +60,7 @@ type Server struct {
 
 	Unhandled *Unhandleds
 	traffic   *traffic
+	subs      subscriptions
 }
 
 func New(cfg Config, st *state.Store) *Server {
@@ -92,6 +93,9 @@ func (s *Server) Config() Config         { return s.cfg }
 func (s *Server) Store() *state.Store    { return s.store }
 func (s *Server) Started() time.Time     { return s.started }
 func (s *Server) Traffic(n int) []Packet { return s.traffic.latest(n) }
+
+// Subscriptions returns the active meter and data subscriptions.
+func (s *Server) Subscriptions() []Subscription { return s.subs.view() }
 
 // Clients returns the peers seen so far, most recent first.
 func (s *Server) Clients() []Client {
@@ -137,6 +141,7 @@ func (s *Server) Serve(ctx context.Context, conn *net.UDPConn) error {
 		<-ctx.Done()
 		conn.Close()
 	}()
+	go s.runSubscriptions(ctx)
 	buf := make([]byte, 65536)
 	for {
 		n, from, err := conn.ReadFromUDP(buf)
@@ -178,11 +183,19 @@ func (s *Server) handle(pkt []byte, from *net.UDPAddr) {
 }
 
 func (s *Server) send(c *Client, m osc.Message) {
+	if s.sendQuiet(c, m) {
+		s.traffic.add(Packet{Time: time.Now(), Client: c.Addr, Text: m.String()})
+	}
+}
+
+// sendQuiet sends without recording the packet in the traffic log (meters
+// and subscription updates would flood it).
+func (s *Server) sendQuiet(c *Client, m osc.Message) bool {
 	if _, err := s.conn.Load().WriteToUDP(m.Bytes(), c.udp); err != nil {
 		s.log.Warn("send failed", "client", c.Addr, "err", err)
-		return
+		return false
 	}
-	s.traffic.add(Packet{Time: time.Now(), Client: c.Addr, Text: m.String()})
+	return true
 }
 
 func strArg(m osc.Message) (string, bool) {
@@ -230,8 +243,28 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 		}
 		s.send(c, m) // the console echoes "/" commands
 		return
-	case "/unsubscribe", "/renew", "/subscribe", "/formatsubscribe", "/batchsubscribe",
-		"/meters", "/showdump", "/load", "/save", "/copy", "/delete", "/rename", "/add":
+	case "/meters", "/subscribe", "/formatsubscribe", "/batchsubscribe":
+		start := map[string]func(osc.Message, *Client) error{
+			"/meters": s.meters, "/subscribe": s.subscribe,
+			"/formatsubscribe": s.formatSubscribe, "/batchsubscribe": s.batchSubscribe,
+		}[m.Address]
+		if err := start(m, c); err != nil {
+			s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
+		}
+		return
+	case "/renew", "/unsubscribe":
+		name, _ := strArg(m)
+		if len(m.Args) > 0 && name == "" {
+			s.Unhandled.Record(m, c.Addr, ReasonRejected, "expects an optional string")
+			return
+		}
+		if m.Address == "/renew" {
+			s.subs.renew(c, name, time.Now())
+		} else {
+			s.subs.remove(c, name)
+		}
+		return
+	case "/showdump", "/load", "/save", "/copy", "/delete", "/rename", "/add":
 		s.Unhandled.Record(m, c.Addr, ReasonUnimplemented, "")
 		return
 	}

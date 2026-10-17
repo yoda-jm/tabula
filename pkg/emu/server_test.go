@@ -3,6 +3,9 @@ package emu
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"log/slog"
 	"math"
@@ -168,7 +171,7 @@ func TestUnhandledIsRecorded(t *testing.T) {
 	p := dial(t, addr)
 	p.send("/-prefs/style")
 	p.send("/-prefs/style")
-	p.send("/meters", osc.String("/meters/1"))
+	p.send("/showdump")
 	p.send("/ch/01/mix/fader", osc.String("loud"))
 	p.ask("/info") // wait for the previous packets to be handled
 
@@ -179,8 +182,8 @@ func TestUnhandledIsRecorded(t *testing.T) {
 	if u := got["/-prefs/style"]; u.Count != 2 || u.Reason != ReasonUnknown {
 		t.Errorf("/-prefs/style: %+v", u)
 	}
-	if u := got["/meters"]; u.Reason != ReasonUnimplemented || u.LastArgs != `"/meters/1"` {
-		t.Errorf("/meters: %+v", u)
+	if u := got["/showdump"]; u.Reason != ReasonUnimplemented {
+		t.Errorf("/showdump: %+v", u)
 	}
 	if u := got["/ch/01/mix/fader"]; u.Reason != ReasonRejected || u.Detail == "" {
 		t.Errorf("rejected fader: %+v", u)
@@ -217,5 +220,64 @@ func TestSceneDumpOverNetwork(t *testing.T) {
 			}
 		}
 		t.Fatalf("%d lines, want %d", len(g), len(w))
+	}
+}
+
+func TestMetersAndSubscriptions(t *testing.T) {
+	_, addr := start(t)
+	p := dial(t, addr)
+	p.send("/ch/17/mix/on", osc.Int(1))
+
+	// /meters ,si /meters/6 16: four strip meters of channel 17.
+	m := p.ask("/meters", osc.String("/meters/6"), osc.Int(16))
+	if m.Address != "/meters/6" || len(m.Args) != 1 || m.Args[0].Tag != 'b' {
+		t.Fatalf("meters: %v", m)
+	}
+	blob := m.Args[0].Blob
+	if len(blob) != 20 || binary.LittleEndian.Uint32(blob) != 4 {
+		t.Fatalf("meters blob % x", blob)
+	}
+	if in := math.Float32frombits(binary.LittleEndian.Uint32(blob[4:])); in <= 0 || in > 1 {
+		t.Errorf("channel 17 input level %v", in)
+	}
+	p.send("/unsubscribe")
+	drain(p)
+
+	// The document's /formatsubscribe example: mutes of channels 06 to 09.
+	for ch := 6; ch <= 9; ch++ {
+		p.send(fmt.Sprintf("/ch/%02d/mix/on", ch), osc.Int(1))
+	}
+	m = p.ask("/formatsubscribe", osc.String("/testme"), osc.String("/ch/**/mix/on"), osc.Int(6), osc.Int(9), osc.Int(80))
+	if got := hex.EncodeToString(m.Bytes()); got != "2f746573746d65002c620000000000141400000001000000010000000100000001000000" {
+		t.Errorf("formatsubscribe: %s", got)
+	}
+	p.send("/unsubscribe", osc.String("/testme"))
+	drain(p)
+
+	m = p.ask("/batchsubscribe", osc.String("/yy"), osc.String("/meters/6"), osc.Int(0), osc.Int(0), osc.Int(40))
+	if m.Address != "/yy" || len(m.Args[0].Blob) != 20 {
+		t.Errorf("batchsubscribe: %v", m)
+	}
+	p.send("/unsubscribe")
+	drain(p)
+
+	// /subscribe with time factor 1: an update every 50 ms.
+	p.send("/subscribe", osc.String("/ch/01/mix/on"), osc.Int(1))
+	n := 0
+	for deadline := time.Now().Add(300 * time.Millisecond); time.Now().Before(deadline); {
+		if m, ok := p.recv(100 * time.Millisecond); ok && m.Address == "/ch/01/mix/on" {
+			n++
+		}
+	}
+	if n < 3 {
+		t.Errorf("%d updates in 300 ms", n)
+	}
+}
+
+func drain(p *peer) {
+	for {
+		if _, ok := p.recv(80 * time.Millisecond); !ok {
+			return
+		}
 	}
 }

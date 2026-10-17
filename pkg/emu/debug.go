@@ -24,6 +24,7 @@ func (s *Server) DebugHandler() http.Handler {
 	})
 	mux.HandleFunc("GET /api/unhandled", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, s.Unhandled.List()) })
 	mux.HandleFunc("GET /api/clients", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, s.Clients()) })
+	mux.HandleFunc("GET /api/subscriptions", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, s.Subscriptions()) })
 	mux.HandleFunc("GET /api/traffic", func(w http.ResponseWriter, r *http.Request) {
 		n, _ := strconv.Atoi(r.URL.Query().Get("n"))
 		writeJSON(w, s.Traffic(cmp(n, 200)))
@@ -85,7 +86,7 @@ func (s *Server) debugPage(w http.ResponseWriter, r *http.Request) {
 	refresh, _ := strconv.Atoi(r.URL.Query().Get("refresh"))
 	data := map[string]any{
 		"Cfg": s.cfg, "Addr": s.Addr(), "Uptime": time.Since(s.started).Round(time.Second),
-		"Clients": s.Clients(), "Unhandled": s.Unhandled.List(), "Traffic": s.Traffic(100),
+		"Clients": s.Clients(), "Subs": s.Subscriptions(), "Unhandled": s.Unhandled.List(), "Traffic": s.Traffic(100),
 		"Nodes": nodes, "Total": total, "Limit": limit, "Q": q, "Refresh": refresh, "Now": time.Now(),
 		"NParams": len(s.store.Schema().Leaves()), "NNodes": len(s.store.Schema().Nodes),
 	}
@@ -132,6 +133,11 @@ a { color:var(--accent) } .pill { display:inline-block; padding:0 .4rem; border-
 {{range .Clients}}<tr><td class="mono">{{.Addr}}</td><td>{{.Requests}}</td><td>{{ago .LastSeen}}</td>
 <td>{{if active .XremoteUntil}}<span class="pill">subscribed</span>{{else}}<span class="muted">no</span>{{end}}</td></tr>
 {{else}}<tr><td colspan="4" class="muted">No client yet.</td></tr>{{end}}</table></div>
+
+<h2>Subscriptions <span class="muted">(meters, /subscribe… — not shown in the traffic log)</span></h2>
+<div class="scroll"><table><tr><th>Client</th><th>Kind</th><th>Name</th><th>Every</th><th>Expires</th></tr>
+{{range .Subs}}<tr><td class="mono">{{.Client}}</td><td>{{.Kind}}</td><td class="mono">{{.Name}}</td><td>{{.Interval}}</td><td>{{ago .Expires}}</td></tr>
+{{else}}<tr><td colspan="5" class="muted">None.</td></tr>{{end}}</table></div>
 
 <h2>Unhandled requests <span class="muted">(<a href="/api/unhandled">JSON</a>)</span></h2>
 <div class="scroll"><table><tr><th>Count</th><th>Reason</th><th>Address</th><th>Tags</th><th>Last arguments</th><th>Detail</th><th>Last</th></tr>
