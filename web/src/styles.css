@@ -1174,6 +1174,26 @@ div.scribble {
   margin: 0 0 12px;
 }
 
+/* ---------- headamp ---------- */
+
+.headamp {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #22262f;
+}
+.headamp-port strong {
+  font-family: var(--mono);
+}
+.headamp-none {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+}
+.btn.toggle.phantom.lit {
+  background: #7a2a1c;
+  border-color: #ff8a65;
+  color: #fff3ee;
+}
+
 /* ---------- narrow screens ---------- */
 
 @media (max-width: 720px) {

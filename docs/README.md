@@ -1,6 +1,7 @@
 # Documentation
 
 - [PLAN.md](PLAN.md) — goals, architecture and milestones.
+- [gui.md](gui.md) — the pages of the tabula GUI.
 - [API.md](API.md) — the tabula client's HTTP API.
 - [testing-with-editors.md](testing-with-editors.md) — connecting X32-Edit / M32-Edit to the emulator.
 

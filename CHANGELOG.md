@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### tabula
+- Channel page: the headamp feeding a channel or aux input — which input it
+  is (`AES50 A 12`), its gain and its phantom power (switched after a
+  confirmation) — and the physical input next to the channel source.
+- New page describing [every page of the GUI](docs/gui.md).
+
 ### tabula-emu
 - Accepts node text ending with a line feed, as M32-Edit sends it when
   writing a scene to the console ("PC -> Mixer").

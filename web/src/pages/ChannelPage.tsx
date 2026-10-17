@@ -1,13 +1,16 @@
 // The selected strip in detail: only the sections its type has.
 
 import { EqCurve } from "../components/EqCurve";
+import { Headamp } from "../components/Headamp";
 import { ParamControl } from "../components/controls";
 import { Scribble } from "../components/Scribble";
+import { inputSource, portLabel } from "../lib/routing";
 import type { Strip } from "../lib/strips";
 import { ALL_STRIPS, BANKS, eqBandsOf, sectionsOf, sendsOf, sourceLabel, stripAddrs, stripByPath } from "../lib/strips";
 import type { Send } from "../lib/strips";
 import { prettyText } from "../lib/values";
-import { useLeaf, useSchema, useValue } from "../store/hooks";
+import { useLeaf, useNodes, useSchema, useValue } from "../store/hooks";
+import { lookup } from "../store/lookup";
 import { FieldRow, Fields, NotConnected, Section } from "./common";
 
 export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: string): void }) {
@@ -61,6 +64,7 @@ export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: 
         )}
         {sections.includes("preamp") && (
           <Section title="Preamp">
+            <Headamp strip={p} />
             <Fields path={`${p}/preamp`} />
           </Section>
         )}
@@ -137,13 +141,20 @@ function StripOption({ strip }: { strip: Strip }) {
 function SourceRow({ addr }: { addr: string }) {
   const leaf = useLeaf(addr);
   const val = useValue(addr);
+  useNodes(["/config/routing", "/config/routing/IN", "/config/routing/PLAY"]);
   if (!leaf) return null;
+  const n = Number(val?.value);
+  // channel inputs 1-32 go through the input routing: say where they come from
+  const port = val && addr.startsWith("/ch/") && n >= 1 && n <= 32 ? inputSource(lookup, n) : null;
   return (
     <div className="field">
       <span className="field-label">Source</span>
       <span className="field-inline">
         <ParamControl addr={addr} />
-        <span className="muted">{val ? sourceLabel(Number(val.value)) : ""}</span>
+        <span className="muted">
+          {val ? sourceLabel(n) : ""}
+          {port && ` · ${portLabel(port)}`}
+        </span>
       </span>
     </div>
   );

@@ -89,8 +89,9 @@ tabula -console 192.168.1.62 -http :8033
 - **Mixer**: banks of strips (inputs, aux and FX returns, buses, matrices
   and mains, DCAs) with scribble strips in the console colours, meters,
   faders, mutes and pans.
-- **Channel**: everything about one strip — config, preamp, gate, dynamics,
-  EQ with its (approximate) response curve, sends with the bus names.
+- **Channel**: everything about one strip — config, preamp with the headamp
+  feeding it (which input, gain, phantom power), gate, dynamics, EQ with its
+  (approximate) response curve, sends with the bus names.
 - **Browser**: every parameter of the console, searchable by path or value,
   each with an editor; values can also be typed as on the console (`-6`,
   `1k20`, `GATE`).
@@ -99,7 +100,8 @@ tabula -console 192.168.1.62 -http :8033
 - **Connect**: find consoles on the network or type an address.
 
 It is **read-only** until writes are armed, after a confirmation: on a real
-console, nothing moves by accident. `-record` starts recording as soon as
+console, nothing moves by accident. **[Every page of the GUI](gui.md)** in
+detail. `-record` starts recording as soon as
 the console is synced, for unattended recording of a concert.
 
 Later: live viewers and band-specific screens (in-ear mixes from a phone…).

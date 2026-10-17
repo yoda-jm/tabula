@@ -14,8 +14,8 @@ Tools for Behringer X32 / Midas M32 digital consoles, in Go.
   replay of shows. Read-only until you arm writes.
 
 See [how the emulator simulates the console](docs/emulator.md) (audio flow,
-meters, RTA, effects, linked strips) and [docs/PLAN.md](docs/PLAN.md) for the
-roadmap.
+meters, RTA, effects, linked strips), [the pages of the GUI](docs/gui.md) and
+[docs/PLAN.md](docs/PLAN.md) for the roadmap.
 
 ## Status
 

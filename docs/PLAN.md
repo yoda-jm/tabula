@@ -55,7 +55,11 @@ Driven by the unknown-request log while connecting the real editors:
 - **Read-only by default** on a real console; writes must be armed explicitly.
 - [x] Web GUI (React + TypeScript, embedded in the binary): Connect, Mixer (banks, meters, faders, mutes, pans), Channel (config, preamp, gate, dynamics, EQ curve, sends), Browser (every parameter with an editor), Record.
 - [x] Server-Sent Events for state changes, status and meters.
-- [ ] Console-like screens still to come: Routing, Outputs, FX pages, Scenes/library, headamp gain/phantom on the Channel page.
+- [x] Headamp gain and phantom on the Channel page.
+- [ ] Routing: input routing and patch, outputs, AES50 A/B, card, P16, aux, AES/EBU, user routing, with names resolved.
+- [ ] FX pages: overview of the 8 slots, per-slot editor, graphic EQ with the RTA.
+- [ ] Scenes, snippets and presets: list, recall, save, rename.
+- [ ] Linked pairs shown as stereo strips in the mixer.
 
 ### 4. Recording and replay *(in progress)*
 - [x] Session = start snapshot (`.scn`, opens in M32-Edit) + time-stamped log of every change (who/what/when) + markers (`pkg/session`).
