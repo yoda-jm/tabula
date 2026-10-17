@@ -313,10 +313,12 @@ export interface Port {
   channels: number;
 }
 
+const AES50_BLOCKS = ["1-8", "9-16", "17-24", "25-32", "33-40", "41-48"];
+
 export const PORTS: Port[] = [
-  { id: "AES50A", label: "AES50 A", node: "/config/routing/AES50A", blocks: ["1-8", "9-16", "17-24", "25-32", "33-40", "41-48"], size: 8, channels: 48 },
-  { id: "AES50B", label: "AES50 B", node: "/config/routing/AES50B", blocks: ["1-8", "9-16", "17-24", "25-32", "33-40", "41-48"], size: 8, channels: 48 },
-  { id: "CARD", label: "Card", node: "/config/routing/CARD", blocks: ["1-8", "9-16", "17-24", "25-32"], size: 8, channels: 32 },
+  { id: "AES50A", label: "AES50 A", node: "/config/routing/AES50A", blocks: AES50_BLOCKS, size: 8, channels: 48 },
+  { id: "AES50B", label: "AES50 B", node: "/config/routing/AES50B", blocks: AES50_BLOCKS, size: 8, channels: 48 },
+  { id: "CARD", label: "Card", node: "/config/routing/CARD", blocks: INPUT_BLOCKS, size: 8, channels: 32 },
   { id: "OUT", label: "Local outputs", node: "/config/routing/OUT", blocks: ["1-4", "5-8", "9-12", "13-16"], size: 4, channels: 16 },
 ];
 

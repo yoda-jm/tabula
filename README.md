@@ -10,8 +10,9 @@ Tools for Behringer X32 / Midas M32 digital consoles, in Go.
   other remote apps can connect to it. A read-only HTTP page shows what it
   stores and every request it did not understand.
 - **`tabula`** — a client that connects to a console or to the emulator and
-  serves a web GUI: mixer, channel details, every parameter, recording and
-  replay of shows. Read-only until you arm writes.
+  serves a web GUI: mixer, channel details with headamps, routing, effects
+  with a graphic EQ and RTA, scenes and presets, every parameter, recording
+  and replay of shows. Read-only until you arm writes.
 
 See [how the emulator simulates the console](docs/emulator.md) (audio flow,
 meters, RTA, effects, linked strips), [the pages of the GUI](docs/gui.md) and

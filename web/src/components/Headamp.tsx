@@ -87,8 +87,8 @@ function PhantomToggle({ addr, port }: { addr: string; port: string }) {
           onCancel={() => setAsking(false)}
         >
           <p>
-            {on ? "Removing" : "Sending"} +48 V on <strong>{port}</strong> makes a loud pop if the channel is open: pull its
-            fader down first.
+            {on ? "Removing" : "Sending"} +48 V on <strong>{port}</strong> makes a loud pop if the channel is open: pull its fader
+            down first.
           </p>
           {!on && <p className="muted">Ribbon microphones and some line sources can be damaged by phantom power.</p>}
         </ConfirmDialog>

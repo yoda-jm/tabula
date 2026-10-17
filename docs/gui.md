@@ -37,6 +37,8 @@ its surface; pans stay per strip, on the Channel page. With the fader and
 mute option off, the two strips stay separate. The Channel page of a linked
 strip says which strip it is linked with.
 
+![Matrices 1-2 and 3-4 linked: one stereo strip each](img/gui-linked.png)
+
 ## Channel
 
 Everything about one strip: configuration, preamp, delay, gate, dynamics,
@@ -58,6 +60,8 @@ confirmation, as it pops through the PA. When the input has no preamp
 (card, user input, a bus…), the section says where it comes from instead.
 The Source row of the Config section also shows the physical input
 (`In 12 · AES50 A 12`).
+
+![The Preamp section of a bass DI: AES50 A 7, gain, phantom on](img/gui-headamp.png)
 
 ## Routing
 
@@ -87,6 +91,8 @@ Blocks are edited with the console's own names (`A1-8`, `OUT9-16`, `P161-8`…),
 with a plain description beside them; output sources are listed with the
 names of their strips.
 
+![The AES50 A view: what the stage box outputs carry](img/gui-routing.png)
+
 ## FX
 
 **All** shows the 8 effect slots: the effect loaded in each, and where it
@@ -94,6 +100,8 @@ is used. FX 1-4 fed from a bus say which (`Fed by Bus 13 Fx Room`) and the
 FX returns they come back on; a slot inserted on a strip says which strips
 (`Inserted on Mtx 1 Façade (L), Mtx 2 (R)`, from the console's `/-insert`).
 The strip names link to their Channel page.
+
+![The 8 effect slots and where each is used](img/gui-fx.png)
 
 **FX 1 … FX 8** open one slot: its effect (loading another one asks for a
 confirmation, as the new effect starts from its defaults), its sources for
@@ -114,6 +122,8 @@ this EQ. Read-only, the editor shows the RTA of whatever source the console
 has, and names it. The dB window follows the console's RTA settings
 (`/-prefs/rta`: 30 dB under the RTA gain, or 60 dB).
 
+![A dual graphic EQ on the wedges, with the RTA after the EQ: the cuts show in the spectrum](img/gui-geq.png)
+
 ## Scenes
 
 The console's library, in six tabs: scenes, snippets, channel presets,
@@ -133,6 +143,8 @@ there).
   FX slot. Saving over a used slot asks first.
 - Open a slot (▾) to **rename**, **copy** it to another slot (not snippets:
   the console cannot) or **delete** it.
+
+![Scenes saved on the console](img/gui-scenes.png)
 
 Every command changes the console, so the page needs armed writes. Recalls
 apply the scene safes and snippet filters on a console; the emulator does

@@ -10,7 +10,17 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { usePersistent } from "../lib/route";
-import { GEQ_LABELS, RTA_BANDS, geqPosition, geqRtaSource, isDualGeq, rtaFraction, rtaFreq, rtaSourceLabel, rtaWindow } from "../lib/rta";
+import {
+  GEQ_LABELS,
+  RTA_BANDS,
+  geqPosition,
+  geqRtaSource,
+  isDualGeq,
+  rtaFraction,
+  rtaFreq,
+  rtaSourceLabel,
+  rtaWindow,
+} from "../lib/rta";
 import { quantize, toDisplay } from "../lib/values";
 import { useCanWrite, useMeterGroup, useNodes, useValue } from "../store/hooks";
 import { store } from "../store/store";
@@ -47,17 +57,18 @@ export function GeqEditor({ slot, type }: { slot: number; type: string }) {
   const [flat, setFlat] = useState(false);
 
   // the RTA source this editor wants, written only when writes are armed
-  const want = geqRtaSource(slot, type, side as 0 | 1, post);
+  const want = geqRtaSource(slot, type, side, post);
+  const canRta = useCanWrite("/-action/setrtasrc");
   const src = useValue("/-stat/rtasource");
   const current = src === undefined ? -1 : Number(src.value);
   const written = useRef(-1);
   useEffect(() => {
-    if (can && current !== want && written.current !== want) {
+    if (canRta && current !== want && written.current !== want) {
       written.current = want;
       store.set("/-action/setrtasrc", want);
     }
     if (current === want) written.current = -1;
-  }, [can, current, want]);
+  }, [canRta, current, want]);
   const asked = useValue("/-action/setrtasrc");
   const rta = useMeterGroup("15");
   // a console that does not report /-stat/rtasource back still shows what was asked
@@ -74,7 +85,13 @@ export function GeqEditor({ slot, type }: { slot: number; type: string }) {
         {dual && (
           <div className="seg" role="group" aria-label="Side">
             {(["A", "B"] as const).map((s, i) => (
-              <button key={s} type="button" className={"btn seg-btn" + (side === i ? " lit" : "")} aria-pressed={side === i} onClick={() => setSide(i as 0 | 1)}>
+              <button
+                key={s}
+                type="button"
+                className={"btn seg-btn" + (side === i ? " lit" : "")}
+                aria-pressed={side === i}
+                onClick={() => setSide(i as 0 | 1)}
+              >
                 Side {s}
               </button>
             ))}
@@ -82,14 +99,20 @@ export function GeqEditor({ slot, type }: { slot: number; type: string }) {
         )}
         <div className="seg" role="group" aria-label="RTA tap">
           {[false, true].map((p) => (
-            <button key={String(p)} type="button" className={"btn seg-btn" + (post === p ? " lit" : "")} aria-pressed={post === p} onClick={() => setPost(p)}>
+            <button
+              key={String(p)}
+              type="button"
+              className={"btn seg-btn" + (post === p ? " lit" : "")}
+              aria-pressed={post === p}
+              onClick={() => setPost(p)}
+            >
               RTA {p ? "after" : "before"} EQ
             </button>
           ))}
         </div>
         <span className={"geq-rta-src" + (showing ? "" : " other")}>
           {current < 0 ? "RTA: —" : `RTA: ${rtaSourceLabel(current)}`}
-          {!showing && !can && " · arm writes to show this EQ"}
+          {!showing && !canRta && " · arm writes to show this EQ"}
         </span>
       </div>
 
@@ -106,7 +129,16 @@ export function GeqEditor({ slot, type }: { slot: number; type: string }) {
           className="geq-bands"
           label="Graphic EQ bands"
         />
-        <GeqColumns addrs={[master]} labels={["Master"]} selected={-1} onSelect={() => {}} disabled={!can} set={set} className="geq-master" label="Master level" />
+        <GeqColumns
+          addrs={[master]}
+          labels={["Master"]}
+          selected={-1}
+          onSelect={() => {}}
+          disabled={!can}
+          set={set}
+          className="geq-master"
+          label="Master level"
+        />
       </div>
 
       <div className="geq-selected">
@@ -114,10 +146,22 @@ export function GeqEditor({ slot, type }: { slot: number; type: string }) {
           {GEQ_LABELS[selected]} Hz{dual ? ` · side ${side ? "B" : "A"}` : ""}
         </span>
         <output className="geq-sel-value">{selDb === undefined ? "—" : dbText(selDb) + " dB"}</output>
-        <button type="button" className="btn" disabled={!can || selDb === undefined} onClick={() => set(bands[selected], (selDb ?? 0) - 0.5)} aria-label="Lower by 0.5 dB">
+        <button
+          type="button"
+          className="btn"
+          disabled={!can || selDb === undefined}
+          onClick={() => set(bands[selected], (selDb ?? 0) - 0.5)}
+          aria-label="Lower by 0.5 dB"
+        >
           −
         </button>
-        <button type="button" className="btn" disabled={!can || selDb === undefined} onClick={() => set(bands[selected], (selDb ?? 0) + 0.5)} aria-label="Raise by 0.5 dB">
+        <button
+          type="button"
+          className="btn"
+          disabled={!can || selDb === undefined}
+          onClick={() => set(bands[selected], (selDb ?? 0) + 0.5)}
+          aria-label="Raise by 0.5 dB"
+        >
           +
         </button>
         <button type="button" className="btn" disabled={!can || selDb === undefined} onClick={() => set(bands[selected], 0)}>
@@ -129,8 +173,8 @@ export function GeqEditor({ slot, type }: { slot: number; type: string }) {
         </button>
       </div>
       <p className="muted geq-help">
-        Drag a band up or down (Shift: finely); arrow keys pick a band and move it by 0.5 dB. RTA window {win.bottom} to{" "}
-        {win.top} dB, from the console's RTA settings.
+        Drag a band up or down (Shift: finely); arrow keys pick a band and move it by 0.5 dB. RTA window {win.bottom} to {win.top}{" "}
+        dB, from the console's RTA settings.
       </p>
       {flat && (
         <ConfirmDialog
@@ -256,8 +300,15 @@ function GeqColumns({ addrs, labels, selected, onSelect, disabled, set, rta, win
           const top = db === undefined ? 50 : (100 * (RANGE_DB - Math.max(0, db))) / (2 * RANGE_DB);
           const h = db === undefined ? 0 : (100 * Math.abs(db)) / (2 * RANGE_DB);
           return (
-            <div key={a} className={"geq-col" + (i === selected ? " sel" : "")} style={{ left: `${(100 * i) / n}%`, width: `${100 / n}%` }}>
-              <div className={"geq-fill" + (db !== undefined && db < 0 ? " cut" : "")} style={{ top: `${top}%`, height: `${h}%` }} />
+            <div
+              key={a}
+              className={"geq-col" + (i === selected ? " sel" : "")}
+              style={{ left: `${(100 * i) / n}%`, width: `${100 / n}%` }}
+            >
+              <div
+                className={"geq-fill" + (db !== undefined && db < 0 ? " cut" : "")}
+                style={{ top: `${top}%`, height: `${h}%` }}
+              />
               {db !== undefined && <div className="geq-cap" style={{ top: y(db) }} />}
             </div>
           );

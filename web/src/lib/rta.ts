@@ -58,7 +58,11 @@ export function stripRtaSource(path: string): number | null {
 export const geqBandFreq = (i: number) => 1000 * Math.pow(2, (i - 17) / 3);
 
 /** GEQ_LABELS are the band names the console prints. */
-export const GEQ_LABELS = ["20", "25", "31.5", "40", "50", "63", "80", "100", "125", "160", "200", "250", "315", "400", "500", "630", "800", "1k", "1k25", "1k6", "2k", "2k5", "3k15", "4k", "5k", "6k3", "8k", "10k", "12k5", "16k", "20k"];
+// prettier-ignore
+export const GEQ_LABELS = [
+  "20", "25", "31.5", "40", "50", "63", "80", "100", "125", "160", "200", "250", "315", "400", "500", "630",
+  "800", "1k", "1k25", "1k6", "2k", "2k5", "3k15", "4k", "5k", "6k3", "8k", "10k", "12k5", "16k", "20k",
+];
 
 /**
  * geqPosition places a frequency on the axis of the 31 graphic EQ bands,

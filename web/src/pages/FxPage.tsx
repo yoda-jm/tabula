@@ -39,7 +39,13 @@ export function FxPage({ slot }: { slot?: number }) {
   return (
     <div className="page fx">
       <div className="banks" role="tablist" aria-label="Effect slots">
-        <button type="button" role="tab" aria-selected={!slot} className={"bank" + (!slot ? " active" : "")} onClick={() => go({ page: "fx" })}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!slot}
+          className={"bank" + (!slot ? " active" : "")}
+          onClick={() => go({ page: "fx" })}
+        >
           All
         </button>
         {SLOTS.map((n) => (

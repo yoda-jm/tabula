@@ -40,6 +40,8 @@ group("library", () => {
     expect(describe({ op: "load", kind: "scene", index: 3 }, "Concert")).toBe("Recall scene 03 “Concert”");
     expect(describe({ op: "load", kind: "libfx", index: 0 }, "Hall")).toBe("Load effect preset 1 “Hall”");
     expect(describe({ op: "copy", kind: "scene", index: 3, to: 4 }, "")).toBe("Copy scene 03 to 04");
-    expect(describe({ op: "rename", kind: "snippet", index: 0, name: "Intro" }, "Old")).toBe("Rename snippet 00 “Old” to “Intro”");
+    expect(describe({ op: "rename", kind: "snippet", index: 0, name: "Intro" }, "Old")).toBe(
+      "Rename snippet 00 “Old” to “Intro”",
+    );
   });
 });

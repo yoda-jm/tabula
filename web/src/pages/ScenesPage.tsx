@@ -73,7 +73,9 @@ export function ScenesPage() {
       </div>
       <NotConnected />
       {!can && (
-        <p className="warn-box">Recalling, saving or changing the library changes the console: it needs armed writes (top right).</p>
+        <p className="warn-box">
+          Recalling, saving or changing the library changes the console: it needs armed writes (top right).
+        </p>
       )}
       <SaveForm k={k} slots={slots} actions={actions} />
       <section className="card">
@@ -91,10 +93,17 @@ export function ScenesPage() {
             <SlotRow key={s.slot} k={k} s={s} current={s.slot === current} actions={actions} />
           ))}
         </div>
-        {k.kind === "scene" && <p className="muted lib-note">A recall loads the whole scene; the console applies its scene safes.</p>}
+        {k.kind === "scene" && (
+          <p className="muted lib-note">A recall loads the whole scene; the console applies its scene safes.</p>
+        )}
       </section>
       {ask && (
-        <ConfirmDialog title={describe(ask.req, ask.name) + "?"} confirm={ask.req.op === "load" ? "Recall" : "Go ahead"} onCancel={() => setAsk(null)} onConfirm={() => void run(ask.req, ask.name)}>
+        <ConfirmDialog
+          title={describe(ask.req, ask.name) + "?"}
+          confirm={ask.req.op === "load" ? "Recall" : "Go ahead"}
+          onCancel={() => setAsk(null)}
+          onConfirm={() => void run(ask.req, ask.name)}
+        >
           {ask.body}
         </ConfirmDialog>
       )}
@@ -145,8 +154,7 @@ function SlotRow({ k, s, current, actions }: { k: KindInfo; s: Slot; current: bo
   const [open, setOpen] = useState(false);
   const label = slotLabel(k, s.slot);
   const simpleLoad = !k.target;
-  const recall = () =>
-    actions.ask({ req: { op: "load", kind: k.kind, index: s.slot }, name: s.name, body: recallBody(k) });
+  const recall = () => actions.ask({ req: { op: "load", kind: k.kind, index: s.slot }, name: s.name, body: recallBody(k) });
   return (
     <div className={"slot" + (s.used ? "" : " empty") + (current ? " current" : "") + (open ? " open" : "")}>
       <div className="slot-head">
@@ -166,7 +174,13 @@ function SlotRow({ k, s, current, actions }: { k: KindInfo; s: Slot; current: bo
             Load…
           </button>
         )}
-        <button type="button" className="btn slot-more" aria-label={`More for ${label}`} aria-expanded={open} onClick={() => setOpen(!open)}>
+        <button
+          type="button"
+          className="btn slot-more"
+          aria-label={`More for ${label}`}
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
           {open ? "▴" : "▾"}
         </button>
       </div>
@@ -190,7 +204,11 @@ function SlotActions({ k, s, actions }: { k: KindInfo; s: Slot; actions: Actions
         <div className="row slot-load">
           <label>
             <span className="field-label">Load to</span>
-            {k.target === "strip" ? <StripSelect value={target} onChange={setTarget} /> : <FxSelect value={target} onChange={setTarget} />}
+            {k.target === "strip" ? (
+              <StripSelect value={target} onChange={setTarget} />
+            ) : (
+              <FxSelect value={target} onChange={setTarget} />
+            )}
           </label>
           {k.kind === "libchan" && (
             <fieldset className="scope">
@@ -228,7 +246,8 @@ function SlotActions({ k, s, actions }: { k: KindInfo; s: Slot; actions: Actions
           className="row"
           onSubmit={(e) => {
             e.preventDefault();
-            if (name.trim() && name.trim() !== s.name) void actions.run({ op: "rename", kind: k.kind, index: s.slot, name: name.trim() }, s.name);
+            if (name.trim() && name.trim() !== s.name)
+              void actions.run({ op: "rename", kind: k.kind, index: s.slot, name: name.trim() }, s.name);
           }}
         >
           <label className="grow">
@@ -290,7 +309,14 @@ function SaveForm({ k, slots, actions }: { k: KindInfo; slots: Slot[]; actions: 
   const at = slot ?? (free < 0 ? 0 : free);
   const taken = slots[at]?.used;
   const save = () => {
-    const req: LibraryRequest = { op: "save", kind: k.kind, index: at, name: name.trim(), ...(k.notes ? { note: note.trim() } : {}), ...(k.target ? { target } : {}) };
+    const req: LibraryRequest = {
+      op: "save",
+      kind: k.kind,
+      index: at,
+      name: name.trim(),
+      ...(k.notes ? { note: note.trim() } : {}),
+      ...(k.target ? { target } : {}),
+    };
     if (taken) {
       actions.ask({
         req,
@@ -333,12 +359,23 @@ function SaveForm({ k, slots, actions }: { k: KindInfo; slots: Slot[]; actions: 
         {k.target && (
           <label>
             <span className="field-label">From {from}</span>
-            {k.target === "strip" ? <StripSelect value={target} onChange={setTarget} /> : <FxSelect value={target} onChange={setTarget} />}
+            {k.target === "strip" ? (
+              <StripSelect value={target} onChange={setTarget} />
+            ) : (
+              <FxSelect value={target} onChange={setTarget} />
+            )}
           </label>
         )}
         <label className="grow">
           <span className="field-label">Name</span>
-          <input className="input" type="text" value={name} maxLength={31} placeholder="Name" onChange={(e) => setName(e.target.value)} />
+          <input
+            className="input"
+            type="text"
+            value={name}
+            maxLength={31}
+            placeholder="Name"
+            onChange={(e) => setName(e.target.value)}
+          />
         </label>
         {k.notes && (
           <label className="grow">

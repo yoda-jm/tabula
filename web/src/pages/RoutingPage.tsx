@@ -49,7 +49,8 @@ const two = (n: number) => String(n).padStart(2, "0");
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 /** The nodes the routing views read: re-render when any of them changes. */
-const WATCHED = /^\/(config\/routing|config\/userrout|outputs\/|-ha\/|-stat\/aes50$|(ch|auxin|fxrtn|bus|mtx)\/\d\d\/config$|main\/(st|m)\/config$)/;
+const WATCHED =
+  /^\/(config\/routing|config\/userrout|outputs\/|-ha\/|-stat\/aes50$|(ch|auxin|fxrtn|bus|mtx)\/\d\d\/config$|main\/(st|m)\/config$)/;
 
 export function RoutingPage() {
   const schema = useSchema();
@@ -79,7 +80,9 @@ export function RoutingPage() {
       <div role="tabpanel" aria-label={current.label}>
         {current.id === "inputs" && <InputsView />}
         {current.id === "outputs" && <OutputsView options={sourceOptions} />}
-        {(current.id === "AES50A" || current.id === "AES50B" || current.id === "CARD") && <PortView port={portById(current.id)} />}
+        {(current.id === "AES50A" || current.id === "AES50B" || current.id === "CARD") && (
+          <PortView port={portById(current.id)} />
+        )}
         {current.id === "other" && <OtherView options={sourceOptions} />}
       </div>
     </div>
@@ -115,8 +118,8 @@ function InputsView() {
     <>
       <Card title="Input routing" aside={<ParamControl addr="/config/routing/routswitch" />}>
         <p className="muted route-hint">
-          REC takes the inputs from the live blocks; PLAY from the playback blocks (usually the card, for a virtual
-          soundcheck). The switch is the console's REC/PLAY routing switch.
+          REC takes the inputs from the live blocks; PLAY from the playback blocks (usually the card, for a virtual soundcheck).
+          The switch is the console's REC/PLAY routing switch.
         </p>
         <div className="route-columns">
           {(["/config/routing/IN", "/config/routing/PLAY"] as const).map((node) => (
@@ -209,8 +212,8 @@ function OutputsView({ options }: { options: IntOption[] }) {
   return (
     <Card title="Outputs 1-16">
       <p className="muted route-hint">
-        The console's outputs. Each output port (AES50, card, local XLR) picks them in blocks: the last column says where
-        each one goes.
+        The console's outputs. Each output port (AES50, card, local XLR) picks them in blocks: the last column says where each one
+        goes.
       </p>
       <div className="route-table" role="table" aria-label="Outputs 1-16">
         <div className="route-row out head" role="row">
@@ -222,14 +225,28 @@ function OutputsView({ options }: { options: IntOption[] }) {
           <span role="columnheader">Goes to</span>
         </div>
         {range(1, 16).map((n) => (
-          <OutputRow key={n} node={`/outputs/main/${two(n)}`} label={`Out ${two(n)}`} options={options} delay dest={dest[n - 1]} />
+          <OutputRow
+            key={n}
+            node={`/outputs/main/${two(n)}`}
+            label={`Out ${two(n)}`}
+            options={options}
+            delay
+            dest={dest[n - 1]}
+          />
         ))}
       </div>
     </Card>
   );
 }
 
-function OutputRow(props: { node: string; label: string; options: IntOption[]; delay?: boolean; dest?: string[]; noInvert?: boolean }) {
+function OutputRow(props: {
+  node: string;
+  label: string;
+  options: IntOption[];
+  delay?: boolean;
+  dest?: string[];
+  noInvert?: boolean;
+}) {
   const { node } = props;
   return (
     <div className="route-row out" role="row">
@@ -331,7 +348,14 @@ function OtherView({ options }: { options: IntOption[] }) {
   );
 }
 
-function OutputGroup(props: { title: string; node: string; count: number; label: string; options: IntOption[]; noInvert?: boolean }) {
+function OutputGroup(props: {
+  title: string;
+  node: string;
+  count: number;
+  label: string;
+  options: IntOption[];
+  noInvert?: boolean;
+}) {
   return (
     <Card title={props.title}>
       <div className="route-table" role="table" aria-label={props.title}>
@@ -360,8 +384,12 @@ function userOptions(): IntOption[] {
 function UserRouting() {
   const [open, setOpen] = useState(false);
   const used = [
-    ...range(1, 32).filter((n) => Number(lookup.value(`/config/userrout/in/${two(n)}`) ?? 0) > 0).map((n) => `in ${n}`),
-    ...range(1, 48).filter((n) => Number(lookup.value(`/config/userrout/out/${two(n)}`) ?? 0) > 0).map((n) => `out ${n}`),
+    ...range(1, 32)
+      .filter((n) => Number(lookup.value(`/config/userrout/in/${two(n)}`) ?? 0) > 0)
+      .map((n) => `in ${n}`),
+    ...range(1, 48)
+      .filter((n) => Number(lookup.value(`/config/userrout/out/${two(n)}`) ?? 0) > 0)
+      .map((n) => `out ${n}`),
   ];
   const options = useMemo(userOptions, []);
   return (
