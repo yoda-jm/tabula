@@ -54,6 +54,8 @@ type Server struct {
 	loginMu    sync.Mutex   // one password check at a time (password.go)
 	limiter    loginLimiter // password.go
 
+	allowedHosts []string // origin.go
+
 	lib   libraryState // library.go
 	audio audioState   // audio.go
 }
@@ -91,7 +93,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	s.libraryRoutes(mux)
 	s.audioRoutes(mux)
 	mux.Handle("/", ui)
-	return gzipJSON(s.guard(mux))
+	return s.protect(gzipJSON(s.guard(mux)))
 }
 
 // Connect connects to a console and starts syncing it (also used by -console).

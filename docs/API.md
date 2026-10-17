@@ -133,6 +133,14 @@ event stream.
 
 ## Access
 
+Requests that change something are refused (403) when a browser says they
+come from a page of another site (`Sec-Fetch-Site`, or `Origin` not matching
+the host); requests without those headers (scripts, `curl`) are not
+concerned. Every request naming `tabula` by a host name it does not know is
+refused too: IP addresses, `localhost` and the machine's name work, other
+names need `-allowed-hosts`.
+
+
 Every API request is checked against the caller's role (see
 [access](access.md)): requests from the machine running `tabula` are the
 engineer's, unless an engineer password is set; other devices use an access

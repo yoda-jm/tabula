@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -32,6 +33,7 @@ func main() {
 		accessF  = flag.String("access", "access.json", "file keeping the access links made on the Access page")
 		guest    = flag.String("guest", "none", "role of other devices without an access link: none, viewer or engineer")
 		resetPw  = flag.Bool("reset-password", false, "remove the engineer password (and its sessions) from the access file, then exit")
+		hosts    = flag.String("allowed-hosts", "", "other host names the GUI is opened by, comma-separated (a DNS name, a reverse proxy); IP addresses, localhost and this machine's name always work")
 		showVer  = flag.Bool("version", false, "print the version and exit")
 		audioF   = addAudioFlags(flag.CommandLine) // audio.go
 	)
@@ -64,6 +66,9 @@ func main() {
 			fmt.Println("no engineer password in", *accessF)
 		}
 		return
+	}
+	if *hosts != "" {
+		api.SetAllowedHosts(strings.Split(*hosts, ","))
 	}
 	guestRole, err := webapi.ParseRole(*guest)
 	if err == nil && guestRole == webapi.RoleMusician {

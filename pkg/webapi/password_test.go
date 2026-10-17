@@ -20,6 +20,7 @@ func init() {
 func from(h http.Handler, addr, method, url, body, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, url, strings.NewReader(body))
 	req.RemoteAddr = addr
+	req.Host = "192.0.2.1:8033"
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0")
 	if token != "" {
 		req.AddCookie(&http.Cookie{Name: accessCookie, Value: token})

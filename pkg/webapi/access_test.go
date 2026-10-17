@@ -61,6 +61,7 @@ func TestBaseURLs(t *testing.T) {
 func remote(h http.Handler, method, url, body, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, url, strings.NewReader(body))
 	req.RemoteAddr = "192.0.2.10:50000"
+	req.Host = "192.0.2.1:8033"
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -75,6 +76,7 @@ func remote(h http.Handler, method, url, body, token string) *httptest.ResponseR
 func local(h http.Handler, method, url, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, url, strings.NewReader(body))
 	req.RemoteAddr = "127.0.0.1:50000"
+	req.Host = "localhost:8033"
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 	return w

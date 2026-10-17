@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### tabula
+- Security: requests that change something are refused when they come from
+  a page of another site (a page open in a browser of the laptop could
+  otherwise use tabula as the engineer, and set a custom recorder command),
+  and tabula answers only to IP addresses, localhost and the machine's name
+  (`-allowed-hosts` adds others), against DNS rebinding.
 - The musicians' in-ear page is a desk of tall vertical faders with meters,
   one per source with its name and colour, the musician's own volume fixed
   on the right, and an overview bar at the bottom to slide through the

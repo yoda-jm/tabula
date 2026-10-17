@@ -145,4 +145,19 @@ its choice: a custom audio recorder command is only accepted from the
 engineer on the machine itself (signed in there when a password is set;
 behind a reverse proxy, from any engineer).
 
+**Other sites.** A web page of any site open in a browser of the laptop
+sends its requests from the laptop too. `tabula` refuses what such a page
+could do with it:
+
+- A request that changes something (a write, a link, the password, the
+  recorder) coming from a page of another site is refused: the browser says
+  where a request comes from (`Sec-Fetch-Site`, `Origin`). Requests without
+  those headers, from `curl` or a script, are not browser pages and pass.
+- `tabula` answers only to the names it knows: IP addresses, `localhost`,
+  this machine's name (and `name.local`). A site could otherwise make its own
+  name lead to the laptop (DNS rebinding) and read the answers as if it were
+  `tabula`. To open it by another name (a DNS name on the band's network, a
+  reverse proxy's), start it with `-allowed-hosts tabula.lan`; any other
+  name gets a page saying so.
+
 See the [HTTP API](API.md#access) for the endpoints.
