@@ -25,9 +25,12 @@ type Type interface {
 }
 
 // Enum is an int carried as an index into Names; clients may also send the name.
+// Aliases are other spellings accepted on input, such as those of older
+// firmware; values are always written with Names.
 type Enum struct {
-	Names []string
-	Def   int32
+	Names   []string
+	Def     int32
+	Aliases map[string]int32
 }
 
 func (Enum) Tag() byte            { return 'i' }
@@ -46,6 +49,9 @@ func (e Enum) Parse(s string) (osc.Arg, error) {
 		if n == s {
 			return osc.Int(int32(i)), nil
 		}
+	}
+	if i, ok := e.Aliases[s]; ok && e.valid(i) {
+		return osc.Int(i), nil
 	}
 	if i, err := strconv.Atoi(s); err == nil && e.valid(int32(i)) {
 		return osc.Int(int32(i)), nil

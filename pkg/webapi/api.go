@@ -18,6 +18,7 @@ import (
 	"github.com/yoda-jm/tabula/pkg/console"
 	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/schema"
+	"github.com/yoda-jm/tabula/pkg/session"
 	"github.com/yoda-jm/tabula/pkg/state"
 )
 
@@ -39,10 +40,18 @@ type Server struct {
 
 	schemaOnce sync.Once
 	schemaJSON []byte
+
+	sessionsDir  string
+	rec          *session.Recorder
+	recordErr    string
+	replayCancel context.CancelFunc
+	replayOf     string
+	replayAt     float64
+	recordOnSync bool
 }
 
 func New(log *slog.Logger) *Server {
-	s := &Server{log: log, model: "M32C", schema: schema.Build("M32C")}
+	s := &Server{log: log, model: "M32C", schema: schema.Build("M32C"), sessionsDir: "sessions"}
 	s.hub.init()
 	return s
 }
@@ -60,6 +69,14 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/state", s.getState)
 	mux.HandleFunc("POST /api/set", s.set)
 	mux.HandleFunc("GET /api/events", s.events)
+	mux.HandleFunc("GET /api/record", s.getRecord)
+	mux.HandleFunc("POST /api/record/start", s.recordStart)
+	mux.HandleFunc("POST /api/record/stop", s.recordStop)
+	mux.HandleFunc("POST /api/record/mark", s.recordMark)
+	mux.HandleFunc("GET /api/sessions", s.listSessions)
+	mux.HandleFunc("GET /api/sessions/{name}", s.getSession)
+	mux.HandleFunc("POST /api/replay/start", s.replayStart)
+	mux.HandleFunc("POST /api/replay/stop", s.replayStop)
 	mux.Handle("/", ui)
 	return gzipJSON(mux)
 }
@@ -108,12 +125,45 @@ func (s *Server) Connect(addr string) error {
 		s.mu.Unlock()
 		s.publishStatus()
 		s.hub.publish("resync", json.RawMessage(`{}`))
+		s.mu.Lock()
+		auto := s.recordOnSync
+		s.mu.Unlock()
+		if auto {
+			if err := s.StartRecording("started with -record"); err != nil {
+				s.log.Error("recording", "err", err)
+			}
+			s.publishRecord()
+		}
+		go s.runMeters(ctx, c)
+		c.OnStatus(s.publishStatus)
+		c.OnReconnect(func() {
+			s.publishStatus()
+			s.hub.publish("resync", json.RawMessage(`{}`))
+			select { // subscribe the wanted meters again
+			case s.hub.meterKick <- struct{}{}:
+			default:
+			}
+		})
 		c.Run(ctx)
 	}()
 	return nil
 }
 
+// RecordOnSync starts a recording as soon as a console is connected and synced.
+func (s *Server) RecordOnSync(on bool) {
+	s.mu.Lock()
+	s.recordOnSync = on
+	s.mu.Unlock()
+}
+
 func (s *Server) closeLocked() {
+	if s.rec != nil {
+		s.rec.Stop()
+		s.rec = nil
+	}
+	if s.replayCancel != nil {
+		s.replayCancel()
+	}
 	if s.cancel != nil {
 		s.cancel()
 		s.cancel = nil

@@ -121,6 +121,8 @@ func fields(n int, name func(int) string, t Type) []Field {
 	return out
 }
 
+var blocks4 = []string{"1-8", "9-16", "17-24", "25-32"}
+
 func two(i int) string   { return fmt.Sprintf("%02d", i) }
 func plain(i int) string { return fmt.Sprint(i) }
 func pair(i int) string  { return fmt.Sprintf("%d-%d", 2*i-1, 2*i) }
@@ -194,15 +196,32 @@ func (b builder) config() {
 	b.node("/config/userrout/out", fields(48, two, Int{0, 208, 0})...)
 	b.node("/config/userrout/in", fields(32, two, Int{0, 168, 0})...)
 	b.node("/config/routing", f("routswitch", Enum{Names: []string{"REC", "PLAY"}}))
-	in := []Field{f("1-8", routIn), f("9-16", routIn), f("17-24", routIn), f("25-32", routIn), f("AUX", routAux)}
-	b.node("/config/routing/IN", in...)
+	// Factory routing: local inputs straight to channels, to the card and to
+	// AES50; outputs 1-16 on the local outputs; playback from the card.
+	ident := func(e Enum, first int32) func(int) Field {
+		return func(i int) Field { return f(blocks4[i], with(e, first+int32(i))) }
+	}
+	in, play := make([]Field, 4), make([]Field, 4)
+	for i := range 4 {
+		in[i], play[i] = ident(routIn, 0)(i), ident(routIn, 16)(i)
+	}
+	b.node("/config/routing/IN", append(in, f("AUX", routAux))...)
 	blocks := []string{"1-8", "9-16", "17-24", "25-32", "33-40", "41-48"}
 	for _, port := range []string{"AES50A", "AES50B"} {
-		b.node("/config/routing/"+port, fields(6, func(i int) string { return blocks[i-1] }, routBlock)...)
+		fs := make([]Field, 6)
+		for i := range fs {
+			fs[i] = f(blocks[i], with(routBlock, int32(i%4)))
+		}
+		b.node("/config/routing/"+port, fs...)
 	}
-	b.node("/config/routing/CARD", fields(4, func(i int) string { return blocks[i-1] }, routBlock)...)
-	b.node("/config/routing/OUT", f("1-4", routOut1), f("5-8", routOut2), f("9-12", routOut1), f("13-16", routOut2))
-	b.node("/config/routing/PLAY", in...)
+	card := make([]Field, 4)
+	for i := range card {
+		card[i] = ident(routBlock, 0)(i)
+	}
+	b.node("/config/routing/CARD", card...)
+	b.node("/config/routing/OUT", f("1-4", with(routOut1, 20)), f("5-8", with(routOut2, 20)),
+		f("9-12", with(routOut1, 21)), f("13-16", with(routOut2, 21)))
+	b.node("/config/routing/PLAY", append(play, f("AUX", routAux))...)
 	for _, set := range []string{"A", "B", "C"} {
 		p := "/config/userctrl/" + set
 		b.node(p, f("color", colors))

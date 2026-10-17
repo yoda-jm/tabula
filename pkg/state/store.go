@@ -14,7 +14,7 @@ import (
 )
 
 // ErrNotModelled is returned for parameters whose type depends on a value
-// that is not modelled yet (effect parameters of some effects).
+// with no model (an effect type the schema does not know).
 var ErrNotModelled = errors.New("not modelled yet")
 
 // Change is one parameter that took a new value.

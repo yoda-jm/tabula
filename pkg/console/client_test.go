@@ -105,3 +105,57 @@ func waitFor(t *testing.T, cond func() bool) {
 	}
 	t.Fatal("condition not met in time")
 }
+
+// A console that disappears is reported lost; when it comes back (here a
+// new emulator on the same port, with a changed scene) the mirror is synced
+// again.
+func TestReconnect(t *testing.T) {
+	st := state.New(schema.Build("M32C"))
+	first := emu.New(emu.Config{Model: "M32C", Logger: quiet}, st)
+	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := conn.LocalAddr().(*net.UDPAddr)
+	ctx1, stop1 := context.WithCancel(context.Background())
+	go first.Serve(ctx1, conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	mirror := state.New(schema.Build("M32C"))
+	c, err := Dial(ctx, addr.String(), mirror, quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	c.tick, c.probeAfter = 50*time.Millisecond, 100*time.Millisecond
+	if err := c.Sync(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	reconnected := make(chan struct{}, 1)
+	c.OnReconnect(func() { reconnected <- struct{}{} })
+	go c.Run(ctx)
+
+	stop1()
+	waitFor(t, func() bool { return !c.Status().Connected })
+
+	st2 := state.New(schema.Build("M32C"))
+	st2.ApplyText(`/ch/01/config "Rebooted" 1 GN 1`, "test")
+	second := emu.New(emu.Config{Model: "M32C", Logger: quiet}, st2)
+	conn2, err := net.ListenUDP("udp4", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx2, stop2 := context.WithCancel(context.Background())
+	defer stop2()
+	go second.Serve(ctx2, conn2)
+
+	select {
+	case <-reconnected:
+	case <-time.After(10 * time.Second):
+		t.Fatal("no reconnection")
+	}
+	if v, _, _ := mirror.Get("/ch/01/config/name"); v.Str != "Rebooted" || !c.Status().Connected {
+		t.Errorf("after reconnect: name %q, status %+v", v.Str, c.Status())
+	}
+}

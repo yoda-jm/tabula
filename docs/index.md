@@ -22,6 +22,8 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   connected clients, the traffic, and every request the emulator did not
   understand — connect an editor and see what is missing.
 - `-unhandled-log file.jsonl` appends every unhandled request to a file.
+- `-library dir` keeps the scenes, snippets and presets saved with `/save`
+  (from an editor's library pages) in a directory, one file each.
 - `-model` picks what `/info` reports: X32, X32RACK, X32C, X32P, X32CORE, M32, M32R, M32C.
 
 Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases).
@@ -30,13 +32,15 @@ Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases)
 
 - Every parameter of a scene file: configuration and routing, 32 channels,
   8 aux ins, 8 FX returns, 16 buses, 6 matrices, main LR and mono, 8 DCAs,
-  FX slots, outputs, 128 headamps.
+  FX slots with the parameters of all 61 effects, outputs, 128 headamps.
 - `/info`, `/xinfo`, `/status`, get and set of every parameter (enums by
   name or index, floats quantized to the console's known values), node sets
   with multiple type tags, `/node`, `/` (echoed), and `/xremote`: changes
   are pushed to the other connected clients.
 - Real scenes round-trip byte for byte, also when dumped over the network
   with Patrick-Gilles Maillot's `X32GetScene`.
+- The scene, snippet and preset library: `/save`, `/load`, `/copy`,
+  `/delete`, `/rename`, `/add`, `/showdump`.
 - Preferences and status (`/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-usb`,
   `/-urec`, `/-action`…), as the editors query them when connecting.
 - Meters (`/meters/0…16`) with synthetic levels that follow the mix, and
@@ -44,9 +48,7 @@ Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases)
 
 ### Not yet
 
-Most effect parameters (only HALL is modelled; other effects are kept as
-text), the scene/preset library commands, and the side effects of actions:
-see the [plan](PLAN.md).
+Scene safes and snippet filters on recall: see the [plan](PLAN.md).
 
 ## tabula — the client *(coming)*
 

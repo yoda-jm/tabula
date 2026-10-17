@@ -42,10 +42,11 @@ Both share the same library (`pkg/`).
 Driven by the unknown-request log while connecting the real editors:
 - [x] `/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-action`, `/-undo`, `/-usb`, `/-urec`, `/-insert`, `/-ha` (1126 nodes; formats checked against a real M32C's values cached by M32-Edit).
 - [x] `/meters/0…16` with synthetic levels following the mix, `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
-- [ ] Effect parameters (`/fx/N/par/NN`): the framework is there (fields depend on the effect type; switching effect loads its defaults); HALL is modelled, the other effects are kept as text until their tables land.
-- [ ] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/showdump`.
-- [ ] Side effects of `/-action/*` and computed status (`/-insert`, `/-ha`, `/-stat/solo`).
-- [ ] Connect X32-Edit and M32-Edit, work through the unhandled-request log.
+- [x] Effect parameters (`/fx/N/par/NN`): fields follow the effect type (switching effect loads its defaults); all 61 effects modelled, with ranges, steps, formats and defaults matching M32-Edit's built-in tables; 57 of 61 real parameter lines round-trip byte for byte, the other 4 (older firmware spellings) load and are written in today's form.
+- [x] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/add` (cues), `/showdump`, with listings in `/-show` and `/-libs`, optionally kept in a directory (`-library`). Scene safes and snippet filters are not applied yet.
+- [x] Side effects of `/-action/*` (go scene/snippet/cue, clear solo, undo checkpoint and undo, init) and computed status (`/-insert`, `/-ha/NN/index` from sources and input routing, `/-stat/solo`).
+- [x] Factory presets: `-presets` imports M32-Edit's library (channel, effect and routing presets).
+- [ ] Connect X32-Edit and M32-Edit, work through the unhandled-request log (guide: `docs/testing-with-editors.md`).
 
 ### 3. Client — connection and GUI v1 *(in progress)*
 - [x] `pkg/console`: discovery (broadcast `/xinfo`), full sync via `/node` (window of 32 requests), `/xremote` renewal, writes refused until armed; tested end to end against the emulator.
@@ -53,9 +54,10 @@ Driven by the unknown-request log while connecting the real editors:
 - Web GUI (embedded in the binary): connection page, generic parameter browser generated from the schema (all menus early), then console-like screens (Home, Gate, Dyn, EQ, Sends, Routing, Outputs, FX, Scenes).
 - WebSocket for state changes, binary frames for meters.
 
-### 4. Recording and replay
-- Session = start snapshot (`.scn`, opens in M32-Edit) + time-stamped log of every change (who/what/when) + markers.
-- Replay to the emulator or a console, with seek; replaying to a real console asks for confirmation.
+### 4. Recording and replay *(in progress)*
+- [x] Session = start snapshot (`.scn`, opens in M32-Edit) + time-stamped log of every change (who/what/when) + markers (`pkg/session`).
+- [x] Replay to the emulator or a console, with seek and speed; refused unless writes are armed. API in `docs/API.md`; `tabula -record` records unattended.
+- [ ] GUI for recording, markers, session browsing and replay.
 - Later: USB audio capture in the same process for exact sync (RF64 or one file per track: a 32-track set exceeds the 4 GB WAV limit).
 
 ### 5. Live viewers, roles, band screens

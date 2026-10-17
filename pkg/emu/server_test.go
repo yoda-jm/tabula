@@ -188,7 +188,6 @@ func TestUnhandledIsRecorded(t *testing.T) {
 	p := dial(t, addr)
 	p.send("/ch/01/nosuch")
 	p.send("/ch/01/nosuch")
-	p.send("/showdump")
 	p.send("/ch/01/mix/fader", osc.String("loud"))
 	p.ask("/info") // wait for the previous packets to be handled
 
@@ -198,9 +197,6 @@ func TestUnhandledIsRecorded(t *testing.T) {
 	}
 	if u := got["/ch/01/nosuch"]; u.Count != 2 || u.Reason != ReasonUnknown {
 		t.Errorf("/ch/01/nosuch: %+v", u)
-	}
-	if u := got["/showdump"]; u.Reason != ReasonUnimplemented {
-		t.Errorf("/showdump: %+v", u)
 	}
 	if u := got["/ch/01/mix/fader"]; u.Reason != ReasonRejected || u.Detail == "" {
 		t.Errorf("rejected fader: %+v", u)

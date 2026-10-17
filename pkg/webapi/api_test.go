@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/yoda-jm/tabula/pkg/emu"
+	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/scene"
 	"github.com/yoda-jm/tabula/pkg/schema"
 	"github.com/yoda-jm/tabula/pkg/state"
@@ -141,5 +142,125 @@ func TestAPI(t *testing.T) {
 	v, _, _ := emuSrv.Store().Get("/ch/12/mix/on")
 	if v.Int != 0 {
 		t.Errorf("emulator mute not set: %v", v)
+	}
+}
+
+func connected(t *testing.T, url string) {
+	t.Helper()
+	var st statusView
+	for deadline := time.Now().Add(15 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		getJSON(t, url+"/api/status", &st)
+		if st.Connected {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("not connected: %+v", st)
+		}
+	}
+}
+
+func TestRecordAndReplay(t *testing.T) {
+	emuSrv, emuAddr := startEmu(t)
+	api := New(quiet)
+	api.SetSessionsDir(t.TempDir())
+	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
+	defer ts.Close()
+	post(t, ts.URL+"/api/connect", `{"addr":"`+emuAddr+`"}`)
+	connected(t, ts.URL)
+
+	if code := post(t, ts.URL+"/api/record/start", `{"note":"set 1"}`); code != http.StatusOK {
+		t.Fatalf("record start: %d", code)
+	}
+	// A change made on the "console" (another client of the emulator).
+	other, _ := net.Dial("udp", emuAddr)
+	defer other.Close()
+	other.Write(osc.NewMessage("/ch/12/mix/fader", osc.Float(0.25)).Bytes())
+	time.Sleep(100 * time.Millisecond)
+	post(t, ts.URL+"/api/record/mark", `{"label":"Song 2"}`)
+	post(t, ts.URL+"/api/record/stop", ``)
+
+	var list []sessionView
+	getJSON(t, ts.URL+"/api/sessions", &list)
+	if len(list) != 1 || list[0].Meta.Events < 1 || list[0].Meta.Markers != 1 {
+		t.Fatalf("sessions: %+v", list)
+	}
+	var one sessionView
+	getJSON(t, ts.URL+"/api/sessions/"+list[0].Name, &one)
+	if len(one.Markers) != 1 || one.Markers[0].Marker != "Song 2" {
+		t.Errorf("session: %+v", one)
+	}
+
+	// Replay needs armed writes, then brings the console back to the recording.
+	body := `{"session":"` + list[0].Name + `","from":0,"speed":20}`
+	if code := post(t, ts.URL+"/api/replay/start", body); code != http.StatusForbidden {
+		t.Errorf("unarmed replay: %d", code)
+	}
+	post(t, ts.URL+"/api/arm", `{"armed":true}`)
+	other.Write(osc.NewMessage("/ch/12/mix/fader", osc.Float(1)).Bytes())
+	time.Sleep(50 * time.Millisecond)
+	if code := post(t, ts.URL+"/api/replay/start", body); code != http.StatusAccepted {
+		t.Fatalf("replay: %d", code)
+	}
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		v, _, _ := emuSrv.Store().Get("/ch/12/mix/fader")
+		var rv recordView
+		getJSON(t, ts.URL+"/api/record", &rv)
+		if !rv.Replaying && v.Float > 0.24 && v.Float < 0.26 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("replay did not restore the fader: %v, %+v", v, rv)
+		}
+	}
+}
+
+func TestMeters(t *testing.T) {
+	_, emuAddr := startEmu(t)
+	api := New(quiet)
+	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
+	defer ts.Close()
+	post(t, ts.URL+"/api/connect", `{"addr":"`+emuAddr+`"}`)
+	connected(t, ts.URL)
+
+	resp, err := http.Get(ts.URL + "/api/events?meters=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	got := make(chan []float64, 1)
+	go func() {
+		sc := bufio.NewScanner(resp.Body)
+		sc.Buffer(make([]byte, 1<<16), 1<<20)
+		meters := false
+		for sc.Scan() {
+			line := sc.Text()
+			if line == "event: meters" {
+				meters = true
+				continue
+			}
+			if meters && strings.HasPrefix(line, "data: ") {
+				var m struct {
+					ID     string    `json:"id"`
+					Values []float64 `json:"values"`
+				}
+				json.Unmarshal([]byte(line[6:]), &m)
+				if m.ID == "1" {
+					got <- m.Values
+					return
+				}
+			}
+			meters = false
+		}
+	}()
+	select {
+	case v := <-got:
+		if len(v) != 96 {
+			t.Errorf("%d values for /meters/1", len(v))
+		}
+		if v[11] <= 0 { // channel 12 has a source and a signal
+			t.Errorf("channel 12 input level %v", v[11])
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("no meters event")
 	}
 }

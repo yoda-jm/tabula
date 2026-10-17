@@ -61,6 +61,11 @@ type Server struct {
 	Unhandled *Unhandleds
 	traffic   *traffic
 	subs      subscriptions
+	lib       *library
+	derived   derived
+
+	undoMu sync.Mutex
+	undo   []string // scene lines saved by /-action/undopt
 }
 
 func New(cfg Config, st *state.Store) *Server {
@@ -84,10 +89,13 @@ func New(cfg Config, st *state.Store) *Server {
 		clients:   map[string]*Client{},
 		Unhandled: newUnhandleds(cfg.Logger, cfg.UnhandledLog),
 		traffic:   newTraffic(cfg.Traffic),
+		lib:       newLibrary(),
 	}
+	s.derived.kick = make(chan struct{}, 1)
 	// The network name is a preference: /xinfo and /status report it.
 	st.Set("/-prefs/name", osc.String(cfg.Name), "config")
 	st.Subscribe(s.broadcast)
+	st.Subscribe(s.watchDerived)
 	return s
 }
 
@@ -126,11 +134,17 @@ func (s *Server) Clients() []Client {
 
 // ListenAndServe serves on addr (e.g. ":10023") until ctx is done.
 func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
-	ua, err := net.ResolveUDPAddr("udp", addr)
+	// Editors find consoles with IPv4 broadcasts, which Linux does not
+	// deliver to dual-stack sockets: listen on IPv4 unless told otherwise.
+	network := "udp"
+	if host, _, err := net.SplitHostPort(addr); err == nil && (host == "" || net.ParseIP(host).To4() != nil) {
+		network = "udp4"
+	}
+	ua, err := net.ResolveUDPAddr(network, addr)
 	if err != nil {
 		return err
 	}
-	conn, err := net.ListenUDP("udp", ua)
+	conn, err := net.ListenUDP(network, ua)
 	if err != nil {
 		return err
 	}
@@ -152,7 +166,12 @@ func (s *Server) Serve(ctx context.Context, conn *net.UDPConn) error {
 		<-ctx.Done()
 		conn.Close()
 	}()
+	// Computed status values are right before the first request.
+	s.deriveSolo()
+	s.deriveInserts()
+	s.deriveHeadamps()
 	go s.runSubscriptions(ctx)
+	go s.runDerived(ctx)
 	buf := make([]byte, 65536)
 	for {
 		n, from, err := conn.ReadFromUDP(buf)
@@ -251,6 +270,10 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 		}
 		if _, err := s.store.ApplyText(text, origin); err != nil {
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
+		} else if path, _ := schema.SplitLine(strings.TrimLeft(text, " /")); strings.HasPrefix(path, "-action/") {
+			if v, l, err := s.store.Get("/" + path); err == nil {
+				s.action(l.Addr, v, origin)
+			}
 		}
 		s.send(c, m) // the console echoes "/" commands
 		return
@@ -275,14 +298,17 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			s.subs.remove(c, name)
 		}
 		return
-	case "/showdump", "/load", "/save", "/copy", "/delete", "/rename", "/add":
-		s.Unhandled.Record(m, c.Addr, ReasonUnimplemented, "")
+	case "/showdump":
+		s.showdump(c)
+		return
+	case "/load", "/save", "/copy", "/delete", "/rename", "/add":
+		s.library(m, c)
 		return
 	}
 
 	if l := s.store.Schema().Leaf(m.Address); l != nil {
 		if s.store.TypeOf(l) == nil {
-			s.Unhandled.Record(m, c.Addr, ReasonUnimplemented, "parameters of this effect are not modelled yet")
+			s.Unhandled.Record(m, c.Addr, ReasonUnimplemented, "parameters of an unknown effect type")
 			return
 		}
 		switch len(m.Args) {
@@ -292,6 +318,9 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 		case 1:
 			if _, err := s.store.Set(l.Addr, m.Args[0], origin); err != nil {
 				s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
+			} else if strings.HasPrefix(l.Addr, "/-action/") {
+				v, _, _ := s.store.Get(l.Addr)
+				s.action(l.Addr, v, origin)
 			}
 		default:
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, "one value expected")
