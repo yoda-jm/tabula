@@ -134,11 +134,17 @@ func (s *Server) Clients() []Client {
 
 // ListenAndServe serves on addr (e.g. ":10023") until ctx is done.
 func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
-	ua, err := net.ResolveUDPAddr("udp", addr)
+	// Editors find consoles with IPv4 broadcasts, which Linux does not
+	// deliver to dual-stack sockets: listen on IPv4 unless told otherwise.
+	network := "udp"
+	if host, _, err := net.SplitHostPort(addr); err == nil && (host == "" || net.ParseIP(host).To4() != nil) {
+		network = "udp4"
+	}
+	ua, err := net.ResolveUDPAddr(network, addr)
 	if err != nil {
 		return err
 	}
-	conn, err := net.ListenUDP("udp", ua)
+	conn, err := net.ListenUDP(network, ua)
 	if err != nil {
 		return err
 	}
