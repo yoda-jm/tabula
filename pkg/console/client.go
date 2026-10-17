@@ -65,6 +65,8 @@ type Client struct {
 
 	onReconnect, onStatus []func()
 
+	libMu sync.Mutex // one library command at a time (library.go)
+
 	tick, probeAfter time.Duration // keepalive timing (shortened in tests)
 }
 
@@ -277,43 +279,25 @@ func (c *Client) Sync(ctx context.Context, progress func(done, total int)) error
 	var mu sync.Mutex
 	done := 0
 	var missing []string
-	fetch := func(nodes []*schema.Node) error {
-		const window = 32
-		sem := make(chan struct{}, window)
-		var wg sync.WaitGroup
-		defer wg.Wait()
-		for _, n := range nodes {
-			select {
-			case sem <- struct{}{}:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-			wg.Add(1)
-			go func(n *schema.Node) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				_, err := c.ask(ctx, osc.NewMessage("/node", osc.String(strings.TrimPrefix(n.Path, "/"))), "node "+n.Path, 3)
-				mu.Lock()
-				defer mu.Unlock()
-				if err != nil {
-					missing = append(missing, n.Path)
-				} else {
-					done++
-				}
-				c.mu.Lock()
-				c.status.Synced = done
-				c.mu.Unlock()
-				if progress != nil {
-					progress(done, total) // one call at a time
-				}
-			}(n)
+	each := func(path string, err error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			missing = append(missing, path)
+		} else {
+			done++
 		}
-		return nil
+		c.mu.Lock()
+		c.status.Synced = done
+		c.mu.Unlock()
+		if progress != nil {
+			progress(done, total) // one call at a time
+		}
 	}
-	if err := fetch(regular); err != nil {
+	if err := c.fetchNodes(ctx, regular, each); err != nil {
 		return err
 	}
-	if err := fetch(variants); err != nil {
+	if err := c.fetchNodes(ctx, variants, each); err != nil {
 		return err
 	}
 	c.mu.Lock()
@@ -323,6 +307,30 @@ func (c *Client) Sync(ctx context.Context, progress func(done, total int)) error
 		c.log.Warn("nodes the console did not answer", "count", len(missing), "first", missing[0])
 	}
 	return ctx.Err()
+}
+
+// fetchNodes requests nodes with /node, a window of requests at a time, and
+// calls each (concurrently) as each reply arrives or is given up.
+func (c *Client) fetchNodes(ctx context.Context, nodes []*schema.Node, each func(path string, err error)) error {
+	const window = 32
+	sem := make(chan struct{}, window)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	for _, n := range nodes {
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		wg.Add(1)
+		go func(n *schema.Node) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			_, err := c.ask(ctx, osc.NewMessage("/node", osc.String(strings.TrimPrefix(n.Path, "/"))), "node "+n.Path, 3)
+			each(n.Path, err)
+		}(n)
+	}
+	return nil
 }
 
 // Run keeps the connection alive until ctx is done: /xremote renewal, and

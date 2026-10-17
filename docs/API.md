@@ -74,6 +74,41 @@ caller's access does not allow it, see [Access](#access)), 400 otherwise.
 The value is quantized like the console does; the resulting change comes
 back on the event stream.
 
+## Library
+
+The console's scenes, snippets and presets. Their listings are status
+nodes, read with `/api/state` like any other:
+`/-show/showfile/scene/000`…`099` and `/-show/showfile/snippet/000`…`099`
+(slot 0-99), `/-libs/ch/001`…`100`, `/-libs/fx/…`, `/-libs/r/…`,
+`/-libs/mon/…` (channel, effect, routing and AES50/DP48 presets, slot N is
+`N+1`). Each has a `name` and `hasdata` (1 when the slot holds something);
+scenes also have `notes`.
+
+`POST /api/library` sends one command to the console (engineer only, writes
+armed):
+
+| Field | Meaning |
+|---|---|
+| `op` | `save`, `load` (recall), `copy`, `delete`, `rename` |
+| `kind` | `scene`, `snippet`, `libchan`, `libfx`, `librout`, `libmon` |
+| `index` | slot 0-99 |
+| `name` | `save`, `rename` |
+| `note` | `save` of a scene (optional) |
+| `to` | `copy`: destination slot (snippets cannot be copied) |
+| `target` | `libchan`: strip index 0-71 (channels 1-32, aux ins, FX returns, buses, matrices, LR, M/C) saved from or loaded to; `libfx`: FX slot 0-7 |
+| `scope` | `load` of a `libchan`: what to load, bits 0 headamp, 1 configuration, 2 gate, 3 compressor, 4 EQ, 5 sends (default 63, all) |
+
+Examples: `{"op": "load", "kind": "scene", "index": 3}`,
+`{"op": "save", "kind": "libchan", "index": 45, "name": "Vox", "target": 11}`.
+
+Answers: 204 when the console answered with success; 400 for a malformed
+command; 403 unless writes are armed; 409 when not connected; 422 when the
+console refused it (an empty slot, for instance); 504 when it did not answer
+(it may have done it all the same). After a success, tabula reads again what
+the command changed: the listing before answering, or, for a recall, every
+value it may have changed, in the background — the changes come on the
+event stream.
+
 ## Events
 
 `GET /api/events` — Server-Sent Events:

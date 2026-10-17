@@ -83,6 +83,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("POST /api/replay/start", s.replayStart)
 	mux.HandleFunc("POST /api/replay/stop", s.replayStop)
 	s.accessRoutes(mux)
+	s.libraryRoutes(mux)
 	mux.Handle("/", ui)
 	return gzipJSON(s.guard(mux))
 }
