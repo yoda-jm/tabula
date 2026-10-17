@@ -163,11 +163,13 @@ func SplitLine(line string) (path, rest string) {
 	return path, rest
 }
 
-// Tokenize splits node text on spaces, keeping "quoted strings" whole.
+// Tokenize splits node text on spaces (and other blanks such as a trailing
+// line feed), keeping "quoted strings" whole.
 func Tokenize(s string) []string {
+	blank := func(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' }
 	var toks []string
 	for i := 0; i < len(s); {
-		if s[i] == ' ' {
+		if blank(s[i]) {
 			i++
 			continue
 		}
@@ -180,7 +182,7 @@ func Tokenize(s string) []string {
 			}
 			i += end + 2
 		} else {
-			for i < len(s) && s[i] != ' ' {
+			for i < len(s) && !blank(s[i]) {
 				i++
 			}
 		}

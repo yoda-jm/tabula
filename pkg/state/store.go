@@ -214,6 +214,9 @@ func (st *Store) ApplyLines(lines []string, origin string) []error {
 }
 
 func (st *Store) applyTextLocked(text, origin string) ([]Change, error) {
+	// Node text may keep the line feed of /node replies: M32-Edit sends it
+	// back like that when it writes a whole scene to the console.
+	text = strings.TrimRight(text, "\r\n")
 	path, rest := schema.SplitLine(strings.TrimLeft(text, " "))
 	if l := st.sch.Leaf(path); l != nil {
 		fs, ok := st.fieldsLocked(l.Node)

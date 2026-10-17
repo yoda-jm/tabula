@@ -294,3 +294,33 @@ func drain(p *peer) {
 		}
 	}
 }
+
+// M32-Edit writes a scene to the console ("PC -> Mixer") as one "/" command
+// per node line, each keeping the line feed of /node replies.
+func TestSceneWrittenLikeM32Edit(t *testing.T) {
+	s, addr := start(t)
+	want, err := os.ReadFile("../../testdata/scenes/GVO-2026.scn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := dial(t, addr)
+	for _, line := range strings.Split(string(want), "\n") {
+		if !strings.HasPrefix(line, "/") {
+			continue
+		}
+		if m := p.ask("/", osc.String(strings.TrimPrefix(line, "/")+"\n")); m.Address != "/" {
+			t.Fatalf("no echo for %q: %v", line, m)
+		}
+	}
+	if n := len(s.Unhandled.List()); n > 0 {
+		t.Fatalf("%d kinds of rejected lines, first %+v", n, s.Unhandled.List()[0])
+	}
+	var got strings.Builder
+	got.WriteString(strings.SplitN(string(want), "\n", 2)[0] + "\n")
+	scene.Write(&got, s.Store(), "")
+	g := strings.SplitN(got.String(), "\n", 3)
+	w := strings.SplitN(string(want), "\n", 2)
+	if g[0]+"\n"+g[2] != w[0]+"\n"+w[1] {
+		t.Error("scene written through \"/\" commands differs from the file")
+	}
+}
