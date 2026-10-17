@@ -10,14 +10,14 @@ import type { KindInfo, LibKind, LibraryRequest, Slot } from "../lib/library";
 import { KINDS, SCOPE_ALL, SCOPE_PARTS, describe, firstFree, libraryApi, readSlots, slotLabel, slotPath } from "../lib/library";
 import { usePersistent } from "../lib/route";
 import { stripName } from "../lib/routing";
-import { ALL_STRIPS } from "../lib/strips";
+import { INDEXED_STRIPS } from "../lib/strips";
 import { useCanWrite, useNodes, useValue } from "../store/hooks";
 import { lookup } from "../store/lookup";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
 
 /** The strips a channel preset is saved from or loaded to, by index 0-71 (DCAs excluded). */
-const PRESET_STRIPS = ALL_STRIPS.slice(0, 72);
+const PRESET_STRIPS = INDEXED_STRIPS;
 
 interface Ask {
   req: LibraryRequest;
@@ -40,15 +40,18 @@ export function ScenesPage() {
   const shown = showEmpty ? slots : used;
   const current = useCurrent(k);
 
-  const run = async (req: LibraryRequest, name: string) => {
+  /** run sends a command and reports it; it tells whether the console did it. */
+  const run = async (req: LibraryRequest, name: string): Promise<boolean> => {
     setAsk(null);
     setBusy(true);
     try {
       await libraryApi.run(req);
       store.toast(`${describe(req, name)}: done.`);
+      return true;
     } catch (e) {
       const msg = e instanceof ApiError && e.status === 403 ? `${e.message}: arm writes first.` : (e as Error).message;
       store.toast(`${describe(req, name)}: ${msg}`, "error");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -90,7 +93,7 @@ export function ScenesPage() {
         {!shown.length && <p className="muted">The console holds no {k.one}.</p>}
         <div className="slots">
           {shown.map((s) => (
-            <SlotRow key={s.slot} k={k} s={s} current={s.slot === current} actions={actions} />
+            <SlotRow key={s.slot} k={k} s={s} slots={slots} current={s.slot === current} actions={actions} />
           ))}
         </div>
         {k.kind === "scene" && (
@@ -122,7 +125,7 @@ function useCurrent(k: KindInfo): number {
 interface Actions {
   can: boolean;
   ask(a: Ask): void;
-  run(req: LibraryRequest, name: string): Promise<void>;
+  run(req: LibraryRequest, name: string): Promise<boolean>;
 }
 
 function recallBody(k: KindInfo, target?: string): ReactNode {
@@ -150,7 +153,8 @@ function recallBody(k: KindInfo, target?: string): ReactNode {
   }
 }
 
-function SlotRow({ k, s, current, actions }: { k: KindInfo; s: Slot; current: boolean; actions: Actions }) {
+function SlotRow(props: { k: KindInfo; s: Slot; slots: Slot[]; current: boolean; actions: Actions }) {
+  const { k, s, current, actions } = props;
   const [open, setOpen] = useState(false);
   const label = slotLabel(k, s.slot);
   const simpleLoad = !k.target;
@@ -184,12 +188,12 @@ function SlotRow({ k, s, current, actions }: { k: KindInfo; s: Slot; current: bo
           {open ? "▴" : "▾"}
         </button>
       </div>
-      {open && <SlotActions k={k} s={s} actions={actions} />}
+      {open && <SlotActions k={k} s={s} slots={props.slots} actions={actions} />}
     </div>
   );
 }
 
-function SlotActions({ k, s, actions }: { k: KindInfo; s: Slot; actions: Actions }) {
+function SlotActions({ k, s, slots, actions }: { k: KindInfo; s: Slot; slots: Slot[]; actions: Actions }) {
   const [name, setName] = useState(s.name);
   const [to, setTo] = useState("");
   const [target, setTarget] = useState(0);
@@ -265,7 +269,20 @@ function SlotActions({ k, s, actions }: { k: KindInfo; s: Slot; actions: Actions
             className="row"
             onSubmit={(e) => {
               e.preventDefault();
-              if (toValid) void actions.run({ op: "copy", kind: k.kind, index: s.slot, to: toSlot }, s.name);
+              if (!toValid) return;
+              const req: LibraryRequest = { op: "copy", kind: k.kind, index: s.slot, to: toSlot };
+              const dest = slots[toSlot];
+              if (dest?.used) {
+                actions.ask({
+                  req,
+                  name: s.name,
+                  body: (
+                    <p>
+                      Slot {slotLabel(k, toSlot)} holds “{dest.name}”: it is replaced by {k.one} {label}.
+                    </p>
+                  ),
+                });
+              } else void actions.run(req, s.name);
             }}
           >
             <label>
@@ -328,7 +345,8 @@ function SaveForm({ k, slots, actions }: { k: KindInfo; slots: Slot[]; actions: 
         ),
       });
     } else {
-      void actions.run(req, "").then(() => {
+      void actions.run(req, "").then((ok) => {
+        if (!ok) return; // keep what was typed
         setName("");
         setNote("");
         setSlot(null);

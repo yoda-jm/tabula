@@ -143,4 +143,44 @@ describe("event stream", () => {
     expect(loads).toBe(2);
     expect(store.stream).toBe("open");
   });
+
+  it("tries a failed replacement again", async () => {
+    const store = new Store(fakeApi);
+    await store.loadSchema();
+    startEvents(store);
+    FakeSource.all[0].open();
+    FakeSource.all[0].fire("status", CONNECTED);
+    store.wantMeters("15");
+    await vi.advanceTimersByTimeAsync(SWAP_DELAY);
+    const failed = FakeSource.all[1];
+    failed.onerror?.();
+    expect(failed.readyState).toBe(FakeSource.CLOSED);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(FakeSource.all).toHaveLength(3);
+    expect(FakeSource.all[2].url).toBe("/api/events?meters=0,2,15");
+  });
+
+  it("leaves no stream open when a replacement and a reopen cross", async () => {
+    const store = new Store(fakeApi);
+    await store.loadSchema();
+    const stop = startEvents(store);
+    const first = FakeSource.all[0];
+    first.open();
+    first.fire("status", CONNECTED);
+    const release = store.wantMeters("15");
+    await vi.advanceTimersByTimeAsync(SWAP_DELAY);
+    const second = FakeSource.all[1];
+    first.readyState = FakeSource.CLOSED; // the server went away: a reopen is scheduled
+    first.onerror?.();
+    second.open();
+    second.fire("status", CONNECTED); // the replacement wins, the reopen is cancelled
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(FakeSource.all).toHaveLength(2);
+    expect(FakeSource.all.filter((s) => s.readyState !== FakeSource.CLOSED)).toEqual([second]);
+    // values of a group given back are dropped until the stream is replaced
+    release();
+    second.fire("meters", { id: "15", values: [-30] });
+    expect(store.getMeters("15")).toBeUndefined();
+    stop();
+  });
 });

@@ -5,8 +5,8 @@
 
 import type { Lookup } from "./routing";
 import { stripName } from "./routing";
-
-const two = (n: number) => String(n).padStart(2, "0");
+import { stripAt } from "./strips";
+import { two } from "./num";
 
 /** FX_NAMES are the effects' full names, by the console's short names. */
 export const FX_NAMES: Record<string, string> = {
@@ -77,15 +77,8 @@ export const fxName = (type: string) => FX_NAMES[type] ?? type;
 
 /** stripOfIndex maps a strip index (0-71, as in /-insert) to its path and label. */
 export function stripOfIndex(i: number): { path: string; label: string } | null {
-  if (!Number.isInteger(i) || i < 0) return null;
-  if (i < 32) return { path: `/ch/${two(i + 1)}`, label: `Ch ${two(i + 1)}` };
-  if (i < 40) return { path: `/auxin/${two(i - 31)}`, label: `Aux ${i - 31}` };
-  if (i < 48) return { path: `/fxrtn/${two(i - 39)}`, label: `FX ${Math.floor((i - 40) / 2) + 1}${i % 2 ? "R" : "L"}` };
-  if (i < 64) return { path: `/bus/${two(i - 47)}`, label: `Bus ${two(i - 47)}` };
-  if (i < 70) return { path: `/mtx/${two(i - 63)}`, label: `Mtx ${i - 63}` };
-  if (i === 70) return { path: "/main/st", label: "LR" };
-  if (i === 71) return { path: "/main/m", label: "M/C" };
-  return null;
+  const s = stripAt(i);
+  return s ? { path: s.path, label: s.label } : null;
 }
 
 export interface Use {

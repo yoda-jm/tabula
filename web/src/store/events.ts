@@ -23,13 +23,15 @@ export const SWAP_DELAY = 150;
 export function startEvents(store: Store, meters = METER_GROUPS): () => void {
   let es: EventSource | null = null; // the stream in use
   let next: EventSource | null = null; // a stream about to replace it (other meter groups)
-  let groups = ""; // the meter groups of the last stream opened
+  let groups = ""; // the meter groups of es
+  let nextGroups = ""; // and of next
   let retry = 1000;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let swapTimer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
 
-  const wanted = () => [...new Set([...meters.split(","), ...store.meterSet()].filter(Boolean))].join(",");
+  const wantedList = () => [...new Set([...meters.split(","), ...store.meterSet()].filter(Boolean))];
+  const wanted = () => wantedList().join(",");
 
   const refreshRecord = () =>
     sessionApi.record().then(
@@ -40,9 +42,19 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
   /** open opens a stream; with swap, it replaces the open one once it has started. */
   const open = (swap = false) => {
     if (stopped) return;
-    groups = wanted();
-    if (!swap) store.setStream("connecting");
-    const src = new EventSource("/api/events" + (groups ? "?meters=" + groups : ""));
+    const g = wanted();
+    if (swap) {
+      next?.close();
+      nextGroups = g;
+    } else {
+      // a fresh start replaces both streams
+      es?.close();
+      next?.close();
+      next = null;
+      groups = g;
+      store.setStream("connecting");
+    }
+    const src = new EventSource("/api/events" + (g ? "?meters=" + g : ""));
     if (swap) next = src;
     else es = src;
     const live = () => src === es || src === next;
@@ -63,8 +75,13 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
         const wasOpen = store.stream === "open";
         es?.close();
         es = src;
+        groups = nextGroups;
         next = null;
         retry = 1000;
+        if (timer) {
+          clearTimeout(timer); // the old stream's reopen is not needed any more
+          timer = null;
+        }
         store.setStream("open");
         if (wasOpen) {
           fresh = false;
@@ -93,7 +110,8 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
     src.addEventListener("meters", (e) => {
       if (!live()) return;
       const m = JSON.parse((e as MessageEvent).data) as { id: string; values: number[] };
-      store.setMeters(String(m.id), m.values);
+      // a group given back keeps coming until the stream is replaced: drop it
+      if (wantedList().includes(String(m.id))) store.setMeters(String(m.id), m.values);
     });
     src.onerror = () => {
       if (src === next) {
@@ -110,7 +128,10 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
         void store.loadAccess().then((who) => {
           if (who?.role === "none") stopped = true;
         });
-        timer = setTimeout(() => open(), retry);
+        timer = setTimeout(() => {
+          timer = null;
+          open();
+        }, retry);
         retry = Math.min(retry * 2, 10000);
       }
       // otherwise the browser reconnects by itself
@@ -122,9 +143,9 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
     if (swapTimer) clearTimeout(swapTimer);
     swapTimer = setTimeout(() => {
       swapTimer = null;
-      if (stopped || wanted() === groups) return;
+      const want = wanted();
+      if (stopped || want === (next ? nextGroups : groups)) return;
       if (!es || es.readyState === EventSource.CLOSED) return; // the next reopen asks for them
-      next?.close();
       open(true);
     }, delay);
   };

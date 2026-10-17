@@ -9,30 +9,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
+import { two } from "../lib/num";
 import { usePersistent } from "../lib/route";
-import {
-  GEQ_LABELS,
-  RTA_BANDS,
-  geqPosition,
-  geqRtaSource,
-  isDualGeq,
-  rtaFraction,
-  rtaFreq,
-  rtaSourceLabel,
-  rtaWindow,
-} from "../lib/rta";
-import { quantize, toDisplay } from "../lib/values";
+import { GEQ_LABELS, geqPosition, geqRtaSource, isDualGeq, rtaSourceLabel, rtaWindow } from "../lib/rta";
+import { fromDisplay, toDisplay } from "../lib/values";
 import { useCanWrite, useMeterGroup, useNodes, useValue } from "../store/hooks";
 import { store } from "../store/store";
+import { rtaRects } from "./RtaBars";
 import { ConfirmDialog } from "./shell";
 
-const two = (n: number) => String(n).padStart(2, "0");
-const RANGE_DB = 15; // bands and master go from -15 to +15 dB
-const STEPS = 61; // in 0.5 dB steps
+const RANGE_DB = 15; // the faders show -15 to +15 dB, the range of the bands and master
 const GRID_DB = [12, 6, -6, -12];
 const KEY_BANDS = new Set([0, 4, 7, 10, 14, 17, 20, 24, 27, 30]); // labels kept on narrow screens
 
-const toNorm = (db: number) => quantize((db + RANGE_DB) / (2 * RANGE_DB), STEPS);
 const dbText = (db: number) => (Math.round(db * 10) / 10 > 0 ? "+" : "") + (Math.round(db * 10) / 10).toFixed(1);
 
 /** dbOf reads a band's gain in dB from the store. */
@@ -76,7 +65,13 @@ export function GeqEditor({ slot, type }: { slot: number; type: string }) {
 
   const win = useRtaWindow();
 
-  const set = (addr: string, db: number) => store.set(addr, toNorm(Math.max(-RANGE_DB, Math.min(RANGE_DB, db))));
+  // writes go through the parameter's type, in the 0.5 dB steps of the console's encoders
+  const set = (addr: string, db: number) => {
+    const t = store.leaf(addr)?.field.type;
+    if (!t) return;
+    const v = Math.max(t.min ?? -RANGE_DB, Math.min(t.max ?? RANGE_DB, Math.round(db * 2) / 2));
+    store.set(addr, fromDisplay(t, v));
+  };
   const selDb = dbOf(bands[selected]);
 
   return (
@@ -290,7 +285,11 @@ function GeqColumns({ addrs, labels, selected, onSelect, disabled, set, rta, win
         onLostPointerCapture={up}
         onKeyDown={key}
       >
-        {rta && win && <RtaBars values={rta} win={win} bands={n} />}
+        {rta && win && (
+          <svg className="geq-rta" viewBox={`0 0 ${n} 1`} preserveAspectRatio="none" aria-hidden>
+            {rtaRects(rta, win, geqPosition, 0, n, 1)}
+          </svg>
+        )}
         {GRID_DB.map((db) => (
           <div key={db} className="geq-grid" style={{ top: y(db) }} />
         ))}
@@ -330,25 +329,5 @@ function GeqColumns({ addrs, labels, selected, onSelect, disabled, set, rta, win
         ))}
       </div>
     </div>
-  );
-}
-
-/** RtaBars draws the 100 RTA bands on the axis of the graphic EQ bands. */
-function RtaBars({ values, win, bands }: { values: number[]; win: { top: number; bottom: number }; bands: number }) {
-  const half = Math.pow(2, 1 / 20); // a band spans a tenth of an octave
-  const rects = [];
-  for (let i = 0; i < Math.min(RTA_BANDS, values.length); i++) {
-    const h = rtaFraction(values[i], win);
-    if (h <= 0) continue;
-    const f = rtaFreq(i);
-    const x0 = Math.max(0, geqPosition(f / half));
-    const x1 = Math.min(bands, geqPosition(f * half));
-    if (x1 <= x0) continue;
-    rects.push(<rect key={i} x={x0} y={1 - h} width={x1 - x0} height={h} />);
-  }
-  return (
-    <svg className="geq-rta" viewBox={`0 0 ${bands} 1`} preserveAspectRatio="none" aria-hidden>
-      {rects}
-    </svg>
   );
 }

@@ -51,6 +51,8 @@ type Server struct {
 
 	acc        access
 	listenAddr string
+
+	lib libraryState // library.go
 }
 
 func New(log *slog.Logger) *Server {

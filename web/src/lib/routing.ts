@@ -4,8 +4,7 @@
 // the headamps. Pure functions: values are read through a Lookup, so
 // everything here is unit tested.
 
-const two = (n: number) => String(n).padStart(2, "0");
-const three = (n: number) => String(n).padStart(3, "0");
+import { three, two } from "./num";
 
 /** Lookup reads mirrored values: the node text of a parameter (enum name, number…) and its raw value. */
 export interface Lookup {

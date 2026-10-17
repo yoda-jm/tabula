@@ -3,10 +3,10 @@
 
 import type { Band } from "../lib/eq";
 import { butterworthDb, logFrequencies, response } from "../lib/eq";
-import { RTA_BANDS, rtaFraction, rtaFreq } from "../lib/rta";
 import { toDisplay } from "../lib/values";
 import { useNodes } from "../store/hooks";
 import { store } from "../store/store";
+import { rtaRects } from "./RtaBars";
 
 const W = 900;
 const H = 240;
@@ -45,22 +45,6 @@ function readBand(path: string, index: number, count: number): Band | null {
   return Number.isFinite(band.freq) ? band : null;
 }
 
-/** RtaBars draws the RTA bands (dB) behind the curve, in the window of the console's RTA settings. */
-function RtaBars({ values, win }: { values: number[]; win: { top: number; bottom: number } }) {
-  const half = Math.pow(2, 1 / 20); // a band spans a tenth of an octave
-  const h = H - PAD_B;
-  const rects = [];
-  for (let i = 0; i < Math.min(RTA_BANDS, values.length); i++) {
-    const frac = rtaFraction(values[i], win);
-    if (frac <= 0) continue;
-    const f = rtaFreq(i);
-    const x0 = Math.max(PAD_L, x(f / half));
-    const x1 = Math.min(W, x(f * half));
-    if (x1 > x0) rects.push(<rect key={i} x={x0} y={h * (1 - frac)} width={x1 - x0} height={h * frac} />);
-  }
-  return <g className="eq-rta">{rects}</g>;
-}
-
 export function EqCurve(props: {
   strip: string;
   bands: string[];
@@ -96,7 +80,7 @@ export function EqCurve(props: {
     <figure className="eqcurve">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="EQ frequency response (approximate)">
         <rect x={PAD_L} y={0} width={W - PAD_L} height={H - PAD_B} className="eq-bg" />
-        {props.rta && props.rtaWindow && <RtaBars values={props.rta} win={props.rtaWindow} />}
+        {props.rta && props.rtaWindow && <g className="eq-rta">{rtaRects(props.rta, props.rtaWindow, x, PAD_L, W, H - PAD_B)}</g>}
         {GRID_F.map((f) => (
           <g key={f}>
             <line x1={x(f)} x2={x(f)} y1={0} y2={H - PAD_B} className="eq-grid" />

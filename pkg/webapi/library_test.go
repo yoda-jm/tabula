@@ -113,3 +113,15 @@ func TestLibraryAPI(t *testing.T) {
 		t.Errorf("listing after delete: %+v", nodes[0].Line)
 	}
 }
+
+// A new recall cancels the reading back of the previous one.
+func TestRecallReadBackCancelled(t *testing.T) {
+	var l libraryState
+	first, cancel1 := l.start(time.Minute)
+	defer cancel1()
+	second, cancel2 := l.start(time.Minute)
+	defer cancel2()
+	if first.Err() == nil || second.Err() != nil {
+		t.Errorf("first %v, second %v", first.Err(), second.Err())
+	}
+}

@@ -5,27 +5,21 @@
 // 72 monitor, 73 talkback, 74-89 dual graphic EQ A/B and 90-97 stereo
 // graphic EQ of FX slots 1-8, before the EQ; 98 more for after it.
 
+import { stripAt, stripIndex } from "./strips";
+
 export const RTA_BANDS = 100;
 export const RTA_POST = 98;
 
 /** rtaFreq is the centre frequency of RTA band i. */
 export const rtaFreq = (i: number) => 1250 * Math.pow(2, (i - 60) / 10);
 
-const two = (n: number) => String(n).padStart(2, "0");
-
-/** rtaSourceLabel names an RTA source: "Ch 12", "FX 5 GEQ A (post)". */
+/** rtaSourceLabel names an RTA source: "Ch 12 (pre EQ)", "FX 5 GEQ A (post EQ)". */
 export function rtaSourceLabel(n: number): string {
   if (!Number.isInteger(n) || n < 0 || n >= 2 * RTA_POST) return String(n);
   const post = n >= RTA_POST;
   const s = n % RTA_POST;
   let label: string;
-  if (s < 32) label = `Ch ${two(s + 1)}`;
-  else if (s < 40) label = `Aux ${s - 31}`;
-  else if (s < 48) label = `FX ${Math.floor((s - 40) / 2) + 1}${s % 2 ? "R" : "L"} return`;
-  else if (s < 64) label = `Bus ${two(s - 47)}`;
-  else if (s < 70) label = `Mtx ${s - 63}`;
-  else if (s === 70) label = "LR";
-  else if (s === 71) label = "M/C";
+  if (s < 72) label = stripAt(s)!.label;
   else if (s === 72) label = "Monitor";
   else if (s === 73) label = "Talkback";
   else if (s < 90) label = `FX ${Math.floor((s - 74) / 2) + 1} GEQ ${(s - 74) % 2 ? "B" : "A"}`;
@@ -44,14 +38,10 @@ export function geqRtaSource(slot: number, type: string, side: 0 | 1, post: bool
   return base + (post ? RTA_POST : 0);
 }
 
-/** stripRtaSource is the RTA source number of a strip (before its EQ), or null. */
+/** stripRtaSource is the RTA source number of a strip (before its EQ): its strip index, or null. */
 export function stripRtaSource(path: string): number | null {
-  if (path === "/main/st") return 70;
-  if (path === "/main/m") return 71;
-  const m = /^\/(ch|auxin|fxrtn|bus|mtx)\/(\d\d)$/.exec(path);
-  if (!m) return null;
-  const n = Number(m[2]) - 1;
-  return { ch: 0, auxin: 32, fxrtn: 40, bus: 48, mtx: 64 }[m[1] as "ch"] + n;
+  const i = stripIndex(path);
+  return i < 0 ? null : i;
 }
 
 /** geqBandFreq is the centre of graphic EQ band i (0-30): third octaves, 1 kHz is band 17. */

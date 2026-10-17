@@ -18,8 +18,7 @@ accident. Disarm to go back to read-only.
 every page. Other devices get a role from an access link: viewers see the
 Mixer, Channel and Browser pages read-only; musicians only get their in-ear
 mix. Routing, FX, Scenes, In-ears, Record, Access and Connect are engineer
-pages. See
-[access](access.md).
+pages. See [access](access.md).
 
 ## Mixer
 

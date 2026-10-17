@@ -33,6 +33,7 @@ import { prettyText } from "../lib/values";
 import { useNodes, useSchema, useValue } from "../store/hooks";
 import { lookup } from "../store/lookup";
 import { NotConnected } from "./common";
+import { range, two } from "../lib/num";
 
 type Tab = "inputs" | "outputs" | "AES50A" | "AES50B" | "CARD" | "other";
 
@@ -44,9 +45,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "CARD", label: "Card" },
   { id: "other", label: "Aux · P16 · AES · Rec" },
 ];
-
-const two = (n: number) => String(n).padStart(2, "0");
-const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 /** The nodes the routing views read: re-render when any of them changes. */
 const WATCHED =

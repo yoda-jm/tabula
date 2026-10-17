@@ -5,6 +5,7 @@
 
 import { call } from "./api";
 import type { Lookup } from "./routing";
+import { three } from "./num";
 
 export type LibKind = "scene" | "snippet" | "libchan" | "libfx" | "librout" | "libmon";
 
@@ -33,8 +34,6 @@ export const KINDS: KindInfo[] = [
 ];
 
 export const kindInfo = (k: LibKind) => KINDS.find((i) => i.kind === k)!;
-
-const three = (n: number) => String(n).padStart(3, "0");
 
 /** slotPath is the listing node of a slot (0-99). */
 export const slotPath = (k: KindInfo, slot: number) => `${k.listing}/${three(slot + k.first)}`;

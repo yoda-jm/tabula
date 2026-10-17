@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yoda-jm/tabula/pkg/console"
@@ -20,6 +21,25 @@ import (
 // read with /api/state like any other; POST /api/library sends a command
 // (save, load, copy, delete, rename) and, once the console has answered,
 // reads again what it changed: the listing, or what a recall loaded.
+
+// libraryState is the reading back of the last recall: a new recall cancels
+// it, so quick recalls (stepping through snippets) do not pile up and an
+// older one never applies values after a newer one.
+type libraryState struct {
+	mu     sync.Mutex
+	cancel context.CancelFunc
+}
+
+func (l *libraryState) start(d time.Duration) (context.Context, context.CancelFunc) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.cancel != nil {
+		l.cancel()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	l.cancel = cancel
+	return ctx, cancel
+}
 
 func (s *Server) libraryRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/library", s.library)
@@ -236,13 +256,13 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 	}
 	match := req.changed(c)
 	refresh := func(ctx context.Context) {
-		if err := c.Refresh(ctx, match); err != nil {
+		if err := c.Refresh(ctx, match); err != nil && !errors.Is(err, context.Canceled) {
 			s.log.Warn("library: reading back", "op", req.Op, "kind", req.Kind, "err", err)
 		}
 	}
 	if req.Op == "load" {
+		ctx, cancel := s.lib.start(time.Minute)
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 			refresh(ctx)
 		}()

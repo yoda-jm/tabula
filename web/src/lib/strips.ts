@@ -2,6 +2,7 @@
 // their parameters exist (read from the schema, not assumed).
 
 import type { Schema } from "./schema";
+import { range, two } from "./num";
 
 export type StripKind = "ch" | "auxin" | "fxrtn" | "bus" | "mtx" | "main" | "dca";
 
@@ -10,9 +11,6 @@ export interface Strip {
   kind: StripKind;
   label: string; // "Ch 01", "LR", "DCA 1"
 }
-
-const two = (n: number) => String(n).padStart(2, "0");
-const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 const ch = (n: number): Strip => ({ path: `/ch/${two(n)}`, kind: "ch", label: `Ch ${two(n)}` });
 const auxin = (n: number): Strip => ({ path: `/auxin/${two(n)}`, kind: "auxin", label: `Aux ${n}` });
@@ -51,6 +49,17 @@ export const BANKS: Bank[] = [
 export const ALL_STRIPS: Strip[] = BANKS.flatMap((b) => b.strips);
 
 export const stripByPath = (path: string) => ALL_STRIPS.find((s) => s.path === path);
+
+/**
+ * INDEXED_STRIPS are the strips in the console's strip numbering, 0-71:
+ * channels, aux ins, FX returns, buses, matrices, LR, M/C. /-insert, channel
+ * presets and the RTA sources count them so.
+ */
+export const INDEXED_STRIPS = ALL_STRIPS.slice(0, 72);
+
+export const stripAt = (i: number): Strip | undefined => (Number.isInteger(i) && i >= 0 ? INDEXED_STRIPS[i] : undefined);
+
+export const stripIndex = (path: string) => INDEXED_STRIPS.findIndex((s) => s.path === path);
 
 /** Addresses a mixer strip shows; a field is absent when the schema lacks it. */
 export interface StripAddrs {
