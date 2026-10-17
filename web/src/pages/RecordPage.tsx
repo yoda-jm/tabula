@@ -1,14 +1,18 @@
 // Recording and replay of shows: start/stop with a note, markers (M key),
-// the recorded sessions, and replaying one onto the console.
+// the recorded sessions, and replaying one onto the console. A session is
+// the console (a snapshot of its settings, then every change) and, when the
+// audio card is on, the sound of the console's USB card.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { Record as RecordStatus, SessionDetail, SessionSummary } from "../lib/session";
+import { audioPlan, plural } from "../lib/audio";
 import { formatDuration, parseTime, sessionApi } from "../lib/session";
 import { useCanWrite, useRecord, useStatus } from "../store/hooks";
 import { store } from "../store/store";
-import { AudioPanel, SessionAudio } from "./AudioPanel";
+import type { Audio } from "./AudioPanel";
+import { AudioPanel, SessionAudio, useAudio } from "./AudioPanel";
 
 const SPEEDS = [0.5, 1, 2, 4, 8];
 
@@ -17,6 +21,7 @@ export function RecordPage() {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
   const [listError, setListError] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const audio = useAudio(!!rec?.recording);
 
   const load = useCallback(async () => {
     try {
@@ -42,8 +47,8 @@ export function RecordPage() {
   }
   return (
     <div className="page record">
-      <Recorder rec={rec} />
-      <AudioPanel rec={rec} />
+      <Recorder rec={rec} audio={audio} />
+      <AudioPanel rec={rec} audio={audio} />
       <section className="card">
         <div className="section-head">
           <h2>Sessions</h2>
@@ -71,8 +76,9 @@ export function RecordPage() {
                   {rec?.replaying && rec.replay_of === s.name && <span className="note"> · replaying</span>}
                 </span>
                 <span className="mono">{formatDuration(s.meta.duration)}</span>
-                <span className="muted">{s.meta.events} events</span>
-                <span className="muted">{s.meta.markers} markers</span>
+                <span className="muted">{plural(s.meta.events, "change")}</span>
+                <span className="muted">{plural(s.meta.markers, "marker")}</span>
+                <span className="muted">{s.meta.audio ? `audio: ${plural(s.meta.audio.tracks?.length ?? 0, "track")}` : "no audio"}</span>
                 <span className="session-note">{s.meta.note || s.meta.console || ""}</span>
               </button>
             );
@@ -100,7 +106,33 @@ function useTick(on: boolean, ms: number) {
   }, [on, ms]);
 }
 
-function Recorder({ rec }: { rec: RecordStatus | null }) {
+/** RecordsWhat lists what a session keeps: the console always, the audio when its card is on. */
+function RecordsWhat({ audio, live }: { audio: string; live?: boolean }) {
+  return (
+    <ul className="records-what">
+      <li>
+        <span className="rec-kind">Console</span>
+        <span>
+          a snapshot of every setting at the start (a scene file that opens in M32-Edit), then every change, on the console or here
+          (faders, mutes, EQ, routing, scene recalls…) with its time, and your markers. Settings only, not the sound; replaying a
+          session moves the console the same way.
+        </span>
+      </li>
+      <li className={audio ? "" : "off"}>
+        <span className="rec-kind">Audio</span>
+        <span>
+          {audio
+            ? `the sound of the console's USB card: ${audio}, in step with the console changes.`
+            : live
+              ? "not recorded in this session."
+              : "not recorded: turn on Audio tracks below to record the sound too."}
+        </span>
+      </li>
+    </ul>
+  );
+}
+
+function Recorder({ rec, audio }: { rec: RecordStatus | null; audio: Audio }) {
   const status = useStatus();
   const [note, setNote] = useState("");
   const [label, setLabel] = useState("");
@@ -155,7 +187,7 @@ function Recorder({ rec }: { rec: RecordStatus | null }) {
   const err = error || rec.error;
   return (
     <section className="card">
-      <h2>Recording</h2>
+      <h2>Recording a session</h2>
       {recording ? (
         <>
           <div className="rec-panel">
@@ -167,8 +199,9 @@ function Recorder({ rec }: { rec: RecordStatus | null }) {
                 <span className="danger-text">
                   <strong>● REC</strong>
                 </span>
-                <span>{rec.meta?.events ?? 0} events</span>
-                <span>{rec.meta?.markers ?? 0} markers</span>
+                <span>console: {plural(rec.meta?.events ?? 0, "change")}</span>
+                <span>{plural(rec.meta?.markers ?? 0, "marker")}</span>
+                <span>{rec.audio ? `audio: ${plural(rec.audio.tracks?.length ?? 0, "track")}` : "no audio"}</span>
               </div>
               {rec.meta?.note && <p className="muted">{rec.meta.note}</p>}
               <p className="muted mono">{rec.name}</p>
@@ -194,21 +227,24 @@ function Recorder({ rec }: { rec: RecordStatus | null }) {
           </form>
         </>
       ) : (
-        <form
-          className="row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run(() => sessionApi.start(note.trim())).then((ok) => ok && setNote(""));
-          }}
-        >
-          <label className="grow">
-            <span className="field-label">Note (optional)</span>
-            <input className="input" type="text" value={note} placeholder="Set 1, venue…" onChange={(e) => setNote(e.target.value)} />
-          </label>
-          <button type="submit" className="btn big rec-start" disabled={busy || !status.connected}>
-            ● Start recording
-          </button>
-        </form>
+        <>
+          <RecordsWhat audio={audioPlan(audio.view?.config)} />
+          <form
+            className="row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run(() => sessionApi.start(note.trim())).then((ok) => ok && setNote(""));
+            }}
+          >
+            <label className="grow">
+              <span className="field-label">Note (optional)</span>
+              <input className="input" type="text" value={note} placeholder="Set 1, venue…" onChange={(e) => setNote(e.target.value)} />
+            </label>
+            <button type="submit" className="btn big rec-start" disabled={busy || !status.connected}>
+              ● Start recording
+            </button>
+          </form>
+        </>
       )}
       {!recording && !status.connected && <p className="muted">Connect to a console to record it.</p>}
       {err && (
@@ -267,13 +303,13 @@ function Session({ name, rec }: { name: string; rec: RecordStatus | null }) {
           <dd>{formatStart(detail.meta.start)}</dd>
           <dt>Duration</dt>
           <dd className="mono">{formatDuration(detail.meta.duration)}</dd>
-          <dt>Events</dt>
+          <dt>Console</dt>
           <dd>
-            {detail.meta.events} changes, {detail.meta.markers} markers
+            settings at the start, then {plural(detail.meta.events, "change")}; {plural(detail.meta.markers, "marker")}
           </dd>
           {detail.meta.console && (
             <>
-              <dt>Console</dt>
+              <dt>Recorded from</dt>
               <dd>{detail.meta.console}</dd>
             </>
           )}
@@ -305,7 +341,11 @@ function Session({ name, rec }: { name: string; rec: RecordStatus | null }) {
 
       {detail && <SessionAudio detail={detail} />}
 
-      <h4>Replay</h4>
+      <h4>Replay onto the console</h4>
+      <p className="muted">
+        A replay moves the console as it was recorded: its settings, faders and mutes. It plays no sound; open the audio in Reaper or
+        Audacity with the exports above.
+      </p>
       {!can && (
         <p className="warn-box">
           A replay writes the recorded mix to the console: it is refused until writes are armed (top right).
@@ -379,7 +419,7 @@ function Session({ name, rec }: { name: string; rec: RecordStatus | null }) {
       {asking && (
         <ConfirmDialog title="Replay this session?" confirm="Replay" onConfirm={() => void start()} onCancel={() => setAsking(false)}>
           <p>
-            <strong>Replay writes the recorded mix to the console.</strong> It first sets the state at{" "}
+            <strong>Replay writes the recorded settings to the console.</strong> It first sets the state at{" "}
             {formatDuration(fromSeconds)}, then plays every recorded change{speed !== 1 ? ` at ${speed}× speed` : ""}.
           </p>
           <p className="muted">Faders and settings on the live console will move.</p>

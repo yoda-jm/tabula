@@ -4,13 +4,18 @@ title: Recording a show, with its audio
 
 # Recording a show, with its audio
 
-`tabula` records a show as a **session**: a snapshot of the console when the
-recording starts, every change made afterwards with its time (who moved
-which fader, when), markers, and — when audio is enabled — **one WAV file
-per track** of the console's USB card, recorded by the same program so that
-the tracks and the console moves line up. Afterwards, open the tracks in
-Audacity or Reaper with the markers in place, and replay the console moves
-onto the console or the emulator.
+`tabula` records a show as a **session**, made of two parts:
+
+- **The console** (always): its settings, not its sound. A snapshot of the
+  console when the recording starts, every change made afterwards with its
+  time (who moved which fader, when), and markers.
+- **The audio** (when enabled): **one WAV file per track** of the console's
+  USB card, recorded by the same program so that the tracks and the console
+  moves line up.
+
+Afterwards, open the tracks in Audacity or Reaper with the markers in
+place, and replay the console moves onto the console or the emulator (a
+replay moves faders and settings; it plays no sound).
 
 ![The Record page while recording: the session and its 16 audio tracks with their levels](img/record-audio.png)
 

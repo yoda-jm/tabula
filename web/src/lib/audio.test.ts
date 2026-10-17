@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AudioConfig } from "./audio";
-import { byteRate, exportUrl, formatBytes, formatHours, parseTracks, trackLabel } from "./audio";
+import { audioPlan, byteRate, exportUrl, formatBytes, formatHours, parseTracks, plural, trackLabel } from "./audio";
 
 describe("audio tracks", () => {
   it("reads track lists as the server does", () => {
@@ -37,5 +37,22 @@ describe("audio tracks", () => {
   });
   it("builds export links", () => {
     expect(exportUrl("2026-10-17_203000", "reaper")).toBe("/api/sessions/2026-10-17_203000/export?format=reaper");
+  });
+});
+
+describe("audioPlan", () => {
+  const c: AudioConfig = { enabled: true, recorder: "arecord", device: "hw:X32", channels: 32, rate: 48000, bits: 24, tracks: "1-16" };
+  it("says what the next session records", () => {
+    expect(audioPlan(c)).toBe("16 tracks, 24-bit WAV");
+    expect(audioPlan({ ...c, tracks: "5" })).toBe("1 track, 24-bit WAV");
+    expect(audioPlan({ ...c, tracks: "" })).toBe("32 tracks, 24-bit WAV");
+  });
+  it("is empty when no audio is recorded", () => {
+    expect(audioPlan({ ...c, enabled: false })).toBe("");
+    expect(audioPlan(undefined)).toBe("");
+    expect(audioPlan({ ...c, tracks: "40" })).toBe("");
+  });
+  it("counts", () => {
+    expect([plural(0, "marker"), plural(1, "marker"), plural(2, "marker")]).toEqual(["0 markers", "1 marker", "2 markers"]);
   });
 });

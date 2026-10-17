@@ -117,6 +117,17 @@ export function parseTracks(spec: string, channels: number): number[] | string {
   return [...seen].sort((x, y) => x - y);
 }
 
+/** audioPlan says what audio a configuration records: "16 tracks, 24-bit WAV", or "" when none. */
+export function audioPlan(c: AudioConfig | undefined): string {
+  if (!c?.enabled) return "";
+  const t = parseTracks(c.tracks ?? "", c.channels);
+  if (typeof t === "string") return "";
+  return `${plural(t.length, "track")}, ${c.bits}-bit WAV`;
+}
+
+/** plural counts things: "1 track", "16 tracks". */
+export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 /** byteRate is what a configuration writes per second, all files. */
 export function byteRate(c: AudioConfig): number {
   const t = parseTracks(c.tracks ?? "", c.channels);

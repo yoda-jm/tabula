@@ -19,12 +19,16 @@ const BITS = [16, 24, 32];
 const RATES = [44100, 48000, 96000];
 const INPUTS = ["s32le", "s24-32le", "s24le", "s16le", "f32le"];
 
-/** AudioPanel is the Record page's audio card. */
-export function AudioPanel({ rec }: { rec: RecordStatus | null }) {
+export interface Audio {
+  view: AudioView | null;
+  error: string;
+  setView(v: AudioView): void;
+}
+
+/** useAudio loads the audio settings, again when a recording starts or stops (free space, last capture). */
+export function useAudio(recording: boolean): Audio {
   const [view, setView] = useState<AudioView | null>(null);
   const [error, setError] = useState("");
-  const recording = !!rec?.recording;
-
   const load = useCallback(async () => {
     try {
       setView(await audioApi.get());
@@ -33,10 +37,16 @@ export function AudioPanel({ rec }: { rec: RecordStatus | null }) {
       setError((e as Error).message);
     }
   }, []);
-  // reload when a recording starts or stops (free space, last capture)
   useEffect(() => {
     void load();
   }, [load, recording]);
+  return { view, error, setView };
+}
+
+/** AudioPanel is the Record page's audio card. */
+export function AudioPanel({ rec, audio }: { rec: RecordStatus | null; audio: Audio }) {
+  const { view, error, setView } = audio;
+  const recording = !!rec?.recording;
 
   if (!view) {
     return error ? (

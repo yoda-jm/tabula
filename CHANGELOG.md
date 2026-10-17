@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### tabula
+- The Record page says what a session keeps: the console (its settings and
+  every change, not the sound) always, the audio only when Audio tracks is
+  on; the session list shows which sessions have audio, and replays say
+  they move the console and play no sound.
 - Security: requests that change something are refused when they come from
   a page of another site (a page open in a browser of the laptop could
   otherwise use tabula as the engineer, and set a custom recorder command),

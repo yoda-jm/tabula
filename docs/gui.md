@@ -172,12 +172,21 @@ bus here; musicians get only theirs. See [access](access.md).
 
 ## Record
 
-Record a show: a snapshot of the console when you start (a scene file
-that opens in M32-Edit) plus every change with its time, and markers you add
-(press M), with the audio tracks of the console's USB card if you choose
-them. Replay a session onto the console or the emulator, from a time or a
-marker, at a chosen speed (writes must be armed); export it for Reaper or
-Audacity. See [recording](recording.md) and the
+Record a show as a session, which keeps two things, as the page says above
+**Start recording**:
+
+- **Console**, always: the console's settings, not its sound. A snapshot of
+  every setting when you start (a scene file that opens in M32-Edit), then
+  every change, made on the console or here, with its time, and the markers
+  you add (press M).
+- **Audio**, when **Audio tracks** is on: the sound of the console's USB
+  card, one WAV file per track, in step with the console changes.
+
+The session list says for each one how many console changes and markers it
+holds, and whether it has audio. Replay a session onto the console or the
+emulator, from a time or a marker, at a chosen speed (writes must be
+armed): it moves the console as recorded and plays no sound. Export it for
+Reaper or Audacity to listen to the audio with the markers. See [recording](recording.md) and the
 [API](API.md#recording-and-replay) for the session format.
 
 ## Access
