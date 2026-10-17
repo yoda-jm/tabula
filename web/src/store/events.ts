@@ -40,6 +40,7 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
       store.setStatus(s);
       if (fresh) {
         fresh = false;
+        if (!store.schema) void store.loadSchema(); // tabula was not reachable when the page opened
         void refreshRecord();
         if (s.connected && !s.connecting) void store.reloadState();
       }

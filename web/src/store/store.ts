@@ -59,6 +59,7 @@ export class Store {
   status: Status = { connected: false, connecting: false };
   stream: StreamState = "connecting";
   record: RecordStatus | null = null;
+  private recordAt = 0;
   toasts: Toast[] = [];
   /** bumped when the whole state is (re)loaded or cleared */
   stateVersion = 0;
@@ -275,7 +276,15 @@ export class Store {
 
   setRecord(r: RecordStatus | null) {
     this.record = r;
+    this.recordAt = this.now();
     this.notify(["record"]);
+  }
+
+  /** recordElapsed is the recording's elapsed time: the server's duration plus the time since it was sent. */
+  recordElapsed(): number {
+    const r = this.record;
+    if (!r?.recording) return 0;
+    return (r.meta?.duration ?? 0) + (this.now() - this.recordAt) / 1000;
   }
 
   /** applyChanges applies a "change" event: an array of parameter changes. */

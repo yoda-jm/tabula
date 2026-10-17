@@ -130,13 +130,15 @@ function NodeEditor({ node }: { node: Node }) {
     );
   }
   const fields = store.fieldsOf(node.path);
+  const used = fields.filter((f) => f.type.kind !== "unused");
   return (
     <div className="node-body">
       {node.variant && <p className="muted">Fields follow {node.variant} (effect type).</p>}
       {!node.scene && <p className="muted">Not part of a scene file (console status or preferences).</p>}
-      {fields.map((f) => (
+      {used.map((f) => (
         <FieldEditor key={f.name} addr={`${node.path}/${f.name}`} />
       ))}
+      {used.length < fields.length && <p className="muted">{fields.length - used.length} unused positions not shown.</p>}
     </div>
   );
 }

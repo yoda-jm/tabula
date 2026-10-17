@@ -143,8 +143,7 @@ export function RecIndicator({ onClick }: { onClick(): void }) {
   }, [r?.recording]);
   if (!r) return null;
   if (r.recording) {
-    const start = r.meta?.start ? Date.parse(r.meta.start) : NaN;
-    const elapsed = Number.isFinite(start) ? (Date.now() - start) / 1000 : (r.meta?.duration ?? 0);
+    const elapsed = store.recordElapsed();
     return (
       <button type="button" className="rec" onClick={onClick} title="Recording">
         <span className="rec-dot" aria-hidden />

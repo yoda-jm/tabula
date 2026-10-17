@@ -1156,7 +1156,15 @@ div.scribble {
   gap: 12px;
 }
 .markers code {
-  min-width: 5em;
+  min-width: 4em;
+}
+.marker-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.markers .btn {
+  white-space: nowrap;
 }
 .warn-box {
   padding: 10px 14px;

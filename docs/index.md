@@ -50,11 +50,33 @@ Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases)
 
 Scene safes and snippet filters on recall: see the [plan](PLAN.md).
 
-## tabula — the client *(coming)*
+## tabula — the client
 
-A program that connects to a console or to the emulator and serves a web GUI:
-connection setup, every console menu, recording and replay of shows, and
-later live viewers and band-specific screens (in-ear mixes from a phone…).
+`tabula` connects to a console (or to `tabula-emu`) and serves a web GUI,
+from the same binary, to any browser on the network — a laptop at the desk
+or a phone on stage.
+
+```sh
+tabula -console 192.168.1.62 -http :8080
+```
+
+- **Mixer**: banks of strips (inputs, aux and FX returns, buses, matrices
+  and mains, DCAs) with scribble strips in the console colours, meters,
+  faders, mutes and pans.
+- **Channel**: everything about one strip — config, preamp, gate, dynamics,
+  EQ with its (approximate) response curve, sends with the bus names.
+- **Browser**: every parameter of the console, searchable by path or value,
+  each with an editor; values can also be typed as on the console (`-6`,
+  `1k20`, `GATE`).
+- **Record**: record a show (snapshot plus every change, with markers) and
+  replay it onto the console or the emulator.
+- **Connect**: find consoles on the network or type an address.
+
+It is **read-only** until writes are armed, after a confirmation: on a real
+console, nothing moves by accident. `-record` starts recording as soon as
+the console is synced, for unattended recording of a concert.
+
+Later: live viewers and band-specific screens (in-ear mixes from a phone…).
 
 ## Reference
 
