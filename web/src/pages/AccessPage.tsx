@@ -1,13 +1,15 @@
 // Access links: the engineer gives each musician a link to their own in-ear
 // mix, and viewers or another engineer device a link of their role. A link
-// opened on a phone (or its QR code scanned) signs that phone in.
+// opened on a phone (or its QR code scanned) signs that phone in. The
+// engineer password, when set, signs browsers in as the engineer (this
+// machine included); they are listed as signed-in devices.
 
 import { useCallback, useEffect, useState } from "react";
 import qrcode from "qrcode-generator";
 import { ConfirmDialog } from "../components/shell";
 import { ROLE_LABELS } from "../lib/access";
 import type { AccessStatus, Grant, Role } from "../lib/api";
-import { accessApi } from "../lib/api";
+import { accessApi, api } from "../lib/api";
 import { ALL_STRIPS } from "../lib/strips";
 import { prettyText } from "../lib/values";
 import { useValue } from "../store/hooks";
@@ -37,6 +39,8 @@ export function AccessPage() {
   }, [st, base]);
 
   const link = (g: Grant) => `${base}/a/${g.token}`;
+  const links = st?.grants.filter((g) => !g.session) ?? [];
+  const sessions = st?.grants.filter((g) => g.session) ?? [];
   const setWrite = (on: boolean) =>
     accessApi.settings(on).then(setSt, (e: Error) => store.toast(e.message, "error"));
   const remove = (g: Grant) =>
@@ -46,8 +50,10 @@ export function AccessPage() {
     <div className="page access">
       <h2>Access</h2>
       <p className="muted">
-        This machine always has full control. Other devices need a link: musicians get their own in-ear mix only,
-        viewers see everything and change nothing.
+        {st?.password
+          ? "Every browser, this machine included, signs in with the engineer password to have full control. "
+          : "This machine has full control. "}
+        Other devices need a link: musicians get their own in-ear mix only, viewers see everything and change nothing.
       </p>
       {error && <p className="banner error">{error}</p>}
       {st && !st.reachable && (
@@ -82,15 +88,17 @@ export function AccessPage() {
           )}
         </section>
       )}
+      {st && <PasswordCard st={st} onChange={setSt} />}
+      {st && (st.password || sessions.length > 0) && <Sessions sessions={sessions} current={st.current} onChange={refresh} />}
       <NewAccess onAdded={refresh} />
       {st && (
         <section className="card section">
           <header className="section-head">
             <h3>Links</h3>
           </header>
-          {st.grants.length === 0 && <p className="muted">No access link yet.</p>}
+          {links.length === 0 && <p className="muted">No access link yet.</p>}
           <ul className="grants">
-            {st.grants.map((g) => (
+            {links.map((g) => (
               <li key={g.id} className="grant">
                 <div className="grant-head">
                   <strong>{g.name}</strong>
@@ -131,6 +139,184 @@ export function AccessPage() {
         </ConfirmDialog>
       )}
     </div>
+  );
+}
+
+/** PasswordCard sets, changes or removes the engineer password. */
+function PasswordCard({ st, onChange }: { st: AccessStatus; onChange(s: AccessStatus): void }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [again, setAgain] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const mismatch = again !== "" && next !== again;
+  const blocked = st.guest === "engineer";
+
+  const send = async (password: string, done: string) => {
+    setBusy(true);
+    try {
+      const had = st.password;
+      onChange(await accessApi.password(current, password));
+      setCurrent("");
+      setNext("");
+      setAgain("");
+      store.toast(done, "info");
+      if (!had) void store.loadAccess(); // the first password signed this browser in
+    } catch (e) {
+      store.toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const change = () =>
+    void send(
+      next,
+      st.password ? "Password changed: the other signed-in devices are signed out." : "Password set: this browser is signed in.",
+    );
+
+  return (
+    <section className="card section">
+      <header className="section-head">
+        <h3>Engineer password</h3>
+      </header>
+      {st.password ? (
+        <p className="muted">
+          Set: every browser signs in with it to have full control, once (it remembers). Changing or removing it signs
+          out the other devices.
+        </p>
+      ) : (
+        <p className="muted">
+          None: whoever uses this machine has full control, and so does everyone if tabula is reached through a proxy
+          on this machine. With a password, every browser signs in, this machine included (once: it remembers).
+        </p>
+      )}
+      {blocked ? (
+        <p className="warn-box">
+          Every device is the engineer (<code>-guest engineer</code>): a password would protect nothing.
+        </p>
+      ) : (
+        <form
+          className="new-access"
+          onSubmit={(e) => {
+            e.preventDefault();
+            change();
+          }}
+        >
+          <input type="text" name="username" autoComplete="username" value="engineer" readOnly hidden />
+          {st.password && (
+            <label className="form-field">
+              <span className="field-label">Current password</span>
+              <input
+                className="input"
+                type="password"
+                autoComplete="current-password"
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+              />
+            </label>
+          )}
+          <label className="form-field">
+            <span className="field-label">{st.password ? "New password" : "Password"}</span>
+            <input
+              className="input"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              placeholder="8 characters or more"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+            />
+          </label>
+          <label className="form-field">
+            <span className="field-label">Again</span>
+            <input
+              className="input"
+              type="password"
+              autoComplete="new-password"
+              value={again}
+              onChange={(e) => setAgain(e.target.value)}
+              aria-invalid={mismatch}
+            />
+          </label>
+          <button
+            type="submit"
+            className="btn"
+            disabled={busy || next.length < 8 || next !== again || (st.password && !current)}
+          >
+            {st.password ? "Change" : "Set password"}
+          </button>
+          {st.password && (
+            <button
+              type="button"
+              className="btn danger-text"
+              disabled={busy || !current}
+              title={current ? undefined : "Enter the current password first"}
+              onClick={() => setRemoving(true)}
+            >
+              Remove
+            </button>
+          )}
+        </form>
+      )}
+      {mismatch && <p className="danger-text">The two passwords differ.</p>}
+      {removing && (
+        <ConfirmDialog
+          title="Remove the engineer password?"
+          confirm="Remove"
+          onConfirm={() => {
+            setRemoving(false);
+            void send("", "Password removed.");
+          }}
+          onCancel={() => setRemoving(false)}
+        >
+          Whoever uses this machine gets full control again without signing in, and the other signed-in devices are
+          signed out.
+        </ConfirmDialog>
+      )}
+    </section>
+  );
+}
+
+/** Sessions lists the browsers signed in with the engineer password. */
+function Sessions({ sessions, current, onChange }: { sessions: Grant[]; current?: string; onChange(): void }) {
+  const signOut = async (g: Grant) => {
+    try {
+      if (g.id === current) {
+        await api.logout();
+        window.location.reload();
+        return;
+      }
+      await accessApi.remove(g.id);
+      onChange();
+    } catch (e) {
+      store.toast((e as Error).message, "error");
+    }
+  };
+  return (
+    <section className="card section">
+      <header className="section-head">
+        <h3>Signed-in devices</h3>
+      </header>
+      {sessions.length === 0 && <p className="muted">No device is signed in with the password.</p>}
+      <ul className="grants">
+        {sessions.map((g) => (
+          <li key={g.id} className="grant">
+            <div className="grant-head">
+              <strong>{g.name}</strong>
+              <span className="muted">
+                since {new Date(g.created).toLocaleString()}
+                {g.id === current ? ", this browser" : ""}
+              </span>
+            </div>
+            <div className="grant-actions">
+              <button type="button" className="btn danger-text" onClick={() => void signOut(g)}>
+                Sign out
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

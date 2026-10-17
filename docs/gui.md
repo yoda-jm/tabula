@@ -15,7 +15,8 @@ made in one shows in the others.
 accident. Disarm to go back to read-only.
 
 **Who sees what.** The machine running `tabula` is the engineer and sees
-every page. Other devices get a role from an access link: viewers see the
+every page (once signed in, when an engineer password is set). Other
+devices get a role from an access link: viewers see the
 Mixer, Channel and Browser pages read-only; musicians only get their in-ear
 mix. Routing, FX, Scenes, In-ears, Record, Access and Connect are engineer
 pages. See [access](access.md).
@@ -181,7 +182,9 @@ Audacity. See [recording](recording.md) and the
 ## Access
 
 Make access links (with QR codes) for musicians, viewers and other engineer
-devices, and delete them to end that access. See [access](access.md).
+devices, and delete them to end that access. Set, change or remove the
+engineer password, and sign out the devices signed in with it. See
+[access](access.md).
 
 ## Connect
 

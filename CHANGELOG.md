@@ -7,6 +7,13 @@
   instead of one long list per section, with the strip names, the current
   values on every row and subtree counts; a filter opens the tree down to
   its matches.
+- An optional engineer password, set on the Access page: then every
+  browser signs in to be the engineer, the machine running tabula included
+  (without one, anyone at that machine, or every device behind a reverse
+  proxy on it, has full control). Signed-in devices are listed and can be
+  signed out; changing the password signs out the others; wrong passwords
+  are slowed down; it is kept as a PBKDF2 hash; `tabula -reset-password`
+  removes it. Musician and viewer links work as before.
 - Access for the band: the engineer makes access links (with QR codes) on a
   new Access page. A musician's link opens their in-ear mix only, on a page
   made for phones: their bus volume and mute, a send slider per source,

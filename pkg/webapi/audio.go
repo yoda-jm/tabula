@@ -221,14 +221,15 @@ func (s *Server) getAudio(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.audioView())
 }
 
-// checkCustom refuses a new custom recorder command unless the request comes
-// from the machine running tabula itself: an engineer link must not be a
-// way to run programs on that machine. Keeping the current command is fine.
+// checkCustom refuses a new custom recorder command unless the engineer is on
+// the machine running tabula itself (signed in there when a password is
+// set): an engineer link or session from another device must not be a way
+// to run programs on that machine. Keeping the current command is fine.
 func (s *Server) checkCustom(r *http.Request, cfg audio.Config) error {
 	if cfg.Recorder != "custom" {
 		return nil
 	}
-	if c := callerFrom(r); c.Local && c.Grant == nil {
+	if c := callerFrom(r); c.Local && c.Role == RoleEngineer {
 		return nil
 	}
 	s.mu.Lock()

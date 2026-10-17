@@ -51,6 +51,8 @@ type Server struct {
 
 	acc        access
 	listenAddr string
+	loginMu    sync.Mutex   // one password check at a time (password.go)
+	limiter    loginLimiter // password.go
 
 	lib   libraryState // library.go
 	audio audioState   // audio.go

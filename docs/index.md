@@ -114,7 +114,8 @@ tabula -console 192.168.1.62 -http :8033
   [recording a show](recording.md).
 - **In-ear mixes for the band**: each musician scans a QR code and gets
   their own mix on their phone, and nothing else; viewers watch without
-  touching. See [access](access.md).
+  touching. An optional engineer password protects full control, on the
+  laptop too. See [access](access.md).
 - **Connect**: find consoles on the network or type an address.
 
 It is **read-only** until writes are armed, after a confirmation: on a real

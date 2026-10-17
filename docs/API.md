@@ -135,12 +135,14 @@ event stream.
 
 Every API request is checked against the caller's role (see
 [access](access.md)): requests from the machine running `tabula` are the
-engineer's; other devices use an access link, which sets a cookie
-(`tabula_access`), or get the guest role (`-guest`, none by default).
+engineer's, unless an engineer password is set; other devices use an access
+link, which sets a cookie (`tabula_access`), or get the guest role
+(`-guest`, none by default). With a password, every browser (this machine
+included) signs in with `POST /api/login`, which sets the same cookie.
 
 | Least role | Routes |
 |---|---|
-| none | `GET /api/whoami`, `POST /api/logout`, `GET /a/{token}` |
+| none | `GET /api/whoami`, `POST /api/login`, `POST /api/logout`, `GET /a/{token}` |
 | viewer | `GET /api/status`, `/api/schema`, `/api/state`, `/api/events`, `/api/record` |
 | musician | `POST /api/set`, only for the sends to their bus (and its linked partner) from channels, aux inputs and FX returns (`on`, `level`, `pan`), and their bus `fader` and `on`; allowed without arming when the musicians may change their mix |
 | engineer | everything else, including any route not listed here |
@@ -150,17 +152,28 @@ A refused request gets 403 with `{"error": "..."}`.
 | Method | Path | Body | Answer |
 |---|---|---|---|
 | GET | `/a/{token}` | | sets the cookie and redirects to `/#/mix` (musician) or `/#/mixer`; 403 page if the link is not valid |
-| GET | `/api/whoami` | | `{"role", "name"?, "bus"?, "buses"?, "local", "link", "musicians_can_write"}` |
-| POST | `/api/logout` | | forgets the cookie; answers the new `whoami` |
-| GET | `/api/access` | | `{"grants": [Grant], "musicians_can_write", "guest", "urls", "reachable"}` |
+| GET | `/api/whoami` | | `{"role", "name"?, "bus"?, "buses"?, "local", "link", "session", "password", "musicians_can_write"}` |
+| POST | `/api/login` | `{"password": "..."}` | signs in with the engineer password: makes a session, sets the cookie, answers the new `whoami`; 403 wrong password, 429 too many wrong ones (with `Retry-After`), 409 no password set |
+| POST | `/api/logout` | | forgets the cookie (and ends a session); answers the new `whoami` |
+| GET | `/api/access` | | `{"grants": [Grant], "musicians_can_write", "password", "current"?, "guest", "urls", "reachable"}` |
 | POST | `/api/access` | `{"name": "Remy", "role": "musician", "bus": 3}` | 201 + `Grant` |
 | DELETE | `/api/access/{id}` | | 204; event streams opened with it end |
 | POST | `/api/access/settings` | `{"musicians_can_write": false}` | the access status |
+| POST | `/api/access/password` | `{"current": "...", "password": "..."}` | sets, changes or (empty `password`) removes the engineer password; `current` is needed when one is set; ends every other session; setting the first one signs the caller in; answers the access status (400 under 8 characters, 403 wrong `current`, 409 with `-guest engineer`) |
 
-`Grant`: `{"id", "name", "role", "bus"?, "token", "created"}`; its link is
-one of `urls` + `/a/` + `token`. `urls` lists where other devices reach
+`Grant`: `{"id", "name", "role", "bus"?, "session"?, "token", "created"}`;
+its link is one of `urls` + `/a/` + `token`. Sessions (`"session": true`,
+browsers signed in with the password) come without their token and are
+ended with `DELETE /api/access/{id}` like links; `current` is the access of
+the caller. `urls` lists where other devices reach
 this `tabula` (one per address of the machine when it listens on all of
 them); `reachable` is false when it listens on the machine only.
+
+`login` and a wrong `current` password count as tries: after 5 wrong
+passwords in a row a client waits 30 s, twice as long after each further
+one (up to an hour), and all clients together get 30 wrong passwords a
+minute at most. The password is kept as a PBKDF2-SHA256 hash in the access
+file; `tabula -reset-password` removes it.
 
 ## Recording and replay
 
