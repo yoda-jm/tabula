@@ -1,46 +1,59 @@
-// A musician's in-ear mix, made for a phone on stage: their bus volume and
-// mute, then one send slider per source (channels, aux inputs, FX returns).
-// A musician's access link opens this page only; the engineer sees any bus's
-// mix as the musician does (#/mix/3).
+// A musician's in-ear mix, made for a phone on stage: a small desk of tall
+// faders, one per source sending to their bus (channels, aux inputs, FX
+// returns; a linked pair is one), with its name, colour and meter, their own
+// bus volume fixed on the right, and an overview at the bottom to slide
+// through the sources without touching a fader. A musician's access link
+// opens this page only; the engineer sees any bus's mix as the musician does
+// (#/mix/3).
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
+import { Fader } from "../components/Fader";
+import { StripMeter } from "../components/Meter";
 import { Scribble } from "../components/Scribble";
 import { Toasts } from "../components/shell";
 import { api } from "../lib/api";
-import { meterFraction, toDbfs } from "../lib/meters";
+import type { MixSource } from "../lib/mix";
+import { mixSources } from "../lib/mix";
 import { go, usePersistent } from "../lib/route";
 import type { Strip } from "../lib/strips";
-import { ALL_STRIPS, stripAddrs } from "../lib/strips";
+import { ALL_STRIPS, colourOf, stripAddrs } from "../lib/strips";
 import { prettyText } from "../lib/values";
-import { useAccess, useCanWrite, useLeaf, useMeters, useSchema, useStatus, useValue } from "../store/hooks";
+import { useAccess, useCanWrite, useLeaf, useNodes, useSchema, useStatus, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
 
 const SOURCES = ALL_STRIPS.filter((s) => s.kind === "ch" || s.kind === "auxin" || s.kind === "fxrtn");
 const BUSES = ALL_STRIPS.filter((s) => s.kind === "bus");
+const LINK_NODES = ["/config/chlink", "/config/auxlink", "/config/fxlink", "/config/buslink"];
+const CONFIG_NODES = SOURCES.map((s) => s.path + "/config");
 
-/** MusicianApp is the whole GUI of a musician's access. */
+/** MusicianApp is the whole GUI of a musician's access: their mix, nothing else. */
 export function MusicianApp() {
   const who = useAccess();
-  const leave = async () => {
-    await api.logout().catch(() => undefined);
-    window.location.replace("/");
-  };
   return (
-    <div className="app">
-      <header className="topbar">
-        <span className="brand">tabula</span>
-        <span className="mix-who">{who?.name}</span>
-        <span className="topbar-gap" />
-        <button type="button" className="btn" onClick={leave} title="Forget this access on this device">
-          Leave
-        </button>
-      </header>
+    <div className="app iem-app">
       <main className="main">
         <MixPage bus={who?.bus} />
       </main>
       <Toasts />
     </div>
+  );
+}
+
+/** Leave forgets a musician's access on this device. */
+function Leave({ name }: { name?: string }) {
+  const leave = async () => {
+    await api.logout().catch(() => undefined);
+    window.location.replace("/");
+  };
+  return (
+    <span className="iem-leave">
+      <span className="muted">{name ? `Access of ${name}` : "Access link"}</span>
+      <button type="button" className="btn" onClick={leave} title="Forget this access on this device">
+        Leave
+      </button>
+    </span>
   );
 }
 
@@ -105,6 +118,16 @@ function useMixBuses(bus: number): number[] {
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
+const linked = (flag: string) => Number(store.getValue(flag)?.value) === 1;
+
+function sourceInfo(strip: Strip) {
+  const schema = store.schema;
+  const a = schema ? stripAddrs(schema, strip) : undefined;
+  return {
+    name: prettyText(a?.name ? store.getValue(a.name)?.text : ""),
+    colour: Number(a?.color ? store.getValue(a.color)?.value : 0) || 0,
+  };
+}
 
 function BusMix({ bus }: { bus: number }) {
   const buses = useMixBuses(bus);
@@ -114,51 +137,53 @@ function BusMix({ bus }: { bus: number }) {
   const name = prettyText(useValue(`${busPath}/config/name`)?.text);
   const [showAll, setShowAll] = usePersistent("tabula.mix.all", false);
   const [pins, setPins] = usePersistent<string[]>(`tabula.mix.pins.${target}`, []);
+  const [options, setOptions] = useState(false);
   const status = useStatus();
   const can = useCanWrite(`${busPath}/mix/fader`);
   const who = useAccess();
+  const strips = useRef<HTMLDivElement>(null);
+  const version = useNodes([...LINK_NODES, ...CONFIG_NODES]);
 
-  const sources = useMemo(() => {
-    const pinned = SOURCES.filter((s) => pins.includes(s.path));
-    return [...pinned, ...SOURCES.filter((s) => !pins.includes(s.path))];
-  }, [pins]);
+  const sources = useMemo(
+    () => mixSources(SOURCES, linked, sourceInfo, { showAll, pins }),
+    [showAll, pins, version], // version: links, names and colours
+  );
   const togglePin = (p: string) => setPins(pins.includes(p) ? pins.filter((x) => x !== p) : [...pins, p]);
 
   return (
-    <>
-      <section className="card mix-master">
-        <div className="mix-title">
-          <h2>{name || `Bus ${target}`}</h2>
-          <span className="muted">{stereo ? `Buses ${buses[0]}-${buses[1]}, stereo` : `Bus ${target}`}</span>
-        </div>
-        <LevelBar group="0" index={47 + target} />
-        <span className="mix-label">My volume</span>
-        <div className="mix-row">
-          <SendSlider addr={`${busPath}/mix/fader`} label="Mix volume" />
-          <MuteButton addr={`${busPath}/mix/on`} label="Mix" />
-        </div>
-        {status.connected && !can && <ReadOnlyNote role={who?.role} canWrite={who?.musicians_can_write} />}
-        <div className="mix-tools">
+    <div className="iem">
+      <div className="iem-bar">
+        <h2>{name || `Bus ${target}`}</h2>
+        <span className="muted">{stereo ? `Buses ${buses[0]}-${buses[1]}, stereo` : `Bus ${target}`}</span>
+        <span className="topbar-gap" />
+        <button type="button" className="btn" aria-expanded={options} onClick={() => setOptions(!options)}>
+          Options
+        </button>
+      </div>
+      {options && (
+        <div className="iem-options">
           <label className="check">
             <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show unnamed sources
           </label>
           <WakeLockToggle />
+          {who?.role === "musician" && <Leave name={who.name} />}
+          <p className="muted">
+            Drag a fader anywhere along it: it never jumps to your finger. Slide through the sources with the bar at the bottom. ★ keeps a source on the left.
+          </p>
         </div>
-      </section>
-      <div className="mix-sources">
-        {sources.map((s) => (
-          <SourceRow
-            key={s.path}
-            strip={s}
-            bus={target}
-            stereo={stereo}
-            showAll={showAll}
-            pinned={pins.includes(s.path)}
-            onPin={() => togglePin(s.path)}
-          />
-        ))}
+      )}
+      {status.connected && !can && <ReadOnlyNote role={who?.role} canWrite={who?.musicians_can_write} />}
+      <div className="iem-desk">
+        <div className="iem-strips" ref={strips}>
+          {sources.map((s) => (
+            <SourceStrip key={s.strip.path} source={s} bus={target} stereo={stereo} pinned={pins.includes(s.strip.path)} onPin={() => togglePin(s.strip.path)} />
+          ))}
+          {!sources.length && <p className="muted iem-empty">No named source sends to this mix: Options → Show unnamed sources.</p>}
+        </div>
+        <MasterStrip bus={target} stereo={stereo} />
       </div>
-    </>
+      <Overview sources={sources} bus={target} scroller={strips} />
+    </div>
   );
 }
 
@@ -170,80 +195,90 @@ function ReadOnlyNote({ role, canWrite }: { role?: string; canWrite?: boolean })
   return <p className="banner">{text}</p>;
 }
 
-function SourceRow(props: { strip: Strip; bus: number; stereo: boolean; showAll: boolean; pinned: boolean; onPin(): void }) {
-  const { strip, bus } = props;
+function SourceStrip(props: { source: MixSource; bus: number; stereo: boolean; pinned: boolean; onPin(): void }) {
+  const { source, bus } = props;
+  const { strip, partner } = source;
   const schema = useSchema();
-  const a = schema ? stripAddrs(schema, strip) : undefined;
-  const name = prettyText(useValue(a?.name)?.text);
   const send = `${strip.path}/mix/${pad2(bus)}`;
-  const sendOn = useValue(`${send}/on`);
-  const level = useValue(`${send}/level`);
-  if (!a || !level) return null; // no send to this bus (or not loaded yet)
-  const used = name !== "" && name !== "-";
-  if (!props.showAll && !used && !props.pinned) return null;
-  const n = Number(strip.path.slice(strip.path.lastIndexOf("/") + 1));
-  const meterIndex = strip.kind === "ch" ? n - 1 : strip.kind === "auxin" ? 31 + n : 39 + n;
-  const off = sendOn !== undefined && Number(sendOn.value) === 0;
+  const on = useValue(`${send}/on`);
+  if (!schema || !store.leaf(`${send}/level`)) return null; // no send to this bus
+  const a = stripAddrs(schema, strip);
+  const off = on !== undefined && Number(on.value) === 0;
+  const label = source.name || source.label;
   return (
-    <div className={"mix-source" + (off ? " off" : "")}>
-      <div className="mix-source-head">
-        <Scribble strip={strip} nameAddr={a.name} colorAddr={a.color} />
-        <LevelBar group="0" index={meterIndex} />
+    <div className={"iem-strip" + (off ? " off" : "") + (props.pinned ? " pinned" : "")}>
+      <div className="iem-head">
+        <Scribble strip={{ ...strip, label: source.label }} nameAddr={a.name} colorAddr={a.color} />
         <button
           type="button"
-          className={"btn pin" + (props.pinned ? " lit" : "")}
+          className={"iem-pin" + (props.pinned ? " lit" : "")}
           aria-pressed={props.pinned}
-          title={props.pinned ? "Unpin" : "Pin to the top"}
+          aria-label={`Keep ${label} on the left`}
           onClick={props.onPin}
         >
           ★
         </button>
       </div>
-      <div className="mix-row">
-        <SendSlider addr={`${send}/level`} label={`${name || strip.label} in my mix`} />
-        <MuteButton addr={`${send}/on`} label={name || strip.label} />
-      </div>
-      {props.stereo && <PanSlider addr={`${send}/pan`} />}
+      {props.stereo &&
+        (partner ? (
+          <span className="iem-pan muted" title="A stereo source keeps the pans set on the console">
+            stereo
+          </span>
+        ) : (
+          <PanSlider addr={`${send}/pan`} label={label} />
+        ))}
+      <TallFader addr={`${send}/level`} label={`${label} in my mix`} meter={<StripMeter strip={strip} partner={partner} />} />
+      <MuteButton addr={`${send}/on`} label={label} />
     </div>
   );
 }
 
-/** SendSlider is a wide horizontal slider on the console's level law. */
-function SendSlider({ addr, label }: { addr: string; label: string }) {
-  const val = useValue(addr);
-  const leaf = useLeaf(addr);
-  const can = useCanWrite(addr);
-  const steps = leaf?.field.type.steps ?? 161;
-  const text = prettyText(val?.text);
+/** MasterStrip is the musician's own volume: their bus fader and mute. */
+function MasterStrip({ bus, stereo }: { bus: number; stereo: boolean }) {
+  const strip = BUSES[bus - 1];
+  const busPath = `/bus/${pad2(bus)}`;
   return (
-    <label className="mix-slider">
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={1 / (steps - 1)}
-        value={Number(val?.value ?? 0)}
-        disabled={!can || val === undefined}
-        aria-label={label}
-        aria-valuetext={`${text} dB`}
-        onChange={(e) => store.set(addr, Number(e.target.value))}
-        onPointerUp={() => store.flush(addr)}
-        onKeyUp={() => store.flush(addr)}
-      />
-      <output className={"db" + (val?.pending ? " pending" : "")}>{val ? text : "—"}</output>
-    </label>
+    <div className="iem-strip iem-master">
+      <div className="iem-master-head">My volume</div>
+      <TallFader addr={`${busPath}/mix/fader`} label="My volume" meter={<StripMeter strip={strip} partner={stereo ? BUSES[bus] : undefined} />} />
+      <MuteButton addr={`${busPath}/mix/on`} label="my mix" />
+    </div>
   );
 }
 
-function PanSlider({ addr }: { addr: string }) {
+/** TallFader is a meter and a fader filling the strip's height, with the level below. */
+function TallFader({ addr, label, meter }: { addr: string; label: string; meter: ReactNode }) {
+  const val = useValue(addr);
+  const leaf = useLeaf(addr);
+  const can = useCanWrite(addr);
+  const text = prettyText(val?.text);
+  return (
+    <>
+      <div className="iem-fader">
+        {meter}
+        <Fader
+          value={Number(val?.value ?? 0)}
+          steps={leaf?.field.type.steps}
+          disabled={!can || val === undefined}
+          label={label}
+          valueText={`${text} dB`}
+          onChange={(v) => store.set(addr, v)}
+          onRelease={() => store.flush(addr)}
+        />
+      </div>
+      <output className={"db" + (val?.pending ? " pending" : "")}>{val ? text : "—"}</output>
+    </>
+  );
+}
+
+function PanSlider({ addr, label }: { addr: string; label: string }) {
   const val = useValue(addr);
   const can = useCanWrite(addr);
-  if (!val) return null;
+  if (!val) return <span className="iem-pan" />;
   const text = prettyText(val.text);
   const shown = text === "+0" || text === "0" ? "C" : text.startsWith("-") ? "L" + text.slice(1) : "R" + text.replace("+", "");
   return (
-    <label className="mix-slider mix-pan">
-      <span className="muted">Pan</span>
+    <label className="iem-pan">
       <input
         type="range"
         min={0}
@@ -251,13 +286,13 @@ function PanSlider({ addr }: { addr: string }) {
         step={0.01}
         value={Number(val.value)}
         disabled={!can}
-        aria-label="Pan in my mix"
+        aria-label={`Pan of ${label} in my mix`}
         aria-valuetext={shown}
         onChange={(e) => store.set(addr, Number(e.target.value))}
         onPointerUp={() => store.flush(addr)}
         onDoubleClick={() => can && store.set(addr, 0.5)}
       />
-      <output className="db">{shown}</output>
+      <span className="iem-pan-text">{shown}</span>
     </label>
   );
 }
@@ -275,20 +310,71 @@ function MuteButton({ addr, label }: { addr: string; label: string }) {
       disabled={!can || val === undefined}
       onClick={() => store.set(addr, muted ? 1 : 0)}
     >
-      {muted ? "OFF" : "ON"}
+      MUTE
     </button>
   );
 }
 
-/** LevelBar is a small horizontal level meter from a meter group. */
-function LevelBar({ group, index }: { group: string; index: number }) {
-  const values = useMeters(group);
-  const level = values?.[index];
-  const f = level === undefined ? 0 : meterFraction(toDbfs(level));
+/**
+ * Overview is the bar under the desk: every source as a block of its colour,
+ * and a window on the ones in view. Dragging along it slides the desk, so the
+ * faders are never touched by a swipe meant to scroll.
+ */
+function Overview({ sources, bus, scroller }: { sources: MixSource[]; bus: number; scroller: RefObject<HTMLDivElement> }) {
+  const bar = useRef<HTMLDivElement>(null);
+  const dragging = useRef<number | null>(null);
+  const [view, setView] = useState({ left: 0, width: 1 });
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const update = () => setView({ left: el.scrollLeft / el.scrollWidth, width: el.clientWidth / el.scrollWidth });
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+  }, [scroller, sources.length]);
+  if (view.width >= 0.999) return null; // every source is in view
+  const seek = (x: number) => {
+    const el = scroller.current;
+    const r = bar.current?.getBoundingClientRect();
+    if (!el || !r) return;
+    const f = (x - r.left) / r.width - el.clientWidth / el.scrollWidth / 2; // centre the window on the finger
+    el.scrollLeft = f * el.scrollWidth;
+  };
   return (
-    <div className="levelbar" aria-hidden>
-      <div className="levelbar-fill" style={{ width: `${f * 100}%` }} />
+    <div
+      ref={bar}
+      className="iem-overview"
+      aria-hidden // the desk scrolls by itself for the keyboard and screen readers
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragging.current = e.pointerId;
+        seek(e.clientX);
+      }}
+      onPointerMove={(e) => dragging.current === e.pointerId && seek(e.clientX)}
+      onPointerUp={() => (dragging.current = null)}
+      onPointerCancel={() => (dragging.current = null)}
+    >
+      {sources.map((s) => (
+        <OverviewCell key={s.strip.path} source={s} bus={bus} />
+      ))}
+      <div className="iem-window" style={{ left: `${view.left * 100}%`, width: `${view.width * 100}%` }} />
     </div>
+  );
+}
+
+function OverviewCell({ source, bus }: { source: MixSource; bus: number }) {
+  const on = useValue(`${source.strip.path}/mix/${pad2(bus)}/on`);
+  const c = colourOf(source.colour);
+  const off = on !== undefined && Number(on.value) === 0;
+  return (
+    <span className={`iem-cell c-${c.name}${off ? " off" : ""}`}>
+      <span>{source.name || source.label}</span>
+    </span>
   );
 }
 

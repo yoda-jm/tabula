@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### tabula
+- The musicians' in-ear page is a desk of tall vertical faders with meters,
+  one per source with its name and colour, the musician's own volume fixed
+  on the right, and an overview bar at the bottom to slide through the
+  sources without touching a fader. Linked channels are one fader.
 - The Browser page is a tree of the OSC paths (`ch` → `01` → `eq` → `1`)
   instead of one long list per section, with the strip names, the current
   values on every row and subtree counts; a filter opens the tree down to

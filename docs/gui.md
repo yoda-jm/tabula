@@ -164,8 +164,9 @@ hundred rows; the counts tell where the other matches are.
 
 ## In-ears
 
-The in-ear mix of one bus as a musician sees it on their phone: the bus
-volume and mute, and a send slider per source. The engineer can open any
+The in-ear mix of one bus as a musician sees it on their phone: a desk of
+tall faders, one per source sending to the bus, with the bus volume on the
+right. The engineer can open any
 bus here; musicians get only theirs. See [access](access.md).
 
 ## Record

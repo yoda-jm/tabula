@@ -46,19 +46,32 @@ use in **Links use**.
 
 ![A musician's in-ear mix on a phone](img/in-ear-mix.png)
 
-- **My volume** and the ON/OFF button are the fader and mute of their bus,
+The page is a small desk filling the phone's screen:
+
+- One column per source sending to their bus: its name and colour as on the
+  console, its meter, a tall fader for its level in the mix, and **MUTE**
+  (the send's switch; lit red when the source is out of the mix).
+- The faders move by dragging anywhere along them, never jumping to the
+  finger, so a tap on stage does not blast the mix; a longer travel means
+  finer steps.
+- **My volume**, always on the right, is the fader and mute of their bus,
   with its meter.
-- Then one row per source: name and colour as on the console, its level, the
-  send level to their bus and the send's ON/OFF. Sources without a name are
-  hidden (**Show unnamed sources** shows them).
-- **★** pins a source to the top (their own voice, the bass…), remembered on
-  the phone.
+- The bar at the bottom shows every source in its colour, with a frame
+  around those in view: drag along it to slide through the sources. Swiping
+  over the names and buttons scrolls too, but a swipe over a fader moves the
+  fader.
+- Two linked channels (a stereo keyboard, two guitar mics) are one column:
+  the console keeps the sends of a linked pair in step.
+- **★** keeps a source on the left (their own voice, the bass…), remembered
+  on the phone. Sources without a name are hidden (**Options → Show unnamed
+  sources** shows them).
 - A stereo in-ear mix (two linked buses) has a pan slider per source; the
-  musician changes the odd bus and the console moves the other one.
-- **Keep the screen on** works when the browser allows it, which needs
-  HTTPS: over plain HTTP on the local network, set the phone's screen timeout
-  instead.
-- **Leave** forgets the access on that phone.
+  musician changes the odd bus and the console moves the other one. A
+  stereo source keeps the pans set on the console.
+- **Options → Keep the screen on** works when the browser allows it, which
+  needs HTTPS: over plain HTTP on the local network, set the phone's screen
+  timeout instead.
+- **Options → Leave** forgets the access on that phone.
 
 Musicians change their mix **even when writes are not armed** on the
 engineer's side, as long as **Musicians can change their mix** is on (the
