@@ -32,10 +32,15 @@ func main() {
 		accessF  = flag.String("access", "access.json", "file keeping the access links made on the Access page")
 		guest    = flag.String("guest", "none", "role of other devices without an access link: none, viewer or engineer")
 		showVer  = flag.Bool("version", false, "print the version and exit")
+		audioF   = addAudioFlags(flag.CommandLine) // audio.go
 	)
 	flag.Parse()
 	if *showVer {
 		fmt.Println("tabula", version)
+		return
+	}
+	if *audioF.list {
+		listAudioDevices(os.Stdout)
 		return
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -56,6 +61,12 @@ func main() {
 		os.Exit(1)
 	}
 	api.SetSessionsDir(*sessions)
+	audioCfg, audioFile, err := audioF.load(*sessions)
+	if err != nil {
+		log.Error("audio", "err", err)
+		os.Exit(2)
+	}
+	api.SetAudioConfig(audioCfg, audioFile)
 	api.RecordOnSync(*record)
 	defer api.StopRecording()
 	if *consoleA != "" {

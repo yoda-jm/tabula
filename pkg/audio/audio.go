@@ -14,9 +14,12 @@
 package audio
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -42,6 +45,9 @@ type Config struct {
 	Tracks string `json:"tracks,omitempty"`
 	// Bits per sample of the files: 16, 24 or 32.
 	Bits int `json:"bits"`
+	// PlainNames names the files "Track 01.wav"…, not after what feeds the
+	// console's card (for a device that is not the console's card).
+	PlainNames bool `json:"plain_names,omitempty"`
 	// Command is the command line of the custom recorder, where {device},
 	// {channels} and {rate} are replaced. It writes the stream on its
 	// standard output: raw samples in the Input format, or a WAV stream.
@@ -116,6 +122,36 @@ func (c Config) Validate() error {
 	}
 	_, err := ParseTracks(c.Tracks, c.Channels)
 	return err
+}
+
+// LoadConfig reads a configuration saved by SaveConfig; without the file,
+// the defaults.
+func LoadConfig(path string) (Config, error) {
+	c := DefaultConfig()
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return c, nil
+	}
+	if err != nil {
+		return c, err
+	}
+	if err := json.Unmarshal(data, &c); err != nil {
+		return c, fmt.Errorf("%s: %w", path, err)
+	}
+	return c.Normalized(), nil
+}
+
+// SaveConfig writes a configuration (at once: no half-written file).
+func SaveConfig(path string, c Config) error {
+	data, _ := json.MarshalIndent(c, "", "  ")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // ByteRate is the number of bytes per second written to the files.

@@ -130,8 +130,8 @@ func splitArgs(line string) ([]string, error) {
 	return args, nil
 }
 
-// quoteArgs writes arguments back as a command line (for display).
-func quoteArgs(args []string) string {
+// QuoteArgs writes arguments back as a command line (for display).
+func QuoteArgs(args []string) string {
 	out := make([]string, len(args))
 	for i, a := range args {
 		switch {

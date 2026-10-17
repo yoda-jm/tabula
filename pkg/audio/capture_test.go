@@ -287,14 +287,14 @@ func TestCaptureProbe(t *testing.T) {
 	if p := st.Peaks[3]; p < float64(sampleAt(4, 4799))/(1<<31)-1e-6 || p > 0.04 {
 		t.Errorf("peaks %v", st.Peaks)
 	}
-	if st.Bytes != 0 || len(st.Tracks) != 0 {
+	if st.Bytes != 0 || len(st.Tracks) != 4 || st.Tracks[0].File != "" {
 		t.Errorf("probe wrote files: %+v", st)
 	}
 }
 
 func fakeCommand(t *testing.T, mode string) Config {
 	t.Setenv("TABULA_FAKE_RECORDER", "1")
-	return Config{Recorder: "custom", Command: quoteArgs([]string{os.Args[0]}) + " fake {channels} {rate} " + mode, Channels: 8, Tracks: "1-2"}
+	return Config{Recorder: "custom", Command: QuoteArgs([]string{os.Args[0]}) + " fake {channels} {rate} " + mode, Channels: 8, Tracks: "1-2"}
 }
 
 // The whole path through a recorder process.

@@ -51,6 +51,8 @@ type Server struct {
 
 	acc        access
 	listenAddr string
+
+	audio audioState // audio.go
 }
 
 func New(log *slog.Logger) *Server {
@@ -83,6 +85,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("POST /api/replay/start", s.replayStart)
 	mux.HandleFunc("POST /api/replay/stop", s.replayStop)
 	s.accessRoutes(mux)
+	s.audioRoutes(mux)
 	mux.Handle("/", ui)
 	return gzipJSON(s.guard(mux))
 }
@@ -163,10 +166,7 @@ func (s *Server) RecordOnSync(on bool) {
 }
 
 func (s *Server) closeLocked() {
-	if s.rec != nil {
-		s.rec.Stop()
-		s.rec = nil
-	}
+	s.endRecordingLocked()
 	if s.replayCancel != nil {
 		s.replayCancel()
 	}

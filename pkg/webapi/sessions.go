@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yoda-jm/tabula/pkg/audio"
 	"github.com/yoda-jm/tabula/pkg/session"
 )
 
@@ -24,6 +25,7 @@ type recordView struct {
 	ReplayOf  string        `json:"replay_of,omitempty"`
 	ReplayAt  float64       `json:"replay_at,omitempty"`
 	Error     string        `json:"error,omitempty"`
+	Audio     *audio.Status `json:"audio,omitempty"` // the audio capture of the recording, or of the last one
 }
 
 // SetSessionsDir sets where sessions are kept.
@@ -36,7 +38,8 @@ func (s *Server) SetSessionsDir(dir string) {
 func (s *Server) recordStatus() recordView {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v := recordView{Replaying: s.replayCancel != nil, ReplayOf: s.replayOf, ReplayAt: s.replayAt, Error: s.recordErr}
+	v := recordView{Replaying: s.replayCancel != nil, ReplayOf: s.replayOf, ReplayAt: s.replayAt, Error: s.recordErr,
+		Audio: publicAudio(s.audioStatusLocked())}
 	if s.rec != nil {
 		m := s.rec.Meta()
 		v.Recording, v.Name, v.Meta = true, filepath.Base(s.rec.Dir()), &m
@@ -64,6 +67,7 @@ func (s *Server) StartRecording(note string) error {
 	}
 	s.rec, s.recordErr = rec, ""
 	s.log.Info("recording", "session", rec.Dir())
+	s.startAudioLocked(rec)
 	go s.tickRecord(rec)
 	return nil
 }
@@ -77,21 +81,28 @@ func (s *Server) tickRecord(rec *session.Recorder) {
 		if !current {
 			return
 		}
+		s.tickAudio(rec)
 		s.publishRecord()
 	}
 }
 
-// StopRecording ends the current recording, if any.
+// StopRecording ends the current recording, if any, and its audio.
 func (s *Server) StopRecording() error {
 	s.mu.Lock()
-	rec := s.rec
-	s.rec = nil
+	rec, c := s.rec, s.audio.cap
+	s.rec, s.audio.cap = nil, nil
 	s.mu.Unlock()
 	if rec == nil {
 		return nil
 	}
 	s.log.Info("recording stopped", "session", rec.Dir())
-	return rec.Stop()
+	last, err := s.endRecording(rec, c)
+	if last != nil {
+		s.mu.Lock()
+		s.audio.last = last
+		s.mu.Unlock()
+	}
+	return err
 }
 
 func (s *Server) recordStart(w http.ResponseWriter, r *http.Request) {

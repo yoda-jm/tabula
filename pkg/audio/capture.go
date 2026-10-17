@@ -24,7 +24,7 @@ type Track struct {
 	Name    string `json:"name,omitempty"`
 	// File is relative to the directory holding the audio directory (the
 	// session): "audio/01 Hang.wav".
-	File string `json:"file"`
+	File string `json:"file,omitempty"`
 }
 
 // Info describes the audio of a session; it is kept in the session's
@@ -150,7 +150,8 @@ type Capture struct {
 }
 
 // Start runs the recorder and writes the selected tracks into dir, one WAV
-// file each (dir is created; no files if dir is empty: a test of the input).
+// file each (dir is created; no files if dir is empty: a test of the
+// input, which measures the levels).
 func Start(cfg Config, dir string, opt Options) (*Capture, error) {
 	cfg = cfg.Normalized()
 	if err := cfg.Validate(); err != nil {
@@ -178,6 +179,13 @@ func Start(cfg Config, dir string, opt Options) (*Capture, error) {
 	c := &Capture{cfg: cfg, dir: dir, opt: opt, log: opt.Log, chans: chans, done: make(chan struct{}),
 		state: Starting, clock: newClock(cfg.Rate, opt.Ref), peaks: make([]int32, len(chans)), free: -1}
 
+	for _, ch := range chans {
+		name := ""
+		if ch <= len(opt.Names) && !cfg.PlainNames {
+			name = opt.Names[ch-1]
+		}
+		c.tracks = append(c.tracks, Track{Channel: ch, Name: name})
+	}
 	if dir != "" {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, err
@@ -188,19 +196,15 @@ func Start(cfg Config, dir string, opt Options) (*Capture, error) {
 				return nil, fmt.Errorf("disk full: %s free in %s", FormatBytes(c.free), dir)
 			}
 		}
-		for _, ch := range chans {
-			name := ""
-			if ch <= len(opt.Names) {
-				name = opt.Names[ch-1]
-			}
-			base := FileName(ch, name)
+		for i, t := range c.tracks {
+			base := FileName(t.Channel, t.Name)
 			w, err := createWAV(opt.create, filepath.Join(dir, base), cfg.Rate, cfg.Bits, opt.rf64At)
 			if err != nil {
 				c.closeFiles()
 				return nil, err
 			}
 			c.files = append(c.files, w)
-			c.tracks = append(c.tracks, Track{Channel: ch, Name: name, File: path.Join(filepath.Base(dir), base)})
+			c.tracks[i].File = path.Join(filepath.Base(dir), base)
 		}
 	}
 
@@ -228,7 +232,7 @@ func (c *Capture) startCommand() error {
 	if err != nil {
 		return err
 	}
-	c.command = quoteArgs(args)
+	c.command = QuoteArgs(args)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.SysProcAttr = procAttr() // its own process group: Ctrl-C in a terminal is ours to handle
 	stdout, err := cmd.StdoutPipe()

@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -51,6 +52,21 @@ func TestConfig(t *testing.T) {
 	}
 }
 
+func TestSaveConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sessions", "audio.json")
+	c, err := LoadConfig(path)
+	if err != nil || c != DefaultConfig() {
+		t.Fatalf("no file: %+v %v", c, err)
+	}
+	c.Enabled, c.Device, c.Tracks = true, "hw:CARD=X32,DEV=0", "1-16"
+	if err := SaveConfig(path, c); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := LoadConfig(path); err != nil || got != c {
+		t.Errorf("loaded %+v %v, want %+v", got, err, c)
+	}
+}
+
 func TestCommandLine(t *testing.T) {
 	c := Config{Recorder: "arecord", Device: "hw:CARD=X32,DEV=0", Channels: 32, Rate: 48000, Bits: 24}
 	args, err := c.commandLine("linux")
@@ -71,7 +87,7 @@ func TestCommandLine(t *testing.T) {
 	if !contains(args, "audio=Microphone (DN32-USB)") || args[len(args)-1] != "-" {
 		t.Errorf("dshow: %q", args)
 	}
-	if q := quoteArgs(args); !strings.Contains(q, "'audio=Microphone (DN32-USB)'") {
+	if q := QuoteArgs(args); !strings.Contains(q, "'audio=Microphone (DN32-USB)'") {
 		t.Errorf("quoted: %s", q)
 	}
 	c.Device = ""
