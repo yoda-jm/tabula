@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### tabula-emu
+- Accepts node text ending with a line feed, as M32-Edit sends it when
+  writing a scene to the console ("PC -> Mixer").
+- The RTA (`/meters/15`) analyses the source chosen with `/-action/setrtasrc`
+  (now mirrored in `/-stat/rtasource`): a channel, bus, matrix or main before
+  or after its EQ, or the input of a graphic EQ. The low cut, the EQ and the
+  graphic EQ bands shape it, so the RTA behind M32-Edit's EQ and GEQ pages
+  follows the edits. It used to show the mains only, too low to be drawn.
+- `/-prefs/rta` fields 11-14 have their real names (`rtaoneq`, `rtaongeq`,
+  `range`, `gain30`) and RTA sources go up to 195 (98 sources, before or
+  after the EQ).
+
 ## v0.1.0 — first pre-release
 
 ### tabula-emu, the console emulator
