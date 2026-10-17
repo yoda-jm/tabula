@@ -1,6 +1,8 @@
 package emu
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -102,5 +104,54 @@ func TestLibrary(t *testing.T) {
 	}
 	if v, _, _ := s2.Store().Get("/-libs/ch/049/name"); v.Str != "Vox 2" {
 		t.Errorf("reloaded preset name %v", v)
+	}
+}
+
+func TestRoutingPreset(t *testing.T) {
+	_, addr := start(t)
+	p := dial(t, addr)
+	p.send("/config/routing/IN/1-8", osc.String("A1-8"))
+	status(t, p, "/save", osc.String("librout"), osc.Int(0), osc.String("DL32"))
+	p.send("/config/routing/IN/1-8", osc.String("AN1-8"))
+	if st := status(t, p, "/load", osc.String("librout"), osc.Int(0)); st != 1 {
+		t.Fatalf("load librout: %d", st)
+	}
+	if got := p.node("config/routing/IN"); !strings.HasPrefix(got, "/config/routing/IN A1-8 ") {
+		t.Errorf("routing after preset: %q", got)
+	}
+}
+
+func TestImportM32EditPresets(t *testing.T) {
+	s, addr := start(t)
+	dir := t.TempDir()
+	write := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// M32-Edit's format: header with position, name, type, flags, hasdata.
+	write("libchan.003", "#2.0# 3 \"My Vocal\" 0 %0011111100010100 1\n/config \"VOX\" 1 RD\n/preamp +0.0 OFF ON 24 101\n")
+	write("libfx.002", "#2.0# 2 \"My Hall\" 1 0 1\ntype HALL\nsource MIX13 MIX13\npar 20 1.57 60 5k74 25 0.0 83 7k2 0.95 25 50 30"+strings.Repeat(" 0", 52)+"\n")
+	if n, err := s.ImportM32EditPresets(dir); err != nil || n != 2 {
+		t.Fatalf("imported %d, %v", n, err)
+	}
+	p := dial(t, addr)
+	if got := p.node("-libs/ch/003"); !strings.Contains(got, `"My Vocal"`) {
+		t.Errorf("listing: %q", got)
+	}
+	if st := status(t, p, "/load", osc.String("libchan"), osc.Int(2), osc.Int(4)); st != 1 {
+		t.Fatalf("load imported channel preset: %d", st)
+	}
+	if got := p.node("ch/05/preamp"); got != "/ch/05/preamp +0.0 OFF ON 24 101" {
+		t.Errorf("ch05 preamp: %q", got)
+	}
+	if st := status(t, p, "/load", osc.String("libfx"), osc.Int(1), osc.Int(2)); st != 1 {
+		t.Fatalf("load imported effect preset: %d", st)
+	}
+	if got := p.node("fx/3"); got != "/fx/3 HALL" {
+		t.Errorf("fx3: %q", got)
+	}
+	if got := p.node("fx/3/source"); got != "/fx/3/source MIX13 MIX13" {
+		t.Errorf("fx3 source: %q", got)
 	}
 }

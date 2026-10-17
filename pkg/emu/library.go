@@ -77,15 +77,19 @@ func stripPath(i int) (string, bool) {
 	return "", false
 }
 
-// capture returns the scene lines of the nodes at base or below it.
-func (s *Server) capture(bases ...string) []relLine {
+// capture returns the scene lines of the nodes under the given prefixes
+// (base itself if none), with paths relative to base.
+func (s *Server) capture(base string, prefixes ...string) []relLine {
+	if len(prefixes) == 0 {
+		prefixes = []string{base}
+	}
 	var out []relLine
 	for _, n := range s.store.Schema().Nodes {
 		if !n.InScene {
 			continue
 		}
-		for _, base := range bases {
-			if n.Path != base && !strings.HasPrefix(n.Path, base+"/") {
+		for _, p := range prefixes {
+			if p != "" && n.Path != p && !strings.HasPrefix(n.Path, p+"/") {
 				continue
 			}
 			_, rest := schema.SplitLine(s.store.NodeLine(n))
@@ -174,9 +178,9 @@ func (s *Server) libraryOp(m osc.Message, kind, origin string) (bool, string) {
 			}
 			e.Lines = s.capture(fmt.Sprintf("/fx/%d", slot+1))
 		case "librout":
-			e.Lines = s.capture("/config/routing", "/config/userrout")
+			e.Lines = s.capture("", "/config/routing", "/config/userrout")
 		case "libmon":
-			e.Lines = s.capture("/config/dp48")
+			e.Lines = s.capture("", "/config/dp48")
 		}
 		slots[idx] = e
 		s.listEntry(kind, idx, e, origin)
@@ -396,8 +400,11 @@ func readEntry(file string) (*entry, error) {
 			first = false
 			if strings.HasPrefix(line, "#") {
 				toks := schema.Tokenize(line)
-				if len(toks) >= 3 {
+				switch {
+				case len(toks) >= 3 && strings.HasPrefix(toks[1], `"`): // ours: #4.0# "name" "note"
 					e.Name, e.Note = strings.Trim(toks[1], `"`), strings.Trim(toks[2], `"`)
+				case len(toks) >= 3: // M32-Edit: #2.0# <pos> "name" <type> %flags <hasdata>
+					e.Name = strings.Trim(toks[2], `"`)
 				}
 				continue
 			}
@@ -406,4 +413,48 @@ func readEntry(file string) (*entry, error) {
 		e.Lines = append(e.Lines, relLine{suffix, rest})
 	}
 	return e, sc.Err()
+}
+
+// ImportM32EditPresets loads the preset files of M32-Edit's library
+// (~/.config/.M32-Edit/Xlib: libchan.001, libfx.012, librout.003…) into the
+// empty preset slots, as a console ships with factory presets.
+func (s *Server) ImportM32EditPresets(dir string) (int, error) {
+	files, err := filepath.Glob(filepath.Join(dir, "lib*.[0-9][0-9][0-9]"))
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, file := range files {
+		kind, num, _ := strings.Cut(filepath.Base(file), ".")
+		idx, err := strconv.Atoi(num)
+		if _, ok := libKinds[kind]; !ok || err != nil || idx < 1 || idx > libSlots {
+			continue
+		}
+		e, err := readEntry(file)
+		if err != nil {
+			s.log.Warn("preset file", "file", file, "err", err)
+			continue
+		}
+		if kind == "libfx" { // "type AMBI", "source …", "par …" are relative to /fx/N
+			for i, l := range e.Lines {
+				switch l.Suffix {
+				case "type":
+					e.Lines[i].Suffix = ""
+				case "source", "par":
+					e.Lines[i].Suffix = "/" + l.Suffix
+				}
+			}
+		}
+		s.lib.mu.Lock()
+		free := s.lib.items[kind][idx-1] == nil
+		if free {
+			s.lib.items[kind][idx-1] = e
+		}
+		s.lib.mu.Unlock()
+		if free {
+			s.listEntry(kind, idx-1, e, "library")
+			n++
+		}
+	}
+	return n, nil
 }

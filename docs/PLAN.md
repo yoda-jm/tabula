@@ -45,7 +45,8 @@ Driven by the unknown-request log while connecting the real editors:
 - [ ] Effect parameters (`/fx/N/par/NN`): the framework is there (fields depend on the effect type; switching effect loads its defaults); HALL is modelled, the other effects are kept as text until their tables land.
 - [x] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/add` (cues), `/showdump`, with listings in `/-show` and `/-libs`, optionally kept in a directory (`-library`). Scene safes and snippet filters are not applied yet.
 - [x] Side effects of `/-action/*` (go scene/snippet/cue, clear solo, undo checkpoint and undo, init) and computed status (`/-insert`, `/-ha/NN/index` from sources and input routing, `/-stat/solo`).
-- [ ] Connect X32-Edit and M32-Edit, work through the unhandled-request log.
+- [x] Factory presets: `-presets` imports M32-Edit's library (channel, effect and routing presets).
+- [ ] Connect X32-Edit and M32-Edit, work through the unhandled-request log (guide: `docs/testing-with-editors.md`).
 
 ### 3. Client — connection and GUI v1 *(in progress)*
 - [x] `pkg/console`: discovery (broadcast `/xinfo`), full sync via `/node` (window of 32 requests), `/xremote` renewal, writes refused until armed; tested end to end against the emulator.
