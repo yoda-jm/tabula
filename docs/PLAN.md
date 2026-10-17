@@ -42,7 +42,7 @@ Both share the same library (`pkg/`).
 Driven by the unknown-request log while connecting the real editors:
 - [x] `/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-action`, `/-undo`, `/-usb`, `/-urec`, `/-insert`, `/-ha` (1126 nodes; formats checked against a real M32C's values cached by M32-Edit).
 - [x] `/meters/0…16` with synthetic levels following the mix, `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
-- [ ] Effect parameters (`/fx/N/par/NN`): the framework is there (fields depend on the effect type; switching effect loads its defaults); HALL is modelled, the other effects are kept as text until their tables land.
+- [x] Effect parameters (`/fx/N/par/NN`): fields follow the effect type (switching effect loads its defaults); all 61 effects modelled, with ranges, steps, formats and defaults matching M32-Edit's built-in tables; 57 of 61 real parameter lines round-trip byte for byte, the other 4 (older firmware spellings) load and are written in today's form.
 - [x] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/add` (cues), `/showdump`, with listings in `/-show` and `/-libs`, optionally kept in a directory (`-library`). Scene safes and snippet filters are not applied yet.
 - [x] Side effects of `/-action/*` (go scene/snippet/cue, clear solo, undo checkpoint and undo, init) and computed status (`/-insert`, `/-ha/NN/index` from sources and input routing, `/-stat/solo`).
 - [x] Factory presets: `-presets` imports M32-Edit's library (channel, effect and routing presets).

@@ -32,7 +32,7 @@ Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases)
 
 - Every parameter of a scene file: configuration and routing, 32 channels,
   8 aux ins, 8 FX returns, 16 buses, 6 matrices, main LR and mono, 8 DCAs,
-  FX slots, outputs, 128 headamps.
+  FX slots with the parameters of all 61 effects, outputs, 128 headamps.
 - `/info`, `/xinfo`, `/status`, get and set of every parameter (enums by
   name or index, floats quantized to the console's known values), node sets
   with multiple type tags, `/node`, `/` (echoed), and `/xremote`: changes
@@ -48,8 +48,7 @@ Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases)
 
 ### Not yet
 
-Most effect parameters (only HALL is modelled; other effects are kept as
-text), scene safes and snippet filters: see the [plan](PLAN.md).
+Scene safes and snippet filters on recall: see the [plan](PLAN.md).
 
 ## tabula — the client *(coming)*
 

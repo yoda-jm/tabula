@@ -35,7 +35,7 @@ Open <http://localhost:8032>, the read-only debug page:
 - **Recent traffic** — the last requests and replies (meters excluded).
 - **State** — search any parameter, e.g. `ch/01/` or `IEM`, and watch it change while you move things in the editor.
 
-Things worth checking in the editor: channel names, colours and icons; faders and mutes moving both ways (edit in the editor, then in a second editor or with `tabula`); routing pages; effect pages (only HALL parameters are modelled so far, other effects show their stored values without being editable through OSC); library pages; meters moving.
+Things worth checking in the editor: channel names, colours and icons; faders and mutes moving both ways (edit in the editor, then in a second editor or with `tabula`); routing pages; effect pages (every effect is modelled); library pages; meters moving.
 
 ## Report
 

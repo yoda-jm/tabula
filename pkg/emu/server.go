@@ -308,7 +308,7 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 
 	if l := s.store.Schema().Leaf(m.Address); l != nil {
 		if s.store.TypeOf(l) == nil {
-			s.Unhandled.Record(m, c.Addr, ReasonUnimplemented, "parameters of this effect are not modelled yet")
+			s.Unhandled.Record(m, c.Addr, ReasonUnimplemented, "parameters of an unknown effect type")
 			return
 		}
 		switch len(m.Args) {

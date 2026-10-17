@@ -10,7 +10,8 @@
   `/-stat`, `/-show`, `/-libs`, `/-usb`, `/-urec`, `/-action`, `/-undo`,
   `/-insert`, `/-ha`): about 3240 nodes and 12800 parameters. Real scenes
   round-trip byte for byte, also through Maillot's `X32GetScene`.
-- Effect parameters follow the effect loaded in each slot.
+- Effect parameters follow the effect loaded in each slot; all 61 effects are
+  modelled (ranges, formats and defaults as in M32-Edit).
 - Meters (`/meters/0…16`) with synthetic levels that follow the mix, and
   `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
 - Scene, snippet and preset library (`/save`, `/load`, `/copy`, `/delete`,
