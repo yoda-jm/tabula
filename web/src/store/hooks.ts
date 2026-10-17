@@ -1,6 +1,6 @@
 // React bindings of the store.
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import type { Leaf } from "../lib/schema";
 import { parentOf } from "../lib/schema";
 import { store } from "./store";
@@ -67,6 +67,15 @@ export function useMeters(id: string): number[] | undefined {
     "m:" + id,
     useCallback(() => store.getMeters(id), [id]),
   );
+}
+
+/**
+ * useMeterGroup subscribes to a meter group outside the default ones (e.g.
+ * "15", the RTA) while the component is shown, or not at all for null.
+ */
+export function useMeterGroup(id: string | null): number[] | undefined {
+  useEffect(() => (id ? store.wantMeters(id) : undefined), [id]);
+  return useMeters(id ?? "");
 }
 
 /** useNodes re-renders when any of the nodes changes (one subscription per node). */

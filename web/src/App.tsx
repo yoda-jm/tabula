@@ -10,6 +10,7 @@ import { AccessPage } from "./pages/AccessPage";
 import { BrowserPage } from "./pages/BrowserPage";
 import { ChannelPage } from "./pages/ChannelPage";
 import { ConnectPage } from "./pages/ConnectPage";
+import { FxPage } from "./pages/FxPage";
 import { MixPage, MusicianApp, NoAccess } from "./pages/MixPage";
 import { MixerPage } from "./pages/MixerPage";
 import { RecordPage } from "./pages/RecordPage";
@@ -21,6 +22,7 @@ const NAV: { page: Page; label: string; role: Role }[] = [
   { page: "mixer", label: "Mixer", role: "viewer" },
   { page: "channel", label: "Channel", role: "viewer" },
   { page: "routing", label: "Routing", role: "engineer" },
+  { page: "fx", label: "FX", role: "engineer" },
   { page: "browser", label: "Browser", role: "viewer" },
   { page: "mix", label: "In-ears", role: "engineer" },
   { page: "record", label: "Record", role: "engineer" },
@@ -99,6 +101,8 @@ function ConsoleApp({ role }: { role: Role }) {
           <ChannelPage path={route?.strip ?? strip.path} onSelect={select} />
         ) : page === "routing" && engineer ? (
           <RoutingPage />
+        ) : page === "fx" && engineer ? (
+          <FxPage slot={route?.slot} />
         ) : page === "browser" ? (
           <BrowserPage />
         ) : page === "record" && engineer ? (

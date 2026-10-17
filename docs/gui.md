@@ -17,7 +17,7 @@ accident. Disarm to go back to read-only.
 **Who sees what.** The machine running `tabula` is the engineer and sees
 every page. Other devices get a role from an access link: viewers see the
 Mixer, Channel and Browser pages read-only; musicians only get their in-ear
-mix. Routing, In-ears, Record, Access and Connect are engineer pages. See
+mix. Routing, FX, In-ears, Record, Access and Connect are engineer pages. See
 [access](access.md).
 
 ## Mixer
@@ -32,6 +32,11 @@ select it for the Channel page.
 Everything about one strip: configuration, preamp, delay, gate, dynamics,
 EQ with its response curve, insert, main mix, sends with the bus names,
 DCA and mute groups, automix. Only the sections the strip has are shown.
+
+**RTA.** When the console's RTA listens to the strip, its spectrum is
+drawn behind the EQ curve. Two buttons under the curve point the RTA at this
+strip, before or after its EQ (writes must be armed: it changes the console's
+RTA source, `/-action/setrtasrc`).
 
 **Headamp.** For a channel (or an aux input) fed by a preamp, the Preamp
 section starts with that preamp: which input it is (`AES50 A 12`: input 12
@@ -71,6 +76,33 @@ Where the signals come from and where they go, in six views:
 Blocks are edited with the console's own names (`A1-8`, `OUT9-16`, `P161-8`…),
 with a plain description beside them; output sources are listed with the
 names of their strips.
+
+## FX
+
+**All** shows the 8 effect slots: the effect loaded in each, and where it
+is used. FX 1-4 fed from a bus say which (`Fed by Bus 13 Fx Room`) and the
+FX returns they come back on; a slot inserted on a strip says which strips
+(`Inserted on Mtx 1 Façade (L), Mtx 2 (R)`, from the console's `/-insert`).
+The strip names link to their Channel page.
+
+**FX 1 … FX 8** open one slot: its effect (loading another one asks for a
+confirmation, as the new effect starts from its defaults), its sources for
+FX 1-4, and its parameters with their names, ranges and units as the console
+has them. Dual effects show their two sides side by side.
+
+**Graphic EQs** (GEQ, GEQ2, TEQ, TEQ2) get a dedicated editor: 31 band
+faders and the master level, side A or B for the dual ones, with the RTA
+behind the bands. Drag a band up or down (Shift for fine moves, a touch
+never makes it jump); the arrow keys pick a band and move it by 0.5 dB;
+the selected band also has −, + and 0 dB buttons, and Flat resets every
+band after a confirmation.
+
+The RTA shows the input of the graphic EQ, before or after it. Choosing
+the RTA source changes the console's state (`/-action/setrtasrc`), so it is
+done only when writes are armed: opening the editor then points the RTA at
+this EQ. Read-only, the editor shows the RTA of whatever source the console
+has, and names it. The dB window follows the console's RTA settings
+(`/-prefs/rta`: 30 dB under the RTA gain, or 60 dB).
 
 ## Browser
 

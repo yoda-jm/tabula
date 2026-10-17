@@ -57,7 +57,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Server-Sent Events for state changes, status and meters.
 - [x] Headamp gain and phantom on the Channel page.
 - [x] Routing: input routing and patch, outputs, AES50 A/B, card, P16, aux, AES/EBU, user routing, with names resolved.
-- [ ] FX pages: overview of the 8 slots, per-slot editor, graphic EQ with the RTA.
+- [x] FX pages: overview of the 8 slots, per-slot editor, graphic EQ with the RTA (also behind the channel EQ curve).
 - [ ] Scenes, snippets and presets: list, recall, save, rename.
 - [ ] Linked pairs shown as stereo strips in the mixer.
 

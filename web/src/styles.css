@@ -934,6 +934,22 @@ div.scribble {
   font-size: 11px;
   font-weight: 700;
 }
+.eq-rta rect {
+  fill: rgba(79, 216, 190, 0.22);
+}
+.rta-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: -4px 0 12px;
+  font-size: 0.85rem;
+}
+.rta-pick .btn {
+  min-height: 34px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
 .bands {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
@@ -1529,6 +1545,209 @@ div.scribble {
   border-radius: 6px;
 }
 
+/* ---------- effects ---------- */
+
+.fx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: 12px;
+}
+.fx-grid .card {
+  margin: 0;
+}
+.fx-card.unused {
+  opacity: 0.75;
+}
+.fx-card .section-head {
+  margin-bottom: 4px;
+}
+.fx-type {
+  margin-left: 6px;
+  font-family: var(--mono);
+  color: var(--accent);
+}
+.fx-name {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+.fx-uses {
+  margin: 0;
+}
+.fx-use-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+.fx-use {
+  color: var(--text);
+}
+.fx-source {
+  margin-top: 12px;
+  grid-template-columns: minmax(96px, 22%) minmax(0, 1fr);
+}
+.fx-params {
+  grid-template-columns: minmax(96px, 22%) minmax(0, 1fr);
+}
+.fx-dual {
+  margin-bottom: 12px;
+}
+
+/* ---------- graphic EQ ---------- */
+
+.seg {
+  display: inline-flex;
+}
+.btn.seg-btn {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.btn.seg-btn:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+  margin-left: 0;
+}
+.btn.seg-btn:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.btn.seg-btn.lit {
+  background: #3a2f12;
+  border-color: var(--accent);
+  color: var(--text);
+  position: relative;
+}
+.geq-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.geq-rta-src {
+  font-size: 0.85rem;
+  color: #7fd6c2;
+}
+.geq-rta-src.other {
+  color: var(--busy);
+}
+.geq {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.geq-cols {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.geq-bands {
+  flex: 1;
+}
+.geq-master {
+  flex: none;
+  width: 64px;
+}
+.geq-plot {
+  position: relative;
+  height: clamp(220px, calc(100vh - 430px), 420px);
+  border-radius: 6px;
+  background: #0b0d11;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  touch-action: none;
+  cursor: ns-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.geq-plot.disabled {
+  cursor: default;
+}
+.geq-rta {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: rgba(79, 216, 190, 0.28);
+}
+.geq-grid,
+.geq-zero {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #1f242e;
+}
+.geq-zero {
+  background: #4a5263;
+}
+.geq-col {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.geq-col.sel {
+  background: rgba(242, 179, 61, 0.08);
+}
+.geq-fill {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  background: rgba(242, 179, 61, 0.55);
+}
+.geq-fill.cut {
+  background: rgba(108, 182, 255, 0.5);
+}
+.geq-cap {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 2px;
+  background: #e8ebf0;
+}
+.geq-col.sel .geq-cap {
+  background: var(--accent);
+}
+.geq-plot.disabled .geq-cap {
+  background: #8a91a0;
+}
+.geq-labels {
+  display: flex;
+  margin-top: 4px;
+}
+.geq-labels span {
+  flex: none;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: #7d8696;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.geq-master .geq-labels span {
+  font-size: 0.7rem;
+  overflow: visible;
+}
+.geq-selected {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.geq-sel-label {
+  font-family: var(--mono);
+  font-weight: 700;
+  min-width: 7em;
+}
+.geq-sel-value {
+  min-width: 5.5em;
+  font-size: 1.05rem;
+}
+.geq-help {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+}
+
 /* ---------- narrow screens ---------- */
 
 @media (max-width: 720px) {
@@ -1619,5 +1838,17 @@ div.scribble {
   }
   .mix-source-head {
     grid-template-columns: minmax(0, 1fr) 60px auto;
+  }
+  .geq-labels span:not(.key) {
+    visibility: hidden;
+  }
+  .geq-labels span.key {
+    overflow: visible;
+  }
+  .geq-master {
+    width: 44px;
+  }
+  .fx-params {
+    grid-template-columns: minmax(96px, 36%) minmax(0, 1fr);
   }
 }

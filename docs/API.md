@@ -89,9 +89,12 @@ back on the event stream.
   `/meters/N`, `N:a:b` adds its parameters: `5:0:0` channels 1-16 + DCAs,
   `6:12` strip 13). Values are linear levels (1.0 = 0 dBFS; gain reductions
   are gains, 1.0 = none), dB for group 15 (RTA, 100 bands), gains for group
-  16. About 20 updates per second per group; see the protocol document for
-  what each group holds (e.g. 1: 32 inputs, 32 gate and 32 compressor gains;
-  2: 16 buses, 6 matrices, main L/R, mono, then their compressor gains).
+  16. The groups of a stream are fixed: to change them, open another
+  stream and close the first once the second has sent its `status` (the
+  GUI does so, missing no change). About 20 updates per second per group;
+  see the protocol document for what each group holds (e.g. 1: 32 inputs,
+  32 gate and 32 compressor gains; 2: 16 buses, 6 matrices, main L/R, mono,
+  then their compressor gains).
 
 ## Access
 

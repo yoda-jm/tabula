@@ -1,10 +1,10 @@
-// Hash routes: #/mixer, #/channel/ch/01, #/routing, #/browser, #/record,
-// #/connect, #/mix (a musician's in-ear mix; #/mix/3 shows bus 3 to the
-// engineer), #/access.
+// Hash routes: #/mixer, #/channel/ch/01, #/routing, #/fx (#/fx/5: FX slot
+// 5), #/browser, #/record, #/connect, #/mix (a musician's in-ear mix; #/mix/3
+// shows bus 3 to the engineer), #/access.
 
 import { useCallback, useEffect, useState } from "react";
 
-export type Page = "mixer" | "channel" | "routing" | "browser" | "record" | "connect" | "mix" | "access";
+export type Page = "mixer" | "channel" | "routing" | "fx" | "browser" | "record" | "connect" | "mix" | "access";
 
 export interface Route {
   page: Page;
@@ -12,9 +12,11 @@ export interface Route {
   strip?: string;
   /** the bus of the mix page */
   bus?: number;
+  /** the effect slot of the FX page, 1-8 */
+  slot?: number;
 }
 
-const PAGES: Page[] = ["mixer", "channel", "routing", "browser", "record", "connect", "mix", "access"];
+const PAGES: Page[] = ["mixer", "channel", "routing", "fx", "browser", "record", "connect", "mix", "access"];
 
 export function parseRoute(hash: string): Route | null {
   const h = hash.replace(/^#\/?/, "");
@@ -23,11 +25,13 @@ export function parseRoute(hash: string): Route | null {
   const r: Route = { page: page as Page };
   if (page === "channel" && rest.length) r.strip = "/" + rest.join("/");
   if (page === "mix" && /^\d+$/.test(rest[0] ?? "")) r.bus = Number(rest[0]);
+  if (page === "fx" && /^[1-8]$/.test(rest[0] ?? "")) r.slot = Number(rest[0]);
   return r;
 }
 
 export function formatRoute(r: Route): string {
   if (r.page === "mix" && r.bus) return "#/mix/" + r.bus;
+  if (r.page === "fx" && r.slot) return "#/fx/" + r.slot;
   return "#/" + r.page + (r.page === "channel" && r.strip ? r.strip : "");
 }
 

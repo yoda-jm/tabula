@@ -1,16 +1,19 @@
 // The selected strip in detail: only the sections its type has.
 
 import { EqCurve } from "../components/EqCurve";
+import { useRtaWindow } from "../components/Geq";
 import { Headamp } from "../components/Headamp";
 import { ParamControl } from "../components/controls";
 import { Scribble } from "../components/Scribble";
 import { inputSource, portLabel } from "../lib/routing";
+import { RTA_POST, rtaSourceLabel, stripRtaSource } from "../lib/rta";
 import type { Strip } from "../lib/strips";
 import { ALL_STRIPS, BANKS, eqBandsOf, sectionsOf, sendsOf, sourceLabel, stripAddrs, stripByPath } from "../lib/strips";
 import type { Send } from "../lib/strips";
 import { prettyText } from "../lib/values";
-import { useLeaf, useNodes, useSchema, useValue } from "../store/hooks";
+import { useCanWrite, useLeaf, useMeterGroup, useNodes, useSchema, useValue } from "../store/hooks";
 import { lookup } from "../store/lookup";
+import { store } from "../store/store";
 import { FieldRow, Fields, NotConnected, Section } from "./common";
 
 export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: string): void }) {
@@ -164,9 +167,17 @@ function EqSection({ strip }: { strip: Strip }) {
   const schema = useSchema()!;
   const bands = eqBandsOf(schema, strip);
   const on = useValue(`${strip.path}/eq/on`);
+  // the RTA, when the console's RTA listens to this strip
+  const idx = stripRtaSource(strip.path);
+  const src = useValue("/-stat/rtasource");
+  const cur = src === undefined ? -1 : Number(src.value);
+  const here = idx !== null && cur >= 0 && cur % RTA_POST === idx;
+  const rta = useMeterGroup(here ? "15" : null);
+  const win = useRtaWindow();
   return (
     <Section title="EQ" on={`${strip.path}/eq/on`} className="eq">
-      <EqCurve strip={strip.path} bands={bands} eqOn={on ? Number(on.value) === 1 : true} />
+      <EqCurve strip={strip.path} bands={bands} eqOn={on ? Number(on.value) === 1 : true} rta={here ? rta : undefined} rtaWindow={win} />
+      {idx !== null && <RtaPicker source={idx} current={cur} />}
       <div className="bands">
         {bands.map((b, i) => (
           <div key={b} className="band">
@@ -176,6 +187,37 @@ function EqSection({ strip }: { strip: Strip }) {
         ))}
       </div>
     </Section>
+  );
+}
+
+/** RtaPicker points the console's RTA at this strip, before or after its EQ (armed writes only). */
+function RtaPicker({ source, current }: { source: number; current: number }) {
+  const can = useCanWrite("/-action/setrtasrc");
+  const here = current >= 0 && current % RTA_POST === source;
+  return (
+    <div className="rta-pick">
+      <div className="seg" role="group" aria-label="RTA on this strip">
+        {[false, true].map((post) => {
+          const n = source + (post ? RTA_POST : 0);
+          return (
+            <button
+              key={String(post)}
+              type="button"
+              className={"btn seg-btn" + (current === n ? " lit" : "")}
+              aria-pressed={current === n}
+              disabled={!can}
+              onClick={() => store.set("/-action/setrtasrc", n)}
+            >
+              RTA {post ? "after" : "before"} EQ
+            </button>
+          );
+        })}
+      </div>
+      <span className="muted">
+        {here ? "The RTA listens to this strip." : current >= 0 ? `The RTA listens to ${rtaSourceLabel(current)}.` : ""}
+        {!here && !can && " Arm writes to point it here."}
+      </span>
+    </div>
   );
 }
 

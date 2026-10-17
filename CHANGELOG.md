@@ -20,6 +20,17 @@
   each one goes, and channel by channel what AES50 A and B (a DL32's outputs),
   the card, P16, aux, AES/EBU and the local outputs carry, with the names of
   the strips. Edited with the console's routing blocks.
+- New FX page: the 8 effect slots with the effect loaded in each and where
+  it is used (the bus feeding FX 1-4 and their returns, the strips each slot
+  is inserted on), and an editor per slot generated from the effect's
+  parameters; loading another effect asks for a confirmation. Graphic EQs
+  (GEQ, GEQ2, TEQ, TEQ2) get 31 band faders and a master, side A or B, with
+  the RTA (`/meters/15`) behind the bands; the RTA source is pointed at the
+  EQ only when writes are armed.
+- The Channel page draws the RTA behind the EQ curve when the RTA listens to
+  that strip, and can point it there (before or after the EQ).
+- The GUI asks for extra meter groups (the RTA) only while a page shows
+  them, reopening its event stream without a gap.
 - New page describing [every page of the GUI](docs/gui.md).
 
 ### tabula-emu

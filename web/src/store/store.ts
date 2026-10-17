@@ -80,6 +80,7 @@ export class Store {
   private sweepTimer: ReturnType<typeof setTimeout> | null = null;
   private toastId = 0;
   private meterValues = new Map<string, number[]>();
+  private meterWants = new Map<string, number>();
 
   constructor(
     private api: Api = realApi,
@@ -365,6 +366,35 @@ export class Store {
   }
 
   getMeters = (id: string): number[] | undefined => this.meterValues.get(id);
+
+  /**
+   * wantMeters asks for a meter group beyond the default ones (the RTA,
+   * group 15) while a view shows it; the event stream follows (events.ts).
+   * It returns the function that gives it back.
+   */
+  wantMeters(id: string): () => void {
+    const n = this.meterWants.get(id) ?? 0;
+    this.meterWants.set(id, n + 1);
+    if (n === 0) this.notify(["meterset"]);
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      const left = (this.meterWants.get(id) ?? 1) - 1;
+      if (left > 0) {
+        this.meterWants.set(id, left);
+        return;
+      }
+      this.meterWants.delete(id);
+      this.meterValues.delete(id);
+      this.notify(["meterset", "m:" + id]);
+    };
+  }
+
+  /** meterSet lists the extra meter groups wanted now, sorted. */
+  meterSet(): string[] {
+    return [...this.meterWants.keys()].sort();
+  }
 
   // --- writes ---
 
