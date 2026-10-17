@@ -10,6 +10,14 @@
   or after its EQ, or the input of a graphic EQ. The low cut, the EQ and the
   graphic EQ bands shape it, so the RTA behind M32-Edit's EQ and GEQ pages
   follows the edits. It used to show the mains only, too low to be drawn.
+- Linked strips are kept in step as on the console: a change on one strip of
+  a linked pair (channels, aux inputs, FX returns, buses, matrices) is
+  applied to the other and pushed to every client; linking a pair copies
+  the odd strip to the even one; `/config/linkcfg` chooses what follows
+  (headamp and delay, EQ, dynamics, fader and mute). Name, icon, source,
+  pans, key sources and insert selection never follow. M32-Edit relies on
+  the console for this when connected.
+- New page: [how the emulator simulates the console](docs/emulator.md).
 - `/-prefs/rta` fields 11-14 have their real names (`rtaoneq`, `rtaongeq`,
   `range`, `gain30`) and RTA sources go up to 195 (98 sources, before or
   after the EQ).

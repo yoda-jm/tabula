@@ -45,6 +45,13 @@ Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases)
   `/-urec`, `/-action`…), as the editors query them when connecting.
 - Meters (`/meters/0…16`) with synthetic levels that follow the mix, and
   `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
+- The RTA of the source an editor selects (a channel, a bus, a graphic EQ…),
+  shaped by the low cut, the EQ and the graphic EQ.
+- Linked channels, aux inputs, FX returns, buses and matrices kept in step
+  as the console does, following the link options.
+
+**[How the emulator simulates the console](emulator.md)**: audio flow,
+meters, RTA, effects, and exactly what linking two strips does.
 
 ### Not yet
 

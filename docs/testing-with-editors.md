@@ -37,6 +37,33 @@ Open <http://localhost:8032>, the read-only debug page:
 
 Things worth checking in the editor: channel names, colours and icons; faders and mutes moving both ways (edit in the editor, then in a second editor or with `tabula`); routing pages; effect pages (every effect is modelled); library pages; meters moving.
 
+## What is known to work with M32-Edit
+
+Reading the emulator (Mixer → PC) and writing a scene to it (PC → Mixer),
+meters, the RTA on the EQ page and in the graphic EQ editor, and linked
+channels moving together: see [how the emulator works](emulator.md#verified-with-m32-edit).
+An RTA or a meter that stays empty usually means the source has no signal:
+in a fresh scene, faders and sends are down, so buses and matrices are silent.
+
+## Testing without disturbing a running emulator
+
+Only one program can use UDP port 10023 on a machine. To try a second
+emulator and editor side by side (Linux), run them in a private network
+namespace with a dummy interface, so the editor finds that emulator by
+broadcast:
+
+```sh
+unshare -rn sh -c '
+  ip link set lo up
+  ip link add d0 type dummy && ip addr add 10.77.0.1/24 broadcast 10.77.0.255 dev d0 && ip link set d0 up
+  bin/tabula-emu -name test -scene testdata/scenes/GVO-2026.scn -http 127.0.0.1:8099 &
+  cd ~/m32-edit && HOME=/tmp/m32home XAUTHORITY=$HOME/.Xauthority ./M32-Edit'
+```
+
+`HOME` points the editor to a separate settings directory (copy
+`~/.config/.M32-Edit` there first). To send OSC to that emulator, enter its
+namespace: `nsenter -t <emulator pid> -U -n --preserve-credentials <command>`.
+
 ## Report
 
 Send `var/unhandled.jsonl` (or the debug page's JSON at

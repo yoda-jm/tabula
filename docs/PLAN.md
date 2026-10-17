@@ -46,6 +46,8 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/add` (cues), `/showdump`, with listings in `/-show` and `/-libs`, optionally kept in a directory (`-library`). Scene safes and snippet filters are not applied yet.
 - [x] Side effects of `/-action/*` (go scene/snippet/cue, clear solo, undo checkpoint and undo, init) and computed status (`/-insert`, `/-ha/NN/index` from sources and input routing, `/-stat/solo`).
 - [x] Factory presets: `-presets` imports M32-Edit's library (channel, effect and routing presets).
+- [x] RTA of the source chosen with `/-action/setrtasrc` (channels, buses, graphic EQs, pre/post EQ), shaped by low cut, EQ and graphic EQ.
+- [x] Linked strips (channels, aux, FX returns, buses, matrices) kept in step, following `/config/linkcfg`, with the rules of M32-Edit's offline logic (see `docs/emulator.md`).
 - [ ] Connect X32-Edit and M32-Edit, work through the unhandled-request log (guide: `docs/testing-with-editors.md`).
 
 ### 3. Client — connection and GUI v1 *(in progress)*

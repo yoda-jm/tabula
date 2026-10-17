@@ -13,7 +13,9 @@ Tools for Behringer X32 / Midas M32 digital consoles, in Go.
   serves a web GUI: mixer, channel details, every parameter, recording and
   replay of shows. Read-only until you arm writes.
 
-See [docs/PLAN.md](docs/PLAN.md) for the roadmap.
+See [how the emulator simulates the console](docs/emulator.md) (audio flow,
+meters, RTA, effects, linked strips) and [docs/PLAN.md](docs/PLAN.md) for the
+roadmap.
 
 ## Status
 
