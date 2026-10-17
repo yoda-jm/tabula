@@ -103,6 +103,11 @@ func TestInfo(t *testing.T) {
 	if m := p.ask("/status"); len(m.Args) != 3 || m.Args[0].Str != "active" {
 		t.Errorf("/status: %v", m)
 	}
+	// Renaming the console (a preference) changes what /xinfo reports.
+	p.send("/-prefs/name", osc.String("FOH"))
+	if m := p.ask("/xinfo"); m.Args[1].Str != "FOH" {
+		t.Errorf("/xinfo after rename: %v", m)
+	}
 }
 
 func TestGetSetNode(t *testing.T) {
@@ -166,11 +171,23 @@ func TestXremoteFanOut(t *testing.T) {
 	}
 }
 
+// X32-Edit and M32-Edit query console nodes when they connect.
+func TestConsoleNodes(t *testing.T) {
+	_, addr := start(t)
+	p := dial(t, addr)
+	if got := p.node("-prefs/card"); got != "/-prefs/card USB 32/32 32/32 IN WC 64 1-32 1-32 BOTH 32Ch USB AUTO SD1" {
+		t.Errorf("node: %q", got)
+	}
+	if m := p.ask("/-stat/selidx"); m.String() != "/-stat/selidx ,i 0" {
+		t.Errorf("selidx: %v", m)
+	}
+}
+
 func TestUnhandledIsRecorded(t *testing.T) {
 	s, addr := start(t)
 	p := dial(t, addr)
-	p.send("/-prefs/style")
-	p.send("/-prefs/style")
+	p.send("/ch/01/nosuch")
+	p.send("/ch/01/nosuch")
 	p.send("/showdump")
 	p.send("/ch/01/mix/fader", osc.String("loud"))
 	p.ask("/info") // wait for the previous packets to be handled
@@ -179,8 +196,8 @@ func TestUnhandledIsRecorded(t *testing.T) {
 	for _, u := range s.Unhandled.List() {
 		got[u.Address] = u
 	}
-	if u := got["/-prefs/style"]; u.Count != 2 || u.Reason != ReasonUnknown {
-		t.Errorf("/-prefs/style: %+v", u)
+	if u := got["/ch/01/nosuch"]; u.Count != 2 || u.Reason != ReasonUnknown {
+		t.Errorf("/ch/01/nosuch: %+v", u)
 	}
 	if u := got["/showdump"]; u.Reason != ReasonUnimplemented {
 		t.Errorf("/showdump: %+v", u)

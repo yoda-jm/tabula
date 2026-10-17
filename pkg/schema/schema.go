@@ -50,7 +50,7 @@ func (l *Leaf) Type() Type { return l.Node.Fields[l.Index].Type }
 // Schema is the full parameter tree of a console model.
 type Schema struct {
 	Model  Model
-	Nodes  []*Node // in scene file order
+	Nodes  []*Node // scene nodes in scene file order, then the others
 	nodes  map[string]*Node
 	leaves map[string]*Leaf
 	order  []*Leaf

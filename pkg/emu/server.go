@@ -85,8 +85,19 @@ func New(cfg Config, st *state.Store) *Server {
 		Unhandled: newUnhandleds(cfg.Logger, cfg.UnhandledLog),
 		traffic:   newTraffic(cfg.Traffic),
 	}
+	// The network name is a preference: /xinfo and /status report it.
+	st.Set("/-prefs/name", osc.String(cfg.Name), "config")
 	st.Subscribe(s.broadcast)
 	return s
+}
+
+// name is the console's network name (/-prefs/name).
+func (s *Server) name() string {
+	v, _, err := s.store.Get("/-prefs/name")
+	if err != nil || v.Str == "" {
+		return s.cfg.Name
+	}
+	return v.Str
 }
 
 func (s *Server) Config() Config         { return s.cfg }
@@ -213,11 +224,11 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			osc.String(string(s.cfg.Model)), osc.String(s.cfg.Firmware)))
 		return
 	case "/xinfo":
-		s.send(c, osc.NewMessage("/xinfo", osc.String(s.localIP(c)), osc.String(s.cfg.Name),
+		s.send(c, osc.NewMessage("/xinfo", osc.String(s.localIP(c)), osc.String(s.name()),
 			osc.String(string(s.cfg.Model)), osc.String(s.cfg.Firmware)))
 		return
 	case "/status":
-		s.send(c, osc.NewMessage("/status", osc.String("active"), osc.String(s.localIP(c)), osc.String(s.cfg.Name)))
+		s.send(c, osc.NewMessage("/status", osc.String("active"), osc.String(s.localIP(c)), osc.String(s.name())))
 		return
 	case "/xremote":
 		s.mu.Lock()

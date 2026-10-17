@@ -38,10 +38,16 @@ Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases)
 - Real scenes round-trip byte for byte, also when dumped over the network
   with Patrick-Gilles Maillot's `X32GetScene`.
 
+- Preferences and status (`/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-usb`,
+  `/-urec`, `/-action`…), as the editors query them when connecting.
+- Meters (`/meters/0…16`) with synthetic levels that follow the mix, and
+  `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
+
 ### Not yet
 
-Preferences and status (`/-prefs`, `/-stat`…), meters, subscriptions, the
-scene/preset library and effect parameters: see the [plan](PLAN.md).
+Most effect parameters (only HALL is modelled; other effects are kept as
+text), the scene/preset library commands, and the side effects of actions:
+see the [plan](PLAN.md).
 
 ## tabula — the client *(coming)*
 

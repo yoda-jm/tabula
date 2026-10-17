@@ -125,7 +125,8 @@ func two(i int) string   { return fmt.Sprintf("%02d", i) }
 func plain(i int) string { return fmt.Sprint(i) }
 func pair(i int) string  { return fmt.Sprintf("%d-%d", 2*i-1, 2*i) }
 
-// Build returns the parameter tree of a console model.
+// Build returns the parameter tree of a console model: the scene nodes in
+// scene file order, then the nodes outside scenes (console.go).
 func Build(m Model) *Schema {
 	b := builder{newSchema(m)}
 	b.config()
@@ -158,6 +159,7 @@ func Build(m Model) *Schema {
 	for i := 0; i < 128; i++ {
 		b.node(fmt.Sprintf("/headamp/%03d", i), f("gain", headGain), f("phantom", OnOff))
 	}
+	b.console()
 	return b.s
 }
 

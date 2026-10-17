@@ -23,30 +23,32 @@ Both share the same library (`pkg/`).
 | `pkg/scene` | Scene file (`.scn`) read/write. |
 | `pkg/state` | In-memory state store with a change feed; used by the emulator (as the console's memory) and by the client (as a mirror of the console). |
 | `pkg/emu` | The emulator's protocol server and debug HTTP page. |
-| `pkg/console` *(next)* | The client side of the protocol: discovery, full sync, `/xremote` keepalive, meters, rate-limited writes. |
+| `pkg/console` | The client side of the protocol: discovery, full sync, `/xremote` keepalive, meters, rate-limited writes. |
 | `pkg/session` *(later)* | Recording and replay. |
 
 ## Milestones
 
-### 1. Emulator — protocol core *(in progress)*
+### 1. Emulator — protocol core *(done)*
 - [x] OSC codec, byte-exact against the document's examples.
 - [x] Schema for every scene node (config, 32 channels, aux ins, FX returns, 16 buses, 6 matrices, main LR/M, DCAs, FX slots, outputs, 128 headamps).
 - [x] Scene lines of 3 real scenes round-trip byte for byte (6351 lines).
-- [ ] State store, scene load/save.
-- [ ] UDP server: `/info`, `/xinfo`, `/status`, get/set of every parameter, node-address set with multiple type tags, `/node`, `/` (echoed), `/xremote` change fan-out to the *other* clients (10 s lease).
-- [ ] Every request not understood is logged (stderr, JSON lines file, debug page) with client, address, type tags and arguments, so connecting X32-Edit/M32-Edit shows what is missing.
-- [ ] Debug HTTP page: state tree (search), clients, traffic, unknown requests, current state as `.scn`.
-- [ ] Acceptance: load GVO-2026.scn, dump it back over the network with `/node` (and Maillot's `X32GetScene`) → identical file.
+- [x] State store, scene load/save.
+- [x] UDP server: `/info`, `/xinfo`, `/status`, get/set of every parameter, node-address set with multiple type tags, `/node`, `/` (echoed), `/xremote` change fan-out to the *other* clients (10 s lease).
+- [x] Every request not understood is logged (stderr, JSON lines file, debug page) with client, address, type tags and arguments, so connecting X32-Edit/M32-Edit shows what is missing.
+- [x] Debug HTTP page: state tree (search), clients, subscriptions, traffic, unhandled requests, current state as `.scn`.
+- [x] Acceptance: GVO-2026.scn dumped back over the network with `/node` and with Maillot's `X32GetScene` → identical node lines.
 
-### 2. Emulator — what X32-Edit / M32-Edit need
+### 2. Emulator — what X32-Edit / M32-Edit need *(in progress)*
 Driven by the unknown-request log while connecting the real editors:
-- `/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-action`, `/-usb`, `/-urec`, `/-insert`, `/-ha`.
-- `/meters/0…16` with synthetic levels, `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
-- Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/showdump`.
-- Effect parameters (`/fx/N/par/NN`): per-effect parameter tables (61 effect types), replacing the verbatim text kept today.
+- [x] `/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-action`, `/-undo`, `/-usb`, `/-urec`, `/-insert`, `/-ha` (1126 nodes; formats checked against a real M32C's values cached by M32-Edit).
+- [x] `/meters/0…16` with synthetic levels following the mix, `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
+- [ ] Effect parameters (`/fx/N/par/NN`): the framework is there (fields depend on the effect type; switching effect loads its defaults); HALL is modelled, the other effects are kept as text until their tables land.
+- [ ] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/showdump`.
+- [ ] Side effects of `/-action/*` and computed status (`/-insert`, `/-ha`, `/-stat/solo`).
+- [ ] Connect X32-Edit and M32-Edit, work through the unhandled-request log.
 
-### 3. Client — connection and GUI v1
-- `pkg/console`: discovery (broadcast `/xinfo`), full sync via `/node` (≈3 s), `/xremote` renewal, meters, write queue.
+### 3. Client — connection and GUI v1 *(in progress)*
+- [x] `pkg/console`: discovery (broadcast `/xinfo`), full sync via `/node` (window of 32 requests), `/xremote` renewal, writes refused until armed; tested end to end against the emulator.
 - **Read-only by default** on a real console; writes must be armed explicitly.
 - Web GUI (embedded in the binary): connection page, generic parameter browser generated from the schema (all menus early), then console-like screens (Home, Gate, Dyn, EQ, Sends, Routing, Outputs, FX, Scenes).
 - WebSocket for state changes, binary frames for meters.
