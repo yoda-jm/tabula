@@ -1,3 +1,3 @@
 module github.com/yoda-jm/tabula
 
-go 1.26.4
+go 1.26

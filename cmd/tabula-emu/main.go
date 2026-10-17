@@ -24,6 +24,9 @@ import (
 	"github.com/yoda-jm/tabula/pkg/state"
 )
 
+// version is set at release build time.
+var version = "dev"
+
 var models = []string{"X32", "X32RACK", "X32C", "X32P", "X32CORE", "M32", "M32R", "M32C"}
 
 func main() {
@@ -37,14 +40,20 @@ func main() {
 		httpAddr  = flag.String("http", "", "address of the read-only debug page, e.g. :8032 (disabled if empty)")
 		unhandled = flag.String("unhandled-log", "", "append every unhandled request to this JSON lines file")
 		verbose   = flag.Bool("v", false, "log every unhandled request, not only the first of each kind")
+		showVer   = flag.Bool("version", false, "print the version and exit")
 	)
 	flag.Parse()
+	if *showVer {
+		fmt.Println("tabula-emu", version)
+		return
+	}
 
 	level := slog.LevelInfo
 	if *verbose {
 		level = slog.LevelDebug
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	log.Info("tabula-emu", "version", version)
 	if err := run(log, *listen, *model, *name, *firmware, *sceneFile, *save, *httpAddr, *unhandled); err != nil {
 		log.Error("tabula-emu", "err", err)
 		os.Exit(1)

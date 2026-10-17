@@ -1,0 +1,9 @@
+title: tabula
+description: Tools for Behringer X32 / Midas M32 consoles — emulator, remote GUI, show recording.
+theme: jekyll-theme-minimal
+plugins:
+  - jekyll-relative-links
+relative_links:
+  enabled: true
+exclude:
+  - reference/
