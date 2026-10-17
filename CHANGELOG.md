@@ -22,6 +22,12 @@
   `range`, `gain30`) and RTA sources go up to 195 (98 sources, before or
   after the EQ).
 
+### Downloads
+- A `latest` release is rebuilt from `main` after every change that passes
+  CI, with archive names that never change
+  (`releases/download/latest/tabula-linux-amd64.tar.gz`…), linked from the
+  site's download section. `make dist` builds the same archives locally.
+
 ## v0.1.0 — first pre-release
 
 ### tabula-emu, the console emulator

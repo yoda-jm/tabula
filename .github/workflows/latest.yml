@@ -1,0 +1,54 @@
+name: Latest
+
+# After CI passes on main, rebuilds the "latest" release: the binaries of the
+# last commit, under names without a version (tabula-linux-amd64.tar.gz…), so
+# https://github.com/yoda-jm/tabula/releases/download/latest/<file> always
+# gives the newest build.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: latest
+  cancel-in-progress: true
+
+jobs:
+  latest:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: GUI
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: build
+        run: scripts/dist.sh "latest-${SHA::7}" ""
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Built from $(git log -1 --format='%h %s' "$SHA") on $(date -u +%Y-%m-%d).
+
+          Rebuilt after every change on main that passes CI; versioned releases are listed below it."
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest dist/* --target "$SHA" --title "tabula latest (${SHA::7})" \
+            --notes "$notes" --latest

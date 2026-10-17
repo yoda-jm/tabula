@@ -6,6 +6,27 @@ title: tabula
 
 Tools for **Behringer X32 / Midas M32** digital consoles, written in Go.
 
+## Download
+
+The latest build, made from the main branch each time its tests pass:
+
+| System | Download |
+|---|---|
+| Linux, x86-64 | [tabula-linux-amd64.tar.gz](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-linux-amd64.tar.gz) |
+| Linux, ARM 64-bit (Raspberry Pi 3/4/5 with a 64-bit system) | [tabula-linux-arm64.tar.gz](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-linux-arm64.tar.gz) |
+| Linux, ARM 32-bit (Raspberry Pi 2 or later with a 32-bit system) | [tabula-linux-arm.tar.gz](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-linux-arm.tar.gz) |
+| macOS, Apple silicon | [tabula-darwin-arm64.tar.gz](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-darwin-arm64.tar.gz) |
+| macOS, Intel | [tabula-darwin-amd64.tar.gz](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-darwin-amd64.tar.gz) |
+| Windows, x86-64 | [tabula-windows-amd64.zip](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-windows-amd64.zip) |
+
+Each archive holds both programs, `tabula-emu` and `tabula`, with the web GUI
+built in: unpack it and run them, nothing to install. Checksums:
+[SHA256SUMS](https://github.com/yoda-jm/tabula/releases/download/latest/SHA256SUMS). On macOS, the binaries are not signed: allow
+them once with `xattr -d com.apple.quarantine tabula tabula-emu`.
+
+Versioned releases, with their notes, are on the
+[releases page](https://github.com/yoda-jm/tabula/releases).
+
 ## tabula-emu — a console on your laptop
 
 `tabula-emu` speaks the console's OSC protocol on UDP port 10023, so remote
@@ -25,8 +46,6 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
 - `-library dir` keeps the scenes, snippets and presets saved with `/save`
   (from an editor's library pages) in a directory, one file each.
 - `-model` picks what `/info` reports: X32, X32RACK, X32C, X32P, X32CORE, M32, M32R, M32C.
-
-Downloads are on the [releases page](https://github.com/yoda-jm/tabula/releases).
 
 ### What works today
 

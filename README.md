@@ -22,6 +22,17 @@ roadmap.
 Early development. The parameter schema covers every node of a scene file and
 round-trips real scenes byte for byte.
 
+## Download
+
+Latest build of `main` (both programs, GUI included):
+[Linux x86-64](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-linux-amd64.tar.gz) ·
+[Linux ARM64](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-linux-arm64.tar.gz) ·
+[Linux ARM](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-linux-arm.tar.gz) ·
+[macOS Apple silicon](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-darwin-arm64.tar.gz) ·
+[macOS Intel](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-darwin-amd64.tar.gz) ·
+[Windows](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-windows-amd64.zip).
+Versioned releases: [releases page](https://github.com/yoda-jm/tabula/releases).
+
 ## Quick start
 
 ```sh
