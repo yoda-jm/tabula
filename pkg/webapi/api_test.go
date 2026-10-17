@@ -213,3 +213,54 @@ func TestRecordAndReplay(t *testing.T) {
 		}
 	}
 }
+
+func TestMeters(t *testing.T) {
+	_, emuAddr := startEmu(t)
+	api := New(quiet)
+	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
+	defer ts.Close()
+	post(t, ts.URL+"/api/connect", `{"addr":"`+emuAddr+`"}`)
+	connected(t, ts.URL)
+
+	resp, err := http.Get(ts.URL + "/api/events?meters=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	got := make(chan []float64, 1)
+	go func() {
+		sc := bufio.NewScanner(resp.Body)
+		sc.Buffer(make([]byte, 1<<16), 1<<20)
+		meters := false
+		for sc.Scan() {
+			line := sc.Text()
+			if line == "event: meters" {
+				meters = true
+				continue
+			}
+			if meters && strings.HasPrefix(line, "data: ") {
+				var m struct {
+					ID     string    `json:"id"`
+					Values []float64 `json:"values"`
+				}
+				json.Unmarshal([]byte(line[6:]), &m)
+				if m.ID == "1" {
+					got <- m.Values
+					return
+				}
+			}
+			meters = false
+		}
+	}()
+	select {
+	case v := <-got:
+		if len(v) != 96 {
+			t.Errorf("%d values for /meters/1", len(v))
+		}
+		if v[11] <= 0 { // channel 12 has a source and a signal
+			t.Errorf("channel 12 input level %v", v[11])
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("no meters event")
+	}
+}

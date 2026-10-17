@@ -81,7 +81,15 @@ back on the event stream.
 - `change`: `[{"addr", "text", "value", "origin"}]` with origin `console`
   (made on the console or by another remote app) or `local` (made through
   this server);
-- `resync`: the initial sync finished — reload `/api/state`.
+- `resync`: the initial sync finished — reload `/api/state`;
+- `meters`: `{"id": "1", "values": [...]}` for the meter groups named when
+  opening the stream, e.g. `/api/events?meters=1,2,6:12` (`N` is
+  `/meters/N`, `N:a:b` adds its parameters: `5:0:0` channels 1-16 + DCAs,
+  `6:12` strip 13). Values are linear levels (1.0 = 0 dBFS; gain reductions
+  are gains, 1.0 = none), dB for group 15 (RTA, 100 bands), gains for group
+  16. About 20 updates per second per group; see the protocol document for
+  what each group holds (e.g. 1: 32 inputs, 32 gate and 32 compressor gains;
+  2: 16 buses, 6 matrices, main L/R, mono, then their compressor gains).
 
 ## Recording and replay
 

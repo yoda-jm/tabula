@@ -209,10 +209,13 @@ func (c *Client) readLoop() {
 func (c *Client) handle(m osc.Message) {
 	key := m.Address
 	var line string
-	if m.Address == "node" && len(m.Args) == 1 {
+	switch {
+	case m.Address == "node" && len(m.Args) == 1:
 		line = strings.TrimSuffix(m.Args[0].Str, "\n")
 		path, _ := schema.SplitLine(line)
 		key = "node " + path
+	case m.Address == "/" && len(m.Args) == 1:
+		key = "/ " + m.Args[0].Str // echo of a "/" command
 	}
 	c.mu.Lock()
 	c.status.LastSeen = time.Now()
@@ -447,7 +450,9 @@ func (c *Client) ApplyText(line string) error {
 	if !armed {
 		return ErrReadOnly
 	}
-	if err := c.send(osc.NewMessage("/", osc.String(line))); err != nil {
+	// The console echoes "/" commands: waiting for the echo paces the
+	// sender so the console's UDP buffer does not overflow.
+	if _, err := c.ask(context.Background(), osc.NewMessage("/", osc.String(line)), "/ "+line, 3); err != nil {
 		return err
 	}
 	_, err := c.mirror.ApplyText(line, OriginLocal)

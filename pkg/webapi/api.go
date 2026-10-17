@@ -134,6 +134,7 @@ func (s *Server) Connect(addr string) error {
 			}
 			s.publishRecord()
 		}
+		go s.runMeters(ctx, c)
 		c.Run(ctx)
 	}()
 	return nil
