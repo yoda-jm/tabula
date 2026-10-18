@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 — access for the band, audio recording
 
 ### tabula
 - Replays can run at 3× (besides 0.5×, 1×, 2×, 4× and 8×); docs/recording.md
