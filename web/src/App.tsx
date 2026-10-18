@@ -19,6 +19,7 @@ import { RecordPage } from "./pages/RecordPage";
 import { RoutingPage } from "./pages/RoutingPage";
 import { ScenesPage } from "./pages/ScenesPage";
 import { useAccess, useSchema, useStatus, useValue } from "./store/hooks";
+import { store } from "./store/store";
 
 /** The pages, with the least role that sees them. */
 const NAV: { page: Page; label: string; role: Role }[] = [
@@ -52,8 +53,9 @@ function ConsoleApp({ role }: { role: Role }) {
   const nav = useMemo(() => NAV.filter((n) => atLeast(role, n.role)), [role]);
 
   // no route yet (or a page this role does not see): the mixer when
-  // connected, else the connection page
+  // connected, else the connection page, once the status is known
   useEffect(() => {
+    if (engineer && !store.statusKnown) return;
     if (!route || !nav.some((n) => n.page === route.page)) {
       go({ page: !engineer || status.connected || status.connecting ? "mixer" : "connect" });
     }

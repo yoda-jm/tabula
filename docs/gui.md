@@ -26,7 +26,14 @@ pages. See [access](access.md).
 Banks of strips, as on the console: inputs 1-16 and 17-32, aux inputs and
 FX returns, buses, matrices and mains, DCAs. Each strip has its scribble
 strip (name and colour), meter, fader, mute and pan. Tap a scribble strip to
-select it for the Channel page.
+select it for the Channel page. Names of two words take two lines
+(`Guitare Elec`), so the 12 characters the console allows show in full.
+
+![Inputs 1-16 of a show](img/mixer.png)
+
+On a phone, the banks scroll sideways:
+
+![The mixer on a phone](img/mixer-phone.png)
 
 **Linked pairs** (`/config/chlink`, `auxlink`, `fxlink`, `buslink`,
 `mtxlink`) show as one stereo strip, `Mtx 1-2` or `FX 1`, with the meters of
@@ -41,9 +48,13 @@ strip says which strip it is linked with.
 
 ## Channel
 
-Everything about one strip: configuration, preamp, delay, gate, dynamics,
-EQ with its response curve, insert, main mix, sends with the bus names,
-DCA and mute groups, automix. Only the sections the strip has are shown.
+Everything about one strip: configuration, preamp and delay, the EQ with
+its response curve, gate, dynamics, insert, main mix, sends with the bus
+names, DCA and mute groups, automix. Only the sections the strip has are
+shown. The EQ comes right after the preamp, so its curve is on screen when
+the page opens; the other sections fill balanced columns.
+
+![A vocal channel: the EQ with the RTA after the EQ behind its curve](img/channel.png)
 
 **RTA.** When the console's RTA listens to the strip, its spectrum is
 drawn behind the EQ curve. Two buttons under the curve point the RTA at this

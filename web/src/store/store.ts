@@ -58,6 +58,8 @@ export class Store {
   schema: Schema | null = null;
   schemaError = "";
   status: Status = { connected: false, connecting: false };
+  /** whether a status came from the server yet */
+  statusKnown = false;
   /** who this browser is for tabula; null until known */
   access: Whoami | null = null;
   stream: StreamState = "connecting";
@@ -295,6 +297,7 @@ export class Store {
   setStatus(s: Status) {
     const prev = this.status;
     this.status = s;
+    this.statusKnown = true;
     if ((s.connecting && !prev.connecting) || (!s.console && !s.connecting && this.stateLoaded)) {
       this.clearState();
     }

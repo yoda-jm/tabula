@@ -47,6 +47,8 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   (from an editor's library pages) in a directory, one file each.
 - `-model` picks what `/info` reports: X32, X32RACK, X32C, X32P, X32CORE, M32, M32R, M32C.
 
+![The debug page: the connected clients and their meter subscriptions, the requests the emulator did not understand, and every parameter](img/emulator.png)
+
 ### What works today
 
 - Every parameter of a scene file: configuration and routing, 32 channels,
@@ -86,6 +88,8 @@ or a phone on stage.
 tabula -console 192.168.1.62 -http :8033
 ```
 
+![The mixer: inputs 1-16 of a show with the names and colours of the console, meters, faders and mutes](img/mixer.png)
+
 - **Mixer**: banks of strips (inputs, aux and FX returns, buses, matrices
   and mains, DCAs) with scribble strips in the console colours, meters,
   faders, mutes and pans; linked pairs show as one stereo strip.
@@ -117,6 +121,11 @@ tabula -console 192.168.1.62 -http :8033
   touching. An optional engineer password protects full control, on the
   laptop too. See [access](access.md).
 - **Connect**: find consoles on the network or type an address.
+
+<p>
+<img src="img/channel.png" width="68%" alt="The Channel page of a vocal: config, preamp with its headamp, and the EQ with the RTA after the EQ">
+<img src="img/in-ear-mix.png" width="28.5%" alt="A musician's in-ear mix on a phone: one tall fader per source and their own volume">
+</p>
 
 It is **read-only** until writes are armed, after a confirmation: on a real
 console, nothing moves by accident. **[Every page of the GUI](gui.md)** in

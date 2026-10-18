@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### tabula
+- The GUI opens on the mixer when tabula is already connected to a console
+  (it showed the Connect page until the first status came).
+- Scribble strips show names of two words on two lines (`Guitare Elec`,
+  `Vx Valentin`) instead of cutting them, on phones too.
+- Channel page: the EQ comes right after the preamp, so its curve shows
+  when the page opens, and the sections fill balanced columns without
+  holes; the fields of the Main section use the card's whole width.
+
+### tabula-emu
+- The debug page says when a subscription expires (`in 8s`), not `-8s ago`.
+
+### Docs
+- Screenshots of tabula (mixer, channel, phone) and of the emulator's
+  debug page in the README and on the site.
+
 ## v0.2.0 — access for the band, audio recording
 
 ### tabula

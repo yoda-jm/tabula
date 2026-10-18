@@ -103,6 +103,12 @@ var debugTmpl = template.Must(template.New("debug").Funcs(template.FuncMap{
 		}
 		return time.Since(t).Round(time.Second).String() + " ago"
 	},
+	"until": func(t time.Time) string {
+		if d := time.Until(t).Round(time.Second); d > 0 {
+			return "in " + d.String()
+		}
+		return "expired"
+	},
 	"clock":  func(t time.Time) string { return t.Format("15:04:05.000") },
 	"active": func(t time.Time) bool { return t.After(time.Now()) },
 }).Parse(`<!doctype html>
@@ -136,7 +142,7 @@ a { color:var(--accent) } .pill { display:inline-block; padding:0 .4rem; border-
 
 <h2>Subscriptions <span class="muted">(meters, /subscribe… — not shown in the traffic log)</span></h2>
 <div class="scroll"><table><tr><th>Client</th><th>Kind</th><th>Name</th><th>Every</th><th>Expires</th></tr>
-{{range .Subs}}<tr><td class="mono">{{.Client}}</td><td>{{.Kind}}</td><td class="mono">{{.Name}}</td><td>{{.Interval}}</td><td>{{ago .Expires}}</td></tr>
+{{range .Subs}}<tr><td class="mono">{{.Client}}</td><td>{{.Kind}}</td><td class="mono">{{.Name}}</td><td>{{.Interval}}</td><td>{{until .Expires}}</td></tr>
 {{else}}<tr><td colspan="5" class="muted">None.</td></tr>{{end}}</table></div>
 
 <h2>Unhandled requests <span class="muted">(<a href="/api/unhandled">JSON</a>)</span></h2>

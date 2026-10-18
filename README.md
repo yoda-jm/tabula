@@ -19,6 +19,25 @@ See [how the emulator simulates the console](docs/emulator.md) (audio flow,
 meters, RTA, effects, linked strips), [the pages of the GUI](docs/gui.md) and
 [docs/PLAN.md](docs/PLAN.md) for the roadmap.
 
+## Screenshots
+
+**tabula**, the mixer of a show, with the names and colours of the console:
+
+![The tabula mixer: inputs 1-16 with their scribble strips, meters, faders and mutes](docs/img/mixer.png)
+
+A channel, with its EQ curve and the RTA behind it, and a musician's in-ear
+mix on a phone:
+
+<p>
+<img src="docs/img/channel.png" width="68%" alt="The Channel page of a vocal: config, preamp with its headamp, and the EQ with the RTA after the EQ">
+<img src="docs/img/in-ear-mix.png" width="28.5%" alt="A musician's in-ear mix on a phone: one tall fader per source and their own volume">
+</p>
+
+**tabula-emu**, its debug page: the connected clients and their meter
+subscriptions, the requests it did not understand, and every parameter:
+
+![The tabula-emu debug page: clients, subscriptions, unhandled requests and the state](docs/img/emulator.png)
+
 ## Status
 
 Early development. The parameter schema covers every node of a scene file and

@@ -507,7 +507,8 @@ input[type="range"] {
   gap: 8px 12px;
   align-items: center;
 }
-.field {
+.field,
+.fields .fields {
   display: contents;
 }
 .fields .field-label {
@@ -644,7 +645,7 @@ input[type="range"] {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 50px;
+  min-height: 54px;
   width: 100%;
   padding: 4px 4px;
   border-radius: 6px;
@@ -665,12 +666,17 @@ div.scribble {
   opacity: 0.8;
   white-space: nowrap;
 }
+/* names of up to 12 characters, on two lines when they have two words */
 .scribble-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   font-weight: 800;
   font-size: 0.85rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.1;
 }
 .scribble.inv {
   background: #08090c;
@@ -878,14 +884,15 @@ div.scribble {
 .channel-mute {
   margin-left: auto;
 }
+/* balanced columns, so that short cards leave no holes; the EQ and the
+   sends take the whole width */
 .sections {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
-  gap: 12px;
-  align-items: start;
+  columns: 360px;
+  column-gap: 12px;
 }
 .sections .card {
-  margin: 0;
+  margin: 0 0 12px;
+  break-inside: avoid;
 }
 .section-head {
   display: flex;
@@ -897,7 +904,7 @@ div.scribble {
 }
 .section.eq,
 .section.sends {
-  grid-column: 1 / -1;
+  column-span: all;
 }
 .eqcurve {
   margin: 0 0 12px;
@@ -1546,13 +1553,7 @@ div.scribble {
   cursor: default;
 }
 .iem-head .scribble-name {
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  line-height: 1.1;
   font-size: 0.8rem;
-  overflow-wrap: anywhere;
 }
 .iem-head .scribble-label {
   font-size: 0.65rem;
@@ -1803,10 +1804,6 @@ div.scribble {
 .fx-params {
   grid-template-columns: minmax(96px, 22%) minmax(0, 1fr);
 }
-.fx-dual {
-  margin-bottom: 12px;
-}
-
 /* ---------- graphic EQ ---------- */
 
 .seg {
@@ -2139,6 +2136,12 @@ code.wrap {
   .btn.mute {
     font-size: 0.75rem;
     letter-spacing: 0.02em;
+  }
+  .strip .scribble {
+    padding: 4px 2px;
+  }
+  .strip .scribble-name {
+    font-size: 0.75rem;
   }
   .topbar {
     padding: 6px 12px;

@@ -77,6 +77,7 @@ export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: 
             <Fields path={`${p}/delay`} skip={["on"]} />
           </Section>
         )}
+        {sections.includes("eq") && <EqSection strip={strip} />}
         {sections.includes("gate") && (
           <Section title="Gate" on={`${p}/gate/on`}>
             <Fields path={`${p}/gate`} skip={["on"]} />
@@ -99,7 +100,6 @@ export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: 
             )}
           </Section>
         )}
-        {sections.includes("eq") && <EqSection strip={strip} />}
         {sections.includes("insert") && (
           <Section title="Insert" on={`${p}/insert/on`}>
             <Fields path={`${p}/insert`} skip={["on"]} />
