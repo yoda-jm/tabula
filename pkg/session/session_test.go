@@ -2,8 +2,11 @@ package session
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -130,5 +133,51 @@ func TestRecordAudioMeta(t *testing.T) {
 	}
 	if !rec.Started().Equal(s.Meta.Start) {
 		t.Errorf("start %v, meta %v", rec.Started(), s.Meta.Start)
+	}
+}
+
+// clock notes when each fader change of a replay arrives.
+type clock struct {
+	at   []time.Time
+	text []string
+}
+
+func (c *clock) ApplyText(line string) error {
+	if rest, ok := strings.CutPrefix(line, "/ch/01/mix/fader "); ok {
+		c.at, c.text = append(c.at, time.Now()), append(c.text, rest)
+	}
+	return nil
+}
+
+// A replay keeps the recorded times, divided by the speed, without drifting.
+func TestReplayTiming(t *testing.T) {
+	s := &Session{Events: []Event{
+		{T: 1.0, Addr: "/ch/01/mix/fader", Text: "-20.0"},
+		{T: 1.3, Addr: "/ch/01/mix/fader", Text: "-15.0"},
+		{T: 1.6, Marker: "Song 2"},
+		{T: 1.6, Addr: "/ch/01/mix/fader", Text: "-10.0"},
+		{T: 2.2, Addr: "/ch/01/mix/fader", Text: "-5.0"},
+		{T: 3.1, Addr: "/ch/01/mix/fader", Text: "0.0"},
+	}}
+	c := &clock{}
+	var progress []float64
+	p := &Player{S: s, Target: c, Speed: 3, OnProgress: func(t float64) { progress = append(progress, t) }}
+	if err := p.Play(context.Background(), "M32C", 1.0); err != nil {
+		t.Fatal(err)
+	}
+	// the change at 1.0 is part of the state sent first, then 0.1 s, 0.2 s,
+	// 0.4 s and 0.7 s after it at 3×
+	if want := []string{"-15.0", "-10.0", "-5.0", "0.0"}; strings.Join(c.text, " ") != strings.Join(want, " ") {
+		t.Fatalf("changes %q, want %q", c.text, want)
+	}
+	for i, want := range []float64{0.1, 0.3, 0.6} {
+		got := c.at[i+1].Sub(c.at[0]).Seconds()
+		t.Logf("change %d: %.4f s after the first, want %.1f", i+2, got, want)
+		if math.Abs(got-want) > 0.05 {
+			t.Errorf("change %d came %.3f s after the first, want %.3f", i+2, got, want)
+		}
+	}
+	if fmt.Sprint(progress) != "[1.3 1.6 2.2 3.1]" {
+		t.Errorf("progress %v", progress)
 	}
 }

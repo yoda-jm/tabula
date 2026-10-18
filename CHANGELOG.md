@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### tabula
+- Replays can run at 3× (besides 0.5×, 1×, 2×, 4× and 8×); docs/recording.md
+  explains how a session keeps the time of each change and how a replay
+  follows it without drifting (tested to within a millisecond).
 - The Record page says what a session keeps: the console (its settings and
   every change, not the sound) always, the audio only when Audio tracks is
   on; the session list shows which sessions have audio, and replays say

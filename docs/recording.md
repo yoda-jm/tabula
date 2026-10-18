@@ -62,6 +62,26 @@ of the bus, matrix or main behind it. A track without a name is
 `Track 11.wav`. *Name the files “Track 01”…* (`-audio-plain-names`) turns
 this off, for a device that is not the console's card.
 
+## Replaying a session
+
+Every change in `events.jsonl` keeps its time, in seconds after the start
+of the recording, to the nanosecond (`{"t":1.088332318,"addr":"/ch/01/mix/fader",…}`):
+the moment `tabula` received it from the console, a few milliseconds after
+it was made. Markers are timed the same way.
+
+**Replay onto the console** (session details, on the Record page) first sets
+the console as it was at the chosen time (the snapshot plus every change up
+to then), then sends each later change at its recorded time: in real time at
+**1×**, three times faster at **3×** (a fader move of 3 s takes 1 s), or at
+0.5×, 2×, 4× or 8×. Times are counted from the start of the replay, not from
+the previous change, so a long replay does not drift: the changes arrive
+within about a millisecond of their time. Start from a time (`45`, `12:30`)
+or pick a marker (*Replay from here*). The API takes any speed.
+
+A replay moves the console, it plays no sound: to hear the show with its
+console moves, open the audio tracks with the markers (below). Writes must
+be armed, since a replay writes to the console.
+
 ## Setting up on Linux
 
 The console's USB card (DN32-USB in a Midas M32, X-USB in a Behringer X32)

@@ -207,7 +207,8 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 one), an `AudioStatus` without `device` and `command` (viewers see the
 record status); `meta.audio` the audio section of the session (see Audio).
 A replay first sends the state at `from` (snapshot plus the changes up to
-then), then each later change at its time divided by `speed`.
+then), then each later change at its time divided by `speed` (any value
+above 0; 1 is real time), counted from the start of the replay.
 
 Events: `record` carries a `Record` (every second while recording, and on
 every replay progress).

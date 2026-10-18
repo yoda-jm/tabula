@@ -184,9 +184,10 @@ Record a show as a session, which keeps two things, as the page says above
 
 The session list says for each one how many console changes and markers it
 holds, and whether it has audio. Replay a session onto the console or the
-emulator, from a time or a marker, at a chosen speed (writes must be
-armed): it moves the console as recorded and plays no sound. Export it for
-Reaper or Audacity to listen to the audio with the markers. See [recording](recording.md) and the
+emulator, from a time or a marker, in real time (1×) or faster or slower
+(0.5× to 8×; writes must be armed): it moves the console as recorded, each
+change at its recorded time, and plays no sound. Export it for
+Reaper or Audacity to listen to the audio with the markers. See [recording](recording.md#replaying-a-session) and the
 [API](API.md#recording-and-replay) for the session format.
 
 ## Access

@@ -14,7 +14,7 @@ import { store } from "../store/store";
 import type { Audio } from "./AudioPanel";
 import { AudioPanel, SessionAudio, useAudio } from "./AudioPanel";
 
-const SPEEDS = [0.5, 1, 2, 4, 8];
+const SPEEDS = [0.5, 1, 2, 3, 4, 8];
 
 export function RecordPage() {
   const rec = useRecord();
