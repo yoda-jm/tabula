@@ -96,7 +96,7 @@ describe("strips", () => {
   });
 
   it("merges linked pairs of a bank into stereo strips", () => {
-    // GVO-2026: matrices 1-2 and 3-4 linked, aux 7-8, the FX returns
+    // The demo scene: matrices 1-2 and 3-4 linked, aux 7-8, the FX returns
     const on = new Set(["/config/mtxlink/1-2", "/config/mtxlink/3-4", "/config/auxlink/7-8", "/config/fxlink/1-2", "/config/fxlink/3-4"]);
     const main = pairStrips(BANKS[4].strips, (f) => on.has(f));
     expect(main.map((m) => m.label)).toEqual(["Mtx 1-2", "Mtx 3-4", "Mtx 5", "Mtx 6", "LR", "M/C"]);

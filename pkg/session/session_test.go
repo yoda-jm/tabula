@@ -17,10 +17,10 @@ import (
 	"github.com/yoda-jm/tabula/pkg/state"
 )
 
-func gvo(t *testing.T) *state.Store {
+func demo(t *testing.T) *state.Store {
 	t.Helper()
 	st := state.New(schema.Build("M32C"))
-	f, err := os.Open("../../testdata/scenes/GVO-2026.scn")
+	f, err := os.Open("../../testdata/scenes/demo.scn")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,18 +52,18 @@ func same(t *testing.T, what string, got, want *state.Store) {
 }
 
 func TestRecordAndReplay(t *testing.T) {
-	live := gvo(t)
+	live := demo(t)
 	dir := filepath.Join(t.TempDir(), "concert")
 	rec, err := Start(dir, live, "M32C test", "set 1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	before := gvo(t)
+	before := demo(t)
 	live.Set("/ch/12/mix/fader", osc.Float(0.6), "console")
 	time.Sleep(20 * time.Millisecond)
 	rec.Mark("Song 2")
 	live.Set("/ch/13/mix/on", osc.Int(0), "console")
-	live.ApplyText("/ch/14/config/name Vx Isa", "console")
+	live.ApplyText("/ch/14/config/name Lead Margot", "console")
 	if err := rec.Stop(); err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestRecordAndReplay(t *testing.T) {
 // The audio section of meta.json is updated while recording.
 func TestRecordAudioMeta(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "concert")
-	rec, err := Start(dir, gvo(t), "M32C test", "")
+	rec, err := Start(dir, demo(t), "M32C test", "")
 	if err != nil {
 		t.Fatal(err)
 	}

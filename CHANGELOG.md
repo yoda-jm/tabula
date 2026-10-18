@@ -21,6 +21,10 @@
 - Every screenshot is taken from `testdata/scenes/demo.scn`, a show with
   the same lineup as the real one and made-up performer names, which the
   quick start and `make dev` now load too.
+- The tests use only scenes with made-up names: `demo.scn`, `vocals.scn`
+  and `vocals-live.scn` (real shows, renamed); the real scenes left the
+  repository. The docs say how to put your own scenes in the emulator's
+  library (`-library var/library`, files `scene-NN.scn`).
 
 ## v0.2.0 — access for the band, audio recording
 

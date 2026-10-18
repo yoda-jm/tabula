@@ -25,7 +25,7 @@ func TestLibrary(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := dial(t, addr)
-	p.send("/ch/12/config/name", osc.String("Vx Remy"))
+	p.send("/ch/12/config/name", osc.String("Vx Theo"))
 	p.send("/ch/12/mix/fader", osc.Float(0.5))
 
 	// Scenes: save, listing, recall.
@@ -62,7 +62,7 @@ func TestLibrary(t *testing.T) {
 	if st := status(t, p, "/load", osc.String("libchan"), osc.Int(45), osc.Int(2), osc.Int(2)); st != 1 {
 		t.Fatalf("load libchan: %d", st)
 	}
-	if got := p.node("ch/03/config"); !strings.HasPrefix(got, `/ch/03/config "Vx Remy"`) {
+	if got := p.node("ch/03/config"); !strings.HasPrefix(got, `/ch/03/config "Vx Theo"`) {
 		t.Errorf("preset config: %q", got)
 	}
 	if m := p.ask("/ch/03/mix/fader"); m.Args[0].Float != 0 {

@@ -18,8 +18,8 @@ function lookup(v: Record<string, number | string>): Lookup {
   return { text: (a) => (a in v ? String(v[a]) : undefined), value: (a) => v[a] };
 }
 
-/** GVO-2026: reverbs on buses 13-16, graphic EQs inserted on matrices 1-4 and buses 7-8. */
-const GVO = lookup({
+/** The demo scene: reverbs on buses 13-16, graphic EQs inserted on matrices 1-4 and buses 7-8. */
+const DEMO = lookup({
   "/fx/1/type": "VRM",
   "/fx/1/source/l": "MIX13",
   "/fx/1/source/r": "MIX13",
@@ -54,17 +54,17 @@ describe("effects", () => {
   });
 
   it("tells where each slot is used", () => {
-    const fx1 = fxUsage(GVO, 1);
+    const fx1 = fxUsage(DEMO, 1);
     expect(fx1.type).toBe("VRM");
     expect(fx1.sources.map((u) => u.text)).toEqual(["Bus 13 Fx Room", "Bus 13 Fx Room"]);
     expect(fx1.returns.map((u) => u.text)).toEqual(["FX 1L Room L", "FX 1R"]);
     expect(fx1.inserts).toEqual([]);
-    expect(fxUsage(GVO, 5).inserts).toEqual([
+    expect(fxUsage(DEMO, 5).inserts).toEqual([
       { text: "Mtx 1 Façade", strip: "/mtx/01", side: "L" },
       { text: "Mtx 2", strip: "/mtx/02", side: "R" },
     ]);
-    expect(fxUsage(GVO, 7).inserts.map((u) => u.text)).toEqual(["Bus 07", "Bus 08"]);
-    const fx8 = fxUsage(GVO, 8);
+    expect(fxUsage(DEMO, 7).inserts.map((u) => u.text)).toEqual(["Bus 07", "Bus 08"]);
+    const fx8 = fxUsage(DEMO, 8);
     expect(fx8.inserts).toEqual([]);
     expect(fx8.sources).toEqual([]);
   });

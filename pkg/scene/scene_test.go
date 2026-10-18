@@ -42,8 +42,8 @@ func TestFileRoundTrip(t *testing.T) {
 }
 
 func TestHeader(t *testing.T) {
-	h := Header("GVO-2026", "")
-	if len(h) != headerWidth || !strings.HasPrefix(h, `#4.0# "GVO-2026" "" %000000000 1 `) {
+	h := Header("Demo-2026", "")
+	if len(h) != headerWidth || !strings.HasPrefix(h, `#4.0# "Demo-2026" "" %000000000 1 `) {
 		t.Errorf("header %q (%d chars)", h, len(h))
 	}
 }

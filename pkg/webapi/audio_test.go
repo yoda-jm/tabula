@@ -116,7 +116,7 @@ func TestAudioRecording(t *testing.T) {
 	}
 	name, a := list[0].Name, list[0].Meta.Audio
 	if a.Frames < 0.3*48000 || a.Offset <= 0 || a.Offset > 1 || a.Error != "" || a.Tracks[0].File != "audio/01 Hang.wav" ||
-		a.Tracks[11].File != "audio/12 Vx Remy.wav" || a.Tracks[10].File != "audio/Track 11.wav" {
+		a.Tracks[11].File != "audio/12 Vx Theo.wav" || a.Tracks[10].File != "audio/Track 11.wav" {
 		t.Errorf("audio meta: %+v", a)
 	}
 	dir := filepath.Join(sessions, name)

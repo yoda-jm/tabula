@@ -19,11 +19,11 @@ import (
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
-// startEmu runs tabula-emu's server with GVO-2026 loaded.
+// startEmu runs tabula-emu's server with the demo scene loaded.
 func startEmu(t *testing.T) (*emu.Server, string) {
 	t.Helper()
 	st := state.New(schema.Build("M32C"))
-	f, err := os.Open("../../testdata/scenes/GVO-2026.scn")
+	f, err := os.Open("../../testdata/scenes/demo.scn")
 	if err != nil {
 		t.Fatal(err)
 	}

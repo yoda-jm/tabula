@@ -22,11 +22,11 @@ func eventually(t *testing.T, p *peer, addr string, want int32) {
 
 func TestDerivedValues(t *testing.T) {
 	s, addr := start(t)
-	data, _ := os.ReadFile("../../testdata/scenes/GVO-2026.scn")
+	data, _ := os.ReadFile("../../testdata/scenes/demo.scn")
 	scene.Load(bytes.NewReader(data), s.Store(), "test")
 	p := dial(t, addr)
 
-	// GVO-2026: channel 12 takes AES50-A input 12 (routing block A9-16).
+	// The demo scene: channel 12 takes AES50-A input 12 (routing block A9-16).
 	eventually(t, p, "/-ha/11/index", 43)
 	p.send("/config/routing/IN/9-16", osc.String("AN9-16"))
 	eventually(t, p, "/-ha/11/index", 11)

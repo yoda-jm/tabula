@@ -191,7 +191,7 @@ describe("store", () => {
 
   it("lets a musician write their own mix only, armed or not", async () => {
     const { s, sets } = await ready();
-    s.setAccess({ role: "musician", name: "Remy", bus: 3, buses: [3], local: false, link: true, musicians_can_write: true });
+    s.setAccess({ role: "musician", name: "Theo", bus: 3, buses: [3], local: false, link: true, musicians_can_write: true });
     s.setStatus({ ...CONNECTED, console: { ...CONNECTED.console!, armed: false } });
     s.set("/ch/01/mix/03/on", 0);
     expect(sets).toEqual([{ addr: "/ch/01/mix/03/on", value: 0 }]);

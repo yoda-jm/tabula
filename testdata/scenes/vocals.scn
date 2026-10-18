@@ -1,4 +1,4 @@
-#4.0# "popcorns" "" %000000000 1                                                                                               
+#4.0# "vocals" "" %000000000 1                                                                                                 
 /config/chlink OFF OFF OFF OFF OFF OFF OFF OFF OFF OFF OFF OFF OFF OFF OFF OFF
 /config/auxlink OFF OFF OFF ON
 /config/fxlink ON ON ON ON
@@ -36,7 +36,7 @@
 /config/dp48/assign 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 /config/dp48/link 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1
 /config/dp48/grpname "" "" "" "" "" "" "" "" "" "" "" ""
-/ch/01/config "Elizabeth" 42 MG 1
+/ch/01/config "Alice" 42 MG 1
 /ch/01/delay OFF   0.3
 /ch/01/preamp +0.0 OFF OFF 24 121
 /ch/01/gate OFF GATE -80.0 60.0 1  502  983 0
@@ -68,7 +68,7 @@
 /ch/01/mix/16 ON   -oo
 /ch/01/grp %00000000 %000001
 /ch/01/automix OFF  +0.0
-/ch/02/config "Isabel" 42 YE 2
+/ch/02/config "Claire" 42 YE 2
 /ch/02/delay OFF   0.3
 /ch/02/preamp +0.0 OFF OFF 24  20
 /ch/02/gate OFF GATE -80.0 60.0 10 50.2  258 0
@@ -100,7 +100,7 @@
 /ch/02/mix/16 ON   -oo
 /ch/02/grp %00000000 %000001
 /ch/02/automix OFF  +0.0
-/ch/03/config "Marie" 42 BL 3
+/ch/03/config "Julie" 42 BL 3
 /ch/03/delay OFF   0.3
 /ch/03/preamp +0.0 OFF OFF 24  20
 /ch/03/gate OFF GATE -80.0 60.0 10 50.2  258 0
@@ -132,7 +132,7 @@
 /ch/03/mix/16 ON   -oo
 /ch/03/grp %00000000 %000001
 /ch/03/automix OFF  +0.0
-/ch/04/config "Nadine" 42 CY 4
+/ch/04/config "Sophie" 42 CY 4
 /ch/04/delay OFF   0.3
 /ch/04/preamp +0.0 OFF OFF 24  20
 /ch/04/gate OFF GATE -80.0 60.0 10 50.2  258 0
@@ -164,7 +164,7 @@
 /ch/04/mix/16 ON   -oo
 /ch/04/grp %00000000 %000001
 /ch/04/automix OFF  +0.0
-/ch/05/config "Jerome" 41 GN 5
+/ch/05/config "Marc" 41 GN 5
 /ch/05/delay OFF   0.3
 /ch/05/preamp +0.0 OFF OFF 24  20
 /ch/05/gate OFF GATE -80.0 60.0 10 50.2  258 0
@@ -196,7 +196,7 @@
 /ch/05/mix/16 ON   -oo
 /ch/05/grp %00000000 %000010
 /ch/05/automix OFF  +0.0
-/ch/06/config "Vince" 41 WH 6
+/ch/06/config "Luc" 41 WH 6
 /ch/06/delay OFF   0.3
 /ch/06/preamp +0.0 OFF OFF 24  20
 /ch/06/gate OFF GATE -80.0 60.0 10 50.2  258 0
@@ -228,7 +228,7 @@
 /ch/06/mix/16 ON   -oo
 /ch/06/grp %00000000 %000010
 /ch/06/automix OFF  +0.0
-/ch/07/config "Vincent" 41 RD 7
+/ch/07/config "Hugo" 41 RD 7
 /ch/07/delay OFF   0.3
 /ch/07/preamp +0.0 OFF OFF 24  20
 /ch/07/gate OFF GATE -80.0 60.0 10 50.2  258 0
@@ -1452,7 +1452,7 @@
 /fxrtn/08/mix/15 ON   -oo +100 POST 0
 /fxrtn/08/mix/16 ON   -oo
 /fxrtn/08/grp %00000000 %000000
-/bus/01/config "IEM Elizab." 71 MGi
+/bus/01/config "IEM Alice" 71 MGi
 /bus/01/dyn OFF COMP RMS LOG 0.0 3.0 1 0.00 10 10.0  151 POST 0 100 OFF
 /bus/01/dyn/filter OFF 3.0 990.9
 /bus/01/insert OFF PRE OFF
@@ -1471,7 +1471,7 @@
 /bus/01/mix/05 ON   -oo +0 POST 0
 /bus/01/mix/06 ON   -oo
 /bus/01/grp %00000000 %000000
-/bus/02/config "IEM Isabel" 71 YEi
+/bus/02/config "IEM Claire" 71 YEi
 /bus/02/dyn OFF COMP RMS LOG 0.0 3.0 1 0.00 10 10.0  151 POST 0 100 OFF
 /bus/02/dyn/filter OFF 3.0 990.9
 /bus/02/insert OFF PRE OFF
@@ -1490,7 +1490,7 @@
 /bus/02/mix/05 ON   -oo +0 POST 0
 /bus/02/mix/06 ON   -oo
 /bus/02/grp %00000000 %000000
-/bus/03/config "IEM Marie" 71 BLi
+/bus/03/config "IEM Julie" 71 BLi
 /bus/03/dyn OFF COMP RMS LOG 0.0 3.0 1 0.00 10 10.0  151 POST 0 100 OFF
 /bus/03/dyn/filter OFF 3.0 990.9
 /bus/03/insert OFF PRE OFF
@@ -1509,7 +1509,7 @@
 /bus/03/mix/05 ON   -oo +0 POST 0
 /bus/03/mix/06 ON   -oo
 /bus/03/grp %00000000 %000000
-/bus/04/config "IEM Nadine" 71 CYi
+/bus/04/config "IEM Sophie" 71 CYi
 /bus/04/dyn OFF COMP RMS LOG 0.0 3.0 1 0.00 10 10.0  151 POST 0 100 OFF
 /bus/04/dyn/filter OFF 3.0 990.9
 /bus/04/insert OFF PRE OFF
@@ -1528,7 +1528,7 @@
 /bus/04/mix/05 ON   -oo +0 POST 0
 /bus/04/mix/06 ON   -oo
 /bus/04/grp %00000000 %000000
-/bus/05/config "IEM Jerome" 71 GNi
+/bus/05/config "IEM Marc" 71 GNi
 /bus/05/dyn OFF COMP RMS LOG 0.0 3.0 1 0.00 10 10.0  151 POST 0 100 OFF
 /bus/05/dyn/filter OFF 3.0 990.9
 /bus/05/insert OFF PRE OFF
@@ -1547,7 +1547,7 @@
 /bus/05/mix/05 ON   -oo +0 POST 0
 /bus/05/mix/06 ON   -oo
 /bus/05/grp %00000000 %000000
-/bus/06/config "IEM Vince" 71 WHi
+/bus/06/config "IEM Luc" 71 WHi
 /bus/06/dyn OFF COMP RMS LOG 0.0 3.0 1 0.00 10 10.0  151 POST 0 100 OFF
 /bus/06/dyn/filter OFF 3.0 990.9
 /bus/06/insert OFF PRE OFF
@@ -1566,7 +1566,7 @@
 /bus/06/mix/05 ON   -oo +0 POST 0
 /bus/06/mix/06 ON   -oo
 /bus/06/grp %00000000 %000000
-/bus/07/config "IEM Vincent" 71 RDi
+/bus/07/config "IEM Hugo" 71 RDi
 /bus/07/dyn OFF COMP RMS LOG 0.0 3.0 1 0.00 10 10.0  151 POST 0 100 OFF
 /bus/07/dyn/filter OFF 3.0 990.9
 /bus/07/insert OFF PRE OFF

@@ -117,8 +117,8 @@ func TestAccess(t *testing.T) {
 	}
 	api.SetGuestRole(RoleNone)
 
-	// The engineer gives Remy the mix of bus 3; the link opens the mix page.
-	w := local(h, "POST", "/api/access", `{"name":"Remy","role":"musician","bus":3}`)
+	// The engineer gives Theo the mix of bus 3; the link opens the mix page.
+	w := local(h, "POST", "/api/access", `{"name":"Theo","role":"musician","bus":3}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("add access: %d %s", w.Code, w.Body)
 	}
@@ -132,7 +132,7 @@ func TestAccess(t *testing.T) {
 		t.Errorf("bad link: %d", w.Code)
 	}
 
-	// Remy changes their own mix, writes not armed; nothing else.
+	// Theo changes their own mix, writes not armed; nothing else.
 	if w := remote(h, "POST", "/api/set", `{"addr":"/ch/02/mix/03/level","text":"-6"}`, g.Token); w.Code != http.StatusNoContent {
 		t.Errorf("own send: %d %s", w.Code, w.Body)
 	}

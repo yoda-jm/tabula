@@ -26,7 +26,7 @@ var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 func startEmu(t *testing.T) (*emu.Server, string) {
 	t.Helper()
 	st := state.New(schema.Build("M32C"))
-	f, err := os.Open("../../testdata/scenes/GVO-2026.scn")
+	f, err := os.Open("../../testdata/scenes/demo.scn")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestAPI(t *testing.T) {
 
 	var nodes []stateNode
 	getJSON(t, ts.URL+"/api/state?prefix=/ch/12/config", &nodes)
-	if len(nodes) != 1 || nodes[0].Values[0].Value != "Vx Remy" {
+	if len(nodes) != 1 || nodes[0].Values[0].Value != "Vx Theo" {
 		t.Errorf("state: %+v", nodes)
 	}
 	getJSON(t, ts.URL+"/api/state?prefix=/fx/2/par", &nodes)

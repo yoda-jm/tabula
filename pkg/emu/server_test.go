@@ -207,7 +207,7 @@ func TestUnhandledIsRecorded(t *testing.T) {
 // network, as Maillot's X32GetScene does, must give the original file.
 func TestSceneDumpOverNetwork(t *testing.T) {
 	s, addr := start(t)
-	want, err := os.ReadFile("../../testdata/scenes/GVO-2026.scn")
+	want, err := os.ReadFile("../../testdata/scenes/demo.scn")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +299,7 @@ func drain(p *peer) {
 // per node line, each keeping the line feed of /node replies.
 func TestSceneWrittenLikeM32Edit(t *testing.T) {
 	s, addr := start(t)
-	want, err := os.ReadFile("../../testdata/scenes/GVO-2026.scn")
+	want, err := os.ReadFile("../../testdata/scenes/demo.scn")
 	if err != nil {
 		t.Fatal(err)
 	}

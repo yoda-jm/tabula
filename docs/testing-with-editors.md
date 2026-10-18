@@ -14,7 +14,7 @@ bin/tabula-emu -model M32C -scene testdata/scenes/demo.scn \
 
 - `-model`: use `M32C`/`M32`/`M32R` for M32-Edit, `X32`/`X32RACK`/`X32C`… for X32-Edit.
 - `-presets` fills the library with M32-Edit's factory presets, as a console ships with them.
-- `-library var/library` keeps what you save from the editor's library pages.
+- `-library var/library` keeps what you save from the editor's library pages, and offers the scene files you put there as `scene-00.scn`, `scene-01.scn`… in the console's scene slots (git ignores `var/`).
 - The emulator listens on UDP 10023 on every IPv4 address, so the editors'
   discovery finds it. On the same machine, connect the editor to this
   machine's LAN address (or 127.0.0.1 if the editor accepts it).

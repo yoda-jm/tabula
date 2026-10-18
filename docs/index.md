@@ -44,7 +44,10 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   understand — connect an editor and see what is missing.
 - `-unhandled-log file.jsonl` appends every unhandled request to a file.
 - `-library dir` keeps the scenes, snippets and presets saved with `/save`
-  (from an editor's library pages) in a directory, one file each.
+  (from an editor's library pages) in a directory, one file each
+  (`scene-07.scn`, `snippet-03.snp`…). A scene file copied there as
+  `scene-NN.scn` fills slot NN, ready to recall from an editor or from
+  tabula's Scenes page.
 - `-model` picks what `/info` reports: X32, X32RACK, X32C, X32P, X32CORE, M32, M32R, M32C.
 
 ![The debug page: the connected clients and their meter subscriptions, the requests the emulator did not understand, and every parameter](img/emulator.png)

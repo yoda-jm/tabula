@@ -138,7 +138,7 @@ describe("other kinds", () => {
   });
   it("prettifies console text", () => {
     expect(prettyText("  -oo")).toBe("−∞");
-    expect(prettyText(' "Vx Remy"')).toBe("Vx Remy");
+    expect(prettyText(' "Vx Theo"')).toBe("Vx Theo");
     expect(prettyText(" -6.0")).toBe("-6.0");
   });
 });

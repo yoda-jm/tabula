@@ -62,7 +62,10 @@ go run ./cmd/tabula-emu -scene testdata/scenes/demo.scn -http :8032
 
 Then point X32-Edit / M32-Edit at this machine's IP and open
 <http://localhost:8032> to see the state, the traffic and every request the
-emulator did not handle.
+emulator did not handle. `testdata/scenes/demo.scn` is a real show with
+made-up names. To have your own scenes in the console's scene slots, copy
+them into `var/library` (git ignores `var/`) as `scene-00.scn`,
+`scene-01.scn`… and add `-library var/library`.
 
 To drive it (or a real console) from a browser:
 

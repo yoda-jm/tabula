@@ -125,7 +125,7 @@ func TestCapture(t *testing.T) {
 	const n = 30011
 	cfg := Config{Recorder: "custom", Command: "unused", Channels: 4, Tracks: "1,3-4"}
 	ref := time.Now()
-	c, err := Start(cfg, dir, Options{Ref: ref, Names: []string{"Kick", "", "Vx Isa"}, Source: pipeSource(frames(4, 0, n), false),
+	c, err := Start(cfg, dir, Options{Ref: ref, Names: []string{"Kick", "", "Vx Margot"}, Source: pipeSource(frames(4, 0, n), false),
 		refresh: 50 * time.Millisecond, freeSpace: func(string) (uint64, error) { return 100e9, nil }})
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +144,7 @@ func TestCapture(t *testing.T) {
 	if st.State != Stopped || st.Error != "" || st.Frames != n || len(st.Tracks) != 3 {
 		t.Fatalf("stopped: %+v", st)
 	}
-	want := []Track{{1, "Kick", "audio/01 Kick.wav"}, {3, "Vx Isa", "audio/03 Vx Isa.wav"}, {4, "", "audio/Track 04.wav"}}
+	want := []Track{{1, "Kick", "audio/01 Kick.wav"}, {3, "Vx Margot", "audio/03 Vx Margot.wav"}, {4, "", "audio/Track 04.wav"}}
 	for i, tr := range st.Tracks {
 		if tr != want[i] {
 			t.Errorf("track %d: %+v, want %+v", i, tr, want[i])

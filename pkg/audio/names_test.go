@@ -13,10 +13,10 @@ import (
 	"github.com/yoda-jm/tabula/pkg/state"
 )
 
-func gvo(t *testing.T) *state.Store {
+func demo(t *testing.T) *state.Store {
 	t.Helper()
 	st := state.New(schema.Build("M32C"))
-	f, err := os.Open("../../testdata/scenes/GVO-2026.scn")
+	f, err := os.Open("../../testdata/scenes/demo.scn")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,11 +30,11 @@ func gvo(t *testing.T) *state.Store {
 // The band's scene: the card takes AES50-A 1-16 and 25-32 (the stage box,
 // through the input patch to the channels) and outputs 9-16 (FX buses and
 // matrices).
-func TestTrackNamesGVO(t *testing.T) {
-	got := TrackNames(gvo(t))
+func TestTrackNamesDemo(t *testing.T) {
+	got := TrackNames(demo(t))
 	want := []string{
 		"Hang", "Cajon", "Snare", "Djembe", "Bongos Perc", "Auto harpe", "Basse", "Guitare Elec",
-		"Guitare Acc", "Ukulele", "", "Vx Remy", "Vx Fred", "Vx Isabel", "Vx Vincent", "Vx Valentin",
+		"Guitare Acc", "Ukulele", "", "Vx Theo", "Vx Paul", "Vx Margot", "Vx Simon", "Vx Bastien",
 		"Fx Room", "Fx Hall", "Fx Delay", "Fx Chorus", "RappelL", "RappelR", "FacadeL", "FacadeR",
 		"", "", "", "", "", "", "", "BT",
 	}

@@ -138,7 +138,7 @@ func TestPassword(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := api.Handler(http.NotFoundHandler())
-	remy, _ := api.acc.add("Remy", RoleMusician, 3)
+	theo, _ := api.acc.add("Theo", RoleMusician, 3)
 
 	if w := from(h, phone, "POST", "/api/login", `{"password":"x"}`, ""); w.Code != http.StatusConflict {
 		t.Errorf("login without a password: %d", w.Code)
@@ -183,7 +183,7 @@ func TestPassword(t *testing.T) {
 	if w := from(h, here, "GET", "/api/state", "", ""); w.Code != http.StatusForbidden {
 		t.Errorf("this machine, state: %d", w.Code)
 	}
-	if v := whoFor(t, h, phone, remy.Token); v.Role != RoleMusician || !v.Link {
+	if v := whoFor(t, h, phone, theo.Token); v.Role != RoleMusician || !v.Link {
 		t.Errorf("musician link: %+v", v)
 	}
 
@@ -225,7 +225,7 @@ func TestPassword(t *testing.T) {
 	if v := whoFor(t, h, here, mine); v.Role != RoleEngineer {
 		t.Errorf("own session after the change: %+v", v)
 	}
-	if v := whoFor(t, h, phone, remy.Token); v.Role != RoleMusician {
+	if v := whoFor(t, h, phone, theo.Token); v.Role != RoleMusician {
 		t.Errorf("link after the change: %+v", v)
 	}
 
@@ -268,7 +268,7 @@ func TestResetPassword(t *testing.T) {
 	}
 	h := api.Handler(http.NotFoundHandler())
 	from(h, here, "POST", "/api/access/password", `{"password":"correct horse"}`, "")
-	api.acc.add("Remy", RoleMusician, 3)
+	api.acc.add("Theo", RoleMusician, 3)
 
 	again := New(quiet) // as tabula -reset-password does
 	again.SetAccessFile(file)
@@ -281,7 +281,7 @@ func TestResetPassword(t *testing.T) {
 	after := New(quiet)
 	after.SetAccessFile(file)
 	d := after.acc.snapshot()
-	if after.HasPassword() || len(d.Grants) != 1 || d.Grants[0].Name != "Remy" {
+	if after.HasPassword() || len(d.Grants) != 1 || d.Grants[0].Name != "Theo" {
 		t.Errorf("after reset: %+v", d)
 	}
 }

@@ -19,8 +19,8 @@ import {
   userSource,
 } from "./routing";
 
-/** A Lookup over the GVO-2026 routing: DL32 on AES50 A, recording card. */
-function gvo(extra: Record<string, number | string> = {}): Lookup {
+/** A Lookup over the demo scene's routing: DL32 on AES50 A, recording card. */
+function demo(extra: Record<string, number | string> = {}): Lookup {
   const v: Record<string, number | string> = {
     "/config/routing/routswitch": 0,
     "/config/routing/IN/1-8": "A1-8",
@@ -47,11 +47,11 @@ function gvo(extra: Record<string, number | string> = {}): Lookup {
     "/config/routing/OUT/13-16": "OUT13-16",
     "/outputs/main/01/src": 4,
     "/outputs/main/13/src": 22,
-    "/bus/01/config/name": "IEM Remy",
+    "/bus/01/config/name": "IEM Theo",
     "/mtx/03/config/name": "Rappel",
-    "/ch/12/config/name": "Vx Remy",
+    "/ch/12/config/name": "Vx Theo",
     "/ch/12/config/source": 12,
-    "/ch/17/config/name": "Remy",
+    "/ch/17/config/name": "Theo",
     "/ch/17/config/source": 12,
     "/ch/01/config/source": 1,
     "/ch/01/config/name": "Hang",
@@ -99,8 +99,8 @@ describe("routing blocks", () => {
 
 describe("inputs and headamps", () => {
   it("follows the input routing, and the playback routing when switched", () => {
-    expect(inputSource(gvo(), 12)).toEqual({ kind: "aes50a", n: 12 });
-    expect(inputSource(gvo({ "/config/routing/routswitch": 1 }), 12)).toEqual({ kind: "card", n: 12 });
+    expect(inputSource(demo(), 12)).toEqual({ kind: "aes50a", n: 12 });
+    expect(inputSource(demo({ "/config/routing/routswitch": 1 }), 12)).toEqual({ kind: "card", n: 12 });
   });
 
   it("numbers the headamps", () => {
@@ -117,9 +117,9 @@ describe("inputs and headamps", () => {
   });
 
   it("names the channels an input feeds", () => {
-    expect(channelsOnPort(gvo(), { kind: "aes50a", n: 12 })).toEqual(["Ch 12 Vx Remy", "Ch 17 Remy"]);
-    expect(channelsOnPort(gvo(), { kind: "aes50a", n: 30 })).toEqual([]);
-    expect(stripsUsingSource(gvo({ "/auxin/01/config/source": 33, "/auxin/01/config/name": "BT" }), 33)).toEqual(["Aux 1 BT"]);
+    expect(channelsOnPort(demo(), { kind: "aes50a", n: 12 })).toEqual(["Ch 12 Vx Theo", "Ch 17 Theo"]);
+    expect(channelsOnPort(demo(), { kind: "aes50a", n: 30 })).toEqual([]);
+    expect(stripsUsingSource(demo({ "/auxin/01/config/source": 33, "/auxin/01/config/name": "BT" }), 33)).toEqual(["Aux 1 BT"]);
   });
 });
 
@@ -147,18 +147,18 @@ describe("outputs", () => {
   });
 
   it("follows a port channel to the strip it carries", () => {
-    const l = gvo();
+    const l = demo();
     const aes = portById("AES50A");
     expect(portChannelSource(l, aes, 1)).toEqual({ kind: "output", n: 1 });
     expect(portChannelSource(l, aes, 34)).toEqual({ kind: "p16", n: 2 });
-    expect(describeSource(l, portChannelSource(l, aes, 1))).toBe("Output 1 · MixBus 01 IEM Remy");
+    expect(describeSource(l, portChannelSource(l, aes, 1))).toBe("Output 1 · MixBus 01 IEM Theo");
     expect(describeSource(l, portChannelSource(l, aes, 13))).toBe("Output 13 · Matrix 3 Rappel");
-    expect(describeSource(l, portChannelSource(l, portById("CARD"), 12))).toBe("AES50 A 12 · Ch 12 Vx Remy, Ch 17 Remy");
+    expect(describeSource(l, portChannelSource(l, portById("CARD"), 12))).toBe("AES50 A 12 · Ch 12 Vx Theo, Ch 17 Theo");
     expect(describeSource(l, null)).toBe("OFF");
   });
 
   it("lists where each output goes", () => {
-    const d = outputDestinations(gvo());
+    const d = outputDestinations(demo());
     expect(d[0]).toEqual(["AES50 A 1", "AES50 A 17", "XLR out 1"]); // AES50 B is not patched here
     expect(d[8]).toContain("Card 17");
   });
