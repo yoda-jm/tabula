@@ -58,7 +58,7 @@ file order then status nodes.
 `GET /api/state?prefix=/ch/01/` → `[{"path", "line", "values": [{"addr", "text", "value"}], "fields"?, "text"?}]`
 
 - `line` is the node text as the console writes it; `text` is one field's
-  token (e.g. `" -6.0"`, `"GATE"`, `"\"Vx Remy\""`); `value` the raw value
+  token (e.g. `" -6.0"`, `"GATE"`, `"\"Vx Theo\""`); `value` the raw value
   (normalized float, int index, or string).
 - Variant nodes carry their current `fields` with inlined `type_info`.
 - `"text": true` means the node is kept as text (an effect without a
@@ -164,7 +164,7 @@ A refused request gets 403 with `{"error": "..."}`.
 | POST | `/api/login` | `{"password": "..."}` | signs in with the engineer password: makes a session, sets the cookie, answers the new `whoami`; 403 wrong password, 429 too many wrong ones (with `Retry-After`), 409 no password set |
 | POST | `/api/logout` | | forgets the cookie (and ends a session); answers the new `whoami` |
 | GET | `/api/access` | | `{"grants": [Grant], "musicians_can_write", "password", "current"?, "guest", "urls", "reachable"}` |
-| POST | `/api/access` | `{"name": "Remy", "role": "musician", "bus": 3}` | 201 + `Grant` |
+| POST | `/api/access` | `{"name": "Theo", "role": "musician", "bus": 3}` | 201 + `Grant` |
 | DELETE | `/api/access/{id}` | | 204; event streams opened with it end |
 | POST | `/api/access/settings` | `{"musicians_can_write": false}` | the access status |
 | POST | `/api/access/password` | `{"current": "...", "password": "..."}` | sets, changes or (empty `password`) removes the engineer password; `current` is needed when one is set; ends every other session; setting the first one signs the caller in; answers the access status (400 under 8 characters, 403 wrong `current`, 409 with `-guest engineer`) |

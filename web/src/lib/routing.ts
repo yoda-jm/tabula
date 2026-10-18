@@ -238,7 +238,7 @@ export function outputNode(p: PortSource): string | undefined {
 
 /**
  * describeSource follows a port source to what it finally carries, as a
- * short text: "Output 1 · MixBus 01 IEM Remy", "AES50 A 12 · Ch 12 Vx Remy".
+ * short text: "Output 1 · MixBus 01 Theo IEM", "AES50 A 12 · Ch 12 Vx Theo".
  * Inputs are described with the channels they feed.
  */
 export function describeSource(l: Lookup, p: PortSource | null, depth = 0): string {
@@ -267,7 +267,7 @@ export function channelSources(l: Lookup): number[] {
 /**
  * stripsUsingSource names the channels and aux inputs whose source is
  * source (/ch/NN/config/source numbering: 1-32 inputs, 33-38 aux…):
- * ["Ch 12 Vx Remy", "Ch 17 Remy"].
+ * ["Ch 12 Vx Theo", "Ch 17 Theo"].
  */
 export function stripsUsingSource(l: Lookup, source: number): string[] {
   const out: string[] = [];
@@ -288,7 +288,7 @@ export function stripsUsingSource(l: Lookup, source: number): string[] {
 
 /**
  * channelsOnPort names the channels fed by an input port (through the
- * input routing and their source): ["Ch 12 Vx Remy", "Ch 17 Remy"].
+ * input routing and their source): ["Ch 12 Vx Theo", "Ch 17 Theo"].
  */
 export function channelsOnPort(l: Lookup, p: PortSource): string[] {
   const out: string[] = [];

@@ -6,7 +6,7 @@
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,
-  `Vx Valentin`) instead of cutting them, on phones too.
+  `Vx Bastien`) instead of cutting them, on phones too.
 - Channel page: the EQ comes right after the preamp, so its curve shows
   when the page opens, and the sections fill balanced columns without
   holes; the fields of the Main section use the card's whole width.
@@ -16,7 +16,11 @@
 
 ### Docs
 - Screenshots of tabula (mixer, channel, phone) and of the emulator's
-  debug page in the README and on the site.
+  debug page in the README and on the site; on the site, click a
+  screenshot to see it full size.
+- Every screenshot is taken from `testdata/scenes/demo.scn`, a show with
+  the same lineup as the real one and made-up performer names, which the
+  quick start and `make dev` now load too.
 
 ## v0.2.0 — access for the band, audio recording
 
@@ -56,7 +60,7 @@
   link see nothing (`-guest` changes that). The server checks every write,
   musicians change their mix without arming, and deleting a link ends it
   at once. See [access](docs/access.md).
-- Changes are recorded with who made them through a link (`web Remy`).
+- Changes are recorded with who made them through a link (`web Theo`).
 - Records the audio of the console's USB card with each session, in the
   same program, so the tracks line up with the console moves: one WAV file
   per track (24-bit by default), named after what feeds it on the console

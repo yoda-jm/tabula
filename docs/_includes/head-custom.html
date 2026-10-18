@@ -1,0 +1,59 @@
+<!-- Click a screenshot to see it full size; click again, or press Escape, to close. -->
+<style>
+  section img { cursor: zoom-in; }
+  .lightbox {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    padding: 16px; background: rgba(12, 14, 18, 0.97); cursor: zoom-out;
+  }
+  .lightbox img {
+    max-width: 100%; max-height: calc(100% - 40px); width: auto; height: auto;
+    border-radius: 4px; box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6); cursor: zoom-out;
+  }
+  .lightbox p { margin: 0; max-width: 60em; color: #d8dce4; font-size: 14px; text-align: center; }
+</style>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var open = null, from = null;
+    function close() {
+      if (!open) return;
+      open.remove();
+      open = null;
+      if (from) from.focus();
+    }
+    function show(img) {
+      close();
+      from = img;
+      open = document.createElement("div");
+      open.className = "lightbox";
+      open.setAttribute("role", "dialog");
+      open.setAttribute("aria-label", img.alt || "Screenshot");
+      var big = document.createElement("img");
+      big.src = img.currentSrc || img.src;
+      big.alt = img.alt;
+      open.appendChild(big);
+      if (img.alt) {
+        var caption = document.createElement("p");
+        caption.textContent = img.alt;
+        open.appendChild(caption);
+      }
+      open.tabIndex = -1;
+      open.addEventListener("click", close);
+      document.body.appendChild(open);
+      open.focus();
+    }
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") close();
+    });
+    document.querySelectorAll("section img").forEach(function (img) {
+      if (img.closest("a")) return;
+      img.tabIndex = 0;
+      img.setAttribute("role", "button");
+      img.title = "Click to enlarge";
+      img.addEventListener("click", function () { show(img); });
+      img.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); show(img); }
+      });
+    });
+  });
+</script>

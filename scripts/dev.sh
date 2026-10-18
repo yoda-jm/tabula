@@ -7,7 +7,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 HTTP=${TABULA_HTTP:-127.0.0.1:8033}
-SCENE=${SCENE:-testdata/scenes/GVO-2026.scn}
+SCENE=${SCENE:-testdata/scenes/demo.scn}
 
 go build -o bin/ ./cmd/...
 [ -d web/node_modules ] || (cd web && npm ci)

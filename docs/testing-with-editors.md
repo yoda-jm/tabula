@@ -7,7 +7,7 @@ editors to it is the fastest way to find what is still missing.
 
 ```sh
 go build -o bin/ ./cmd/...
-bin/tabula-emu -model M32C -scene testdata/scenes/GVO-2026.scn \
+bin/tabula-emu -model M32C -scene testdata/scenes/demo.scn \
     -presets ~/.config/.M32-Edit/Xlib \
     -http :8032 -unhandled-log var/unhandled.jsonl
 ```
@@ -56,7 +56,7 @@ broadcast:
 unshare -rn sh -c '
   ip link set lo up
   ip link add d0 type dummy && ip addr add 10.77.0.1/24 broadcast 10.77.0.255 dev d0 && ip link set d0 up
-  bin/tabula-emu -name test -scene testdata/scenes/GVO-2026.scn -http 127.0.0.1:8099 &
+  bin/tabula-emu -name test -scene testdata/scenes/demo.scn -http 127.0.0.1:8099 &
   cd ~/m32-edit && HOME=/tmp/m32home XAUTHORITY=$HOME/.Xauthority ./M32-Edit'
 ```
 

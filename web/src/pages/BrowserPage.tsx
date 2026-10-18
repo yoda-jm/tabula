@@ -63,7 +63,7 @@ export function BrowserPage() {
         <input
           className="input search"
           type="search"
-          placeholder="Filter by path or value: /ch/01/eq, Remy, GATE…"
+          placeholder="Filter by path or value: /ch/01/eq, Theo, GATE…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           aria-label="Filter nodes"

@@ -82,17 +82,17 @@ Where the signals come from and where they go, in six views:
   in blocks of 8, for live (REC) and playback (PLAY), with the console's
   REC/PLAY switch; then the input patch: for each input, where it comes from
   (`AES50 A 12`), its headamp gain and phantom, and the channels using it
-  (`Ch 12 Vx Remy, Ch 17 IEM Remy`).
+  (`Ch 12 Vx Theo, Ch 17 IEM Theo`).
 - **Outputs 1-16**: the console's outputs: source (with the bus, matrix or
   channel name), tap point, polarity, delay, and where each output goes
   (`AES50 A 1, Card 17…`).
 - **AES50 A** and **AES50 B**: what the console sends on each AES50 port, in
   blocks of 8, then channel by channel what it finally carries
-  (`Output 1 · MixBus 01 IEM Remy`). A stage box plays these channels on its
+  (`Output 1 · MixBus 01 Theo IEM`). A stage box plays these channels on its
   outputs: on a DL32, output N is AES50 channel N (1-16), so the AES50 A view
   is the DL32's output patch.
 - **Card**: what the console sends to the expansion card, track by track
-  (`AES50 A 12 · Ch 12 Vx Remy`): what a computer records over USB.
+  (`AES50 A 12 · Ch 12 Vx Theo`): what a computer records over USB.
 - **Aux · P16 · AES · Rec**: the aux outputs, the P16 (Ultranet) outputs, the
   AES/EBU and 2-track recording outputs, the local XLR outputs (on consoles
   that have them) and the user routing (single-channel patches used by the
@@ -170,7 +170,7 @@ writes them, and opens into an editor of its fields and the nodes below it;
 a value can also be typed as on the console (`-6`, `1k20`, `GATE`). The
 branches you open are remembered.
 
-The filter searches paths and values (`/ch/01/eq`, `Remy`, `GATE`): the tree
+The filter searches paths and values (`/ch/01/eq`, `Theo`, `GATE`): the tree
 keeps only the matches and opens down to them, as far as a couple of
 hundred rows; the counts tell where the other matches are.
 

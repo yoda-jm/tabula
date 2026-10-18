@@ -356,7 +356,7 @@ function NewAccess({ onAdded }: { onAdded(): void }) {
       >
         <label className="form-field">
           <span className="field-label">Name</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Remy" required />
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Theo" required />
         </label>
         <label className="form-field">
           <span className="field-label">Role</span>

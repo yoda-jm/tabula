@@ -38,7 +38,7 @@ role, none by default (`-guest viewer` lets anyone on the network watch,
    which opens their mix. The phone remembers the access (a cookie); the
    musician does not need the link again.
 
-![The Access page: settings, a new link, a musician's link and its QR code](img/access-page.png)
+![The Access page: settings, the engineer password, a new link, and the links, one with its QR code](img/access-page.png)
 
 Links are made of the address of this machine and a secret: when the
 laptop has several addresses (Wi-Fi and Ethernet), pick the one the phones
@@ -91,7 +91,7 @@ write, so this holds for anything talking to its API, not only its pages.
   "no access".
 - Accesses are kept in `access.json` (or the file given with `-access`),
   readable by its owner only since it holds the secrets.
-- Changes made through a link are recorded with its name (`web Remy`) in
+- Changes made through a link are recorded with its name (`web Theo`) in
   [recorded sessions](index.md), so a replay shows who moved what.
 
 ## Engineer password

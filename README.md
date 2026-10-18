@@ -57,7 +57,7 @@ Versioned releases: [releases page](https://github.com/yoda-jm/tabula/releases).
 ## Quick start
 
 ```sh
-go run ./cmd/tabula-emu -scene testdata/scenes/GVO-2026.scn -http :8032
+go run ./cmd/tabula-emu -scene testdata/scenes/demo.scn -http :8032
 ```
 
 Then point X32-Edit / M32-Edit at this machine's IP and open

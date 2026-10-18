@@ -37,7 +37,7 @@ Both share the same library (`pkg/`).
 - [x] UDP server: `/info`, `/xinfo`, `/status`, get/set of every parameter, node-address set with multiple type tags, `/node`, `/` (echoed), `/xremote` change fan-out to the *other* clients (10 s lease).
 - [x] Every request not understood is logged (stderr, JSON lines file, debug page) with client, address, type tags and arguments, so connecting X32-Edit/M32-Edit shows what is missing.
 - [x] Debug HTTP page: state tree (search), clients, subscriptions, traffic, unhandled requests, current state as `.scn`.
-- [x] Acceptance: GVO-2026.scn dumped back over the network with `/node` and with Maillot's `X32GetScene` → identical node lines.
+- [x] Acceptance: a real scene dumped back over the network with `/node` and with Maillot's `X32GetScene` → identical node lines.
 
 ### 2. Emulator — what X32-Edit / M32-Edit need *(in progress)*
 Driven by the unknown-request log while connecting the real editors:
