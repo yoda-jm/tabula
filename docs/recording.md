@@ -23,15 +23,25 @@ replay moves faders and settings; it plays no sound).
 
 On the **Record** page, in **Audio tracks**: tick *Record the audio tracks
 with every recording*, choose the device (**Find devices** lists them; the
-console's card is marked ★), the tracks (`1-16`), and **Save**. **Test the
-input** listens for three seconds and shows the level of every track. From
-then on, **Start recording** records the audio too, and **Stop recording**
-stops both.
+console's card is marked ★), the tracks, and **Save**. **Test the input**
+listens for three seconds and shows the level of every track. From then
+on, **Start recording** records the audio too, and **Stop recording** stops
+both.
+
+To record only the tracks you need, click them: the list names each track
+of the card after what the console sends to it (*Setup › Routing › Card
+Out*), **All** takes them all and **Named** only those with a name. The
+clicks write the list in *Tracks to record* (`1-16,23-24`: the inputs
+and a stereo board mix), which you can also type. The line below says
+what those tracks take per hour, and how long the free space lasts with
+them.
+
+![The tracks of the card, named after the console's routing: 1-16 and 23-24 chosen](img/audio-tracks.png)
 
 Unattended, from the command line:
 
 ```sh
-tabula -console 192.168.1.62 -record -audio-device hw:CARD=X32,DEV=0 -audio-tracks 1-16
+tabula -console 192.168.1.62 -record -audio-device hw:CARD=X32,DEV=0 -audio-tracks 1-16,23-24
 ```
 
 `-record` starts recording once the console is synced; Ctrl-C stops the

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AudioConfig } from "./audio";
-import { audioPlan, byteRate, exportUrl, formatBytes, formatHours, parseTracks, plural, trackLabel } from "./audio";
+import { audioPlan, byteRate, exportUrl, formatBytes, formatHours, formatTracks, parseTracks, plural, trackLabel } from "./audio";
 
 describe("audio tracks", () => {
   it("reads track lists as the server does", () => {
@@ -12,6 +12,15 @@ describe("audio tracks", () => {
     expect(parseTracks("3-1", 4)).toMatch(/outside/);
     expect(parseTracks("1-40", 32)).toMatch(/outside 1-32/);
     expect(parseTracks("a", 4)).toMatch(/not a channel/);
+  });
+  it("writes track lists back", () => {
+    const want = [...Array.from({ length: 16 }, (_, i) => i + 1), 23, 24];
+    expect(formatTracks(want, 32)).toBe("1-16,23-24");
+    expect(parseTracks(formatTracks(want, 32), 32)).toEqual(want);
+    expect(formatTracks([5, 1, 3, 2, 2], 32)).toBe("1-3,5");
+    expect(formatTracks([7], 32)).toBe("7");
+    expect(formatTracks([1, 2, 3, 4], 4)).toBe(""); // all
+    expect(formatTracks([4, 40], 32)).toBe("4");
   });
   it("computes the data rate", () => {
     const c: AudioConfig = { enabled: true, recorder: "arecord", device: "", channels: 32, rate: 48000, bits: 24, tracks: "1-16" };

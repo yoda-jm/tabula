@@ -191,7 +191,10 @@ Record a show as a session, which keeps two things, as the page says above
   every change, made on the console or here, with its time, and the markers
   you add (press M).
 - **Audio**, when **Audio tracks** is on: the sound of the console's USB
-  card, one WAV file per track, in step with the console changes.
+  card, one WAV file per track, in step with the console changes. Click
+  the tracks to record in the list, named after what the console sends to
+  each track of its card ([recording](recording.md#quick-start)); the page
+  says how long the free space lasts with them.
 
 The session list says for each one how many console changes and markers it
 holds, and whether it has audio. Replay a session onto the console or the

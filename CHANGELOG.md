@@ -10,6 +10,10 @@
 - Channel page: the EQ comes right after the preamp, so its curve shows
   when the page opens, and the sections fill balanced columns without
   holes; the fields of the Main section use the card's whole width.
+- Record page: click the audio tracks to record in a list that names them
+  after what the console sends to its card (**All**, **Named**); the clicks
+  write *Tracks to record* (`1-16,23-24`). `GET /api/audio` gives these
+  `names`.
 
 ### tabula-emu
 - The debug page says when a subscription expires (`in 8s`), not `-8s ago`.

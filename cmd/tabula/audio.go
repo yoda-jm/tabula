@@ -37,7 +37,7 @@ func addAudioFlags(fs *flag.FlagSet) *audioFlags {
 		on:       fs.Bool("audio", false, "record the audio tracks with every session; any -audio-… flag implies it (-audio=false: not this time)"),
 		device:   fs.String("audio-device", "", "audio device: ALSA device for arecord (hw:CARD=X32,DEV=0), source for parecord, device for ffmpeg"),
 		channels: fs.Int("audio-channels", 32, "channels the audio device delivers"),
-		tracks:   fs.String("audio-tracks", "", `channels to record, e.g. "1-16" or "1-8,12" (default all)`),
+		tracks:   fs.String("audio-tracks", "", `channels to record, e.g. "1-16" or "1-16,23-24" (default all)`),
 		bits:     fs.Int("audio-bits", 24, "bits per sample of the WAV files: 16, 24 or 32"),
 		rate:     fs.Int("audio-rate", 48000, "sample rate of the audio device"),
 		recorder: fs.String("audio-recorder", audio.DefaultRecorder(), "program recording the audio: arecord, parecord, ffmpeg or custom (-audio-cmd)"),

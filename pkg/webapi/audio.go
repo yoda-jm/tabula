@@ -169,11 +169,15 @@ type audioView struct {
 	Remaining float64           `json:"remaining"` // seconds of audio that fit there, -1 if unknown
 	Status    *audio.Status     `json:"status,omitempty"`
 	Testing   bool              `json:"testing"`
+	// Names is what the console's routing sends to each track of its card
+	// ("" when nothing named), while connected: to choose the tracks.
+	Names []string `json:"names,omitempty"`
 }
 
 func (s *Server) audioView() audioView {
 	s.mu.Lock()
 	cfg, dir, st, testing := s.audio.cfg.Normalized(), s.sessionsDir, s.audioStatusLocked(), s.audio.testing
+	mirror := s.mirror
 	s.mu.Unlock()
 	v := audioView{Config: cfg, Templates: map[string]string{}, ByteRate: cfg.ByteRate(), Free: -1, Remaining: -1,
 		Status: st, Testing: testing}
@@ -198,6 +202,9 @@ func (s *Server) audioView() audioView {
 		if v.ByteRate > 0 {
 			v.Remaining = max(0, float64(v.Free-audio.Reserve(v.ByteRate))/float64(v.ByteRate))
 		}
+	}
+	if mirror != nil {
+		v.Names = audio.TrackNames(mirror)
 	}
 	return v
 }

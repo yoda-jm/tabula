@@ -2067,6 +2067,45 @@ div.scribble {
 .audio form .check {
   justify-self: start;
 }
+.track-pick-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.track-pick-head .field-label {
+  margin: 0 6px 0 0;
+}
+.track-pick-head .btn {
+  min-height: 32px;
+  padding: 2px 12px;
+}
+.track-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px;
+}
+.btn.track-pick-btn {
+  min-height: 32px;
+  padding: 2px 8px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.btn.track-pick-btn.lit {
+  background: #2a4f7a;
+  border-color: var(--focus);
+  color: var(--text);
+}
+.btn.track-pick-btn:disabled {
+  opacity: 1;
+  cursor: default;
+}
 .audio-stats {
   margin-bottom: 8px;
 }

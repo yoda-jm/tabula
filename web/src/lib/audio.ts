@@ -72,6 +72,8 @@ export interface AudioView {
   remaining: number;
   status?: AudioStatus;
   testing: boolean;
+  /** what the console's routing sends to each track of its card ("" when nothing named), while connected */
+  names?: string[];
 }
 
 export interface AudioDevice {
@@ -115,6 +117,20 @@ export function parseTracks(spec: string, channels: number): number[] | string {
   }
   if (!seen.size) return "no channel";
   return [...seen].sort((x, y) => x - y);
+}
+
+/** formatTracks writes channels back as parseTracks reads them: [1…16, 23, 24] → "1-16,23-24"; all of them → "". */
+export function formatTracks(tracks: number[], channels: number): string {
+  const t = [...new Set(tracks)].filter((ch) => ch >= 1 && ch <= channels).sort((x, y) => x - y);
+  if (t.length === channels) return "";
+  const parts: string[] = [];
+  for (let i = 0; i < t.length; ) {
+    let j = i;
+    while (j + 1 < t.length && t[j + 1] === t[j] + 1) j++;
+    parts.push(j > i ? `${t[i]}-${t[j]}` : `${t[i]}`);
+    i = j + 1;
+  }
+  return parts.join(",");
 }
 
 /** audioPlan says what audio a configuration records: "16 tracks, 24-bit WAV", or "" when none. */

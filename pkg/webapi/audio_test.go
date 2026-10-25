@@ -90,8 +90,15 @@ func TestAudioRecording(t *testing.T) {
 		t.Errorf("saved config: %+v %v", saved, err)
 	}
 
+	if len(av.Names) != 0 {
+		t.Errorf("names before connecting: %q", av.Names)
+	}
 	post(t, ts.URL+"/api/connect", `{"addr":"`+emuAddr+`"}`)
 	connected(t, ts.URL)
+	getJSON(t, ts.URL+"/api/audio", &av)
+	if len(av.Names) != 32 || av.Names[0] != "Hang" || av.Names[10] != "" || av.Names[22] != "FacadeL" {
+		t.Errorf("track names: %q", av.Names)
+	}
 	if code := post(t, ts.URL+"/api/record/start", `{"note":"set 1"}`); code != http.StatusOK {
 		t.Fatalf("record start: %d", code)
 	}

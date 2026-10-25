@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AudioConfig, AudioDevice, AudioStatus, AudioTrack, AudioView, ExportFormat, Recorder } from "../lib/audio";
-import { LOW_DISK_SECONDS, audioApi, byteRate, exportUrl, formatBytes, formatHours, parseTracks, trackLabel } from "../lib/audio";
+import { LOW_DISK_SECONDS, audioApi, byteRate, exportUrl, formatBytes, formatHours, formatTracks, parseTracks, trackLabel } from "../lib/audio";
 import { meterFraction, toDbfs } from "../lib/meters";
 import type { Record as RecordStatus, SessionDetail } from "../lib/session";
 import { formatDuration } from "../lib/session";
@@ -158,6 +158,57 @@ function TrackLevels({ tracks, peaks }: { tracks: AudioTrack[]; peaks?: number[]
   );
 }
 
+/**
+ * TrackPicker lists the tracks of the device, named after what the console's
+ * routing sends to them, to pick the ones to record: a click adds or removes
+ * one and writes the list in Tracks to record ("1-16,23-24").
+ */
+function TrackPicker(props: { channels: number; names?: string[]; tracks: number[]; onChange(spec: string): void }) {
+  const { channels, names, tracks, onChange } = props;
+  if (channels < 1 || channels > 128) return null;
+  const on = new Set(tracks);
+  const all = Array.from({ length: channels }, (_, i) => i + 1);
+  const named = all.filter((ch) => names?.[ch - 1]);
+  const choose = (list: number[]) => onChange(formatTracks(list, channels));
+  const toggle = (ch: number) => choose(on.has(ch) ? tracks.filter((t) => t !== ch) : [...tracks, ch]);
+  return (
+    <div className="track-pick">
+      <div className="track-pick-head">
+        <span className="field-label">
+          Click the tracks to record{named.length ? ", named after what the console sends to its card" : ""}:
+        </span>
+        <button type="button" className="btn" onClick={() => choose(all)}>
+          All
+        </button>
+        {named.length > 0 && named.length < channels && (
+          <button type="button" className="btn" title="Only the tracks the console sends something named to" onClick={() => choose(named)}>
+            Named
+          </button>
+        )}
+      </div>
+      <div className="track-pick-grid">
+        {all.map((ch) => {
+          const lit = on.has(ch);
+          const name = names?.[ch - 1];
+          return (
+            <button
+              key={ch}
+              type="button"
+              className={"btn track-pick-btn" + (lit ? " lit" : "")}
+              aria-pressed={lit}
+              disabled={lit && on.size === 1}
+              title={`Track ${ch}${name ? `: ${name}` : ""}${lit ? " (recorded)" : ""}`}
+              onClick={() => toggle(ch)}
+            >
+              <span className="mono">{String(ch).padStart(2, "0")}</span> {name || <span className="muted">—</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** LastCapture is how the audio of the last recording ended. */
 function LastCapture({ st }: { st: AudioStatus }) {
   if (st.state !== "failed") return null;
@@ -287,7 +338,7 @@ function AudioSettings({ view, onSaved }: { view: AudioView; onSaved(v: AudioVie
             className="input"
             type="text"
             value={cfg.tracks ?? ""}
-            placeholder={`all (1-${cfg.channels})`}
+            placeholder={`all (1-${cfg.channels}), or 1-16,23-24…`}
             aria-invalid={typeof tracks === "string"}
             onChange={(e) => set({ tracks: e.target.value })}
           />
@@ -313,6 +364,12 @@ function AudioSettings({ view, onSaved }: { view: AudioView; onSaved(v: AudioVie
           </select>
         </label>
       </div>
+      <TrackPicker
+        channels={cfg.channels}
+        names={view.names}
+        tracks={typeof tracks === "string" ? [] : tracks}
+        onChange={(spec) => set({ tracks: spec })}
+      />
       {typeof tracks === "string" ? (
         <p className="error">Tracks: {tracks}</p>
       ) : (

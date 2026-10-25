@@ -242,9 +242,11 @@ writing raw samples in the `input` format (`s16le`, `s24le`, `s24-32le`,
 
 `AudioView`: `{"config", "command"? (what the configuration runs), "error"?
 (what is wrong with it), "templates": {recorder: command}, "byte_rate",
-"dir", "free", "remaining", "status"?: AudioStatus, "testing"}` — `free`
+"dir", "free", "remaining", "status"?: AudioStatus, "testing", "names"?}` — `free`
 is the free space in the sessions directory (bytes, -1 unknown),
-`remaining` how many seconds of audio it holds at `byte_rate`.
+`remaining` how many seconds of audio it holds at `byte_rate` (the chosen
+tracks only), `names` what the console's routing sends to each of the 32
+tracks of its card (`""` when nothing named), while connected.
 
 `AudioInfo` (the `audio` section of a session's `meta.json`): `{"rate",
 "bits", "channels", "tracks": [{"channel", "name"?, "file"}], "offset",
