@@ -531,6 +531,20 @@ input[type="range"] {
 .facts dd {
   margin: 0;
 }
+.facts dd .btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin-left: 6px;
+  padding: 2px 10px;
+  text-decoration: none;
+}
+.session-delete {
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
 .progress {
   position: relative;
   height: 28px;

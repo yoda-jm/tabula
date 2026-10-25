@@ -337,7 +337,8 @@ func (s *Server) audioTest(w http.ResponseWriter, r *http.Request) {
 var testFor = 3 * time.Second
 
 // exportSession serves an export of a session:
-// ?format=reaper (project), audacity (label track) or csv.
+// ?format=reaper (project), audacity (label track), csv or scene (the
+// console at the start).
 func (s *Server) exportSession(w http.ResponseWriter, r *http.Request) {
 	dir, err := s.sessionDir(r.PathValue("name"))
 	if err != nil {
@@ -361,6 +362,12 @@ func (s *Server) exportSession(w http.ResponseWriter, r *http.Request) {
 		name = ses.Name() + " labels.txt"
 	case session.ExportCSV:
 		name, ctype = ses.Name()+".csv", "text/csv; charset=utf-8"
+	case session.ExportScene:
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			httpError(w, http.StatusNotFound, errors.New("this session has no start scene"))
+			return
+		}
+		name = ses.Name() + ".scn"
 	}
 	w.Header().Set("Content-Type", ctype)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name))

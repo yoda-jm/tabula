@@ -62,6 +62,15 @@ sessions/2026-10-17_203000/
   labels.txt       Audacity label track (idem)
 ```
 
+The details of a session, on the Record page, show what it keeps of the
+console at the start (*every setting of the console*, with the number of
+lines of `start.scn` and `start.nodes`): **⤓ Scene (.scn)** downloads
+`start.scn`, to open in M32-Edit or to start the emulator with
+(`tabula-emu -scene`). A replay starts by setting the console back to it.
+**Delete this session…** removes the session's folder, audio included,
+after saying what it holds; not while it is being recorded or replayed.
+The audio settings (`audio.json`) stay.
+
 Each audio file is mono PCM, 24-bit by default (16 or 32 on request), at
 the card's rate (48 kHz). Files are named after the track number of the
 card and what feeds it on the console: `tabula` follows the card's routing
@@ -211,7 +220,7 @@ When a recording with audio stops, the session folder gets a Reaper project
 and an Audacity label track. Each session in the list of the Record page
 also offers them as downloads, with a CSV of every change and marker:
 
-![A session: its audio and its exports](img/session-exports.png)
+![A session: the console at the start with its scene file, the markers, the audio and its exports, the replay, and Delete](img/session-exports.png)
 
 ### Audacity
 

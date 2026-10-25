@@ -195,10 +195,11 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 |---|---|---|---|
 | GET | `/api/record` | | `Record` |
 | POST | `/api/record/start` | `{"note": "set 1"}` | `Record` (409 if not connected or already recording) |
-| POST | `/api/record/mark` | `{"label": "Song 2"}` (default: elapsed time) | `Record` |
+| POST | `/api/record/mark` | `{"label": "Song 2"}` (default: `Marker 12m34s`, the time since the start) | `Record` |
 | POST | `/api/record/stop` | | `Record` |
 | GET | `/api/sessions` | | `[{"name", "meta"}]`, newest first |
-| GET | `/api/sessions/{name}` | | `{"name", "meta", "markers": [Event]}` |
+| GET | `/api/sessions/{name}` | | `{"name", "meta", "markers": [Event], "snapshot", "scene"}`: `snapshot` counts the node lines of the console at the start (`start.scn` and `start.nodes`), `scene` says whether `start.scn` is there |
+| DELETE | `/api/sessions/{name}` | | 204: the session folder is removed, audio included (not `audio.json`); 409 while it is recorded or replayed |
 | POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console) |
 | POST | `/api/replay/stop` | | `Record` |
 
@@ -231,7 +232,7 @@ goes on. Engineer only.
 | POST | `/api/audio/config` | `AudioConfig` | `AudioView`; 400 if not valid. Used from the next recording, saved in `<sessions>/audio.json` |
 | GET | `/api/audio/devices` | | `[{"recorder", "id", "name", "channels"?, "format"?, "rates"?, "console"?}]`: what the recorders can record from (`id` is the device to use); `console` marks what looks like the console's card. Lists only, opens nothing |
 | POST | `/api/audio/test` | `AudioConfig` (optional: default the saved one) | `AudioStatus` after 3 s of capture, nothing written: the stream format, `peaks`, or `error`; 409 while recording |
-| GET | `/api/sessions/{name}/export?format=` | | a download: `reaper` (`<name>.rpp`), `audacity` (`<name> labels.txt`: `start⇥end⇥label` per marker, in seconds of the audio files), `csv` (`<name>.csv`: `time,audio_time,clock,type,address,text,value,origin,label`) |
+| GET | `/api/sessions/{name}/export?format=` | | a download: `reaper` (`<name>.rpp`), `audacity` (`<name> labels.txt`: `start⇥end⇥label` per marker, in seconds of the audio files), `csv` (`<name>.csv`: `time,audio_time,clock,type,address,text,value,origin,label`), `scene` (`<name>.scn`: `start.scn`, the console at the start, for M32-Edit; 404 without it) |
 
 `AudioConfig`: `{"enabled", "recorder": "arecord"|"parecord"|"ffmpeg"|"custom",
 "device", "channels": 32, "rate": 48000, "tracks"?: "1-16", "bits": 24,

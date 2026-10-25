@@ -14,6 +14,10 @@
   after what the console sends to its card (**All**, **Named**); the clicks
   write *Tracks to record* (`1-16,23-24`). `GET /api/audio` gives these
   `names`.
+- Session details: what the session keeps of the console at the start,
+  with a download of its scene file for M32-Edit (export `scene`), and
+  **Delete this session…** (`DELETE /api/sessions/{name}`), which says what
+  it removes and asks first; not while it is recorded or replayed.
 
 ### tabula-emu
 - The debug page says when a subscription expires (`in 8s`), not `-8s ago`.

@@ -17,11 +17,12 @@ import (
 // Exports of a session for audio editors: a Reaper project (the audio
 // tracks at their place, the markers), an Audacity label track (the
 // markers, at their time in the audio files) and a CSV of every change and
-// marker.
+// marker; and the console at the start, as a scene file for M32-Edit.
 const (
 	ExportReaper   = "reaper"
 	ExportAudacity = "audacity"
 	ExportCSV      = "csv"
+	ExportScene    = "scene"
 )
 
 // Name is the session's name: its directory.
@@ -37,8 +38,10 @@ func (s *Session) ExportFile(format string) (string, error) {
 		return "labels.txt", nil
 	case ExportCSV:
 		return "events.csv", nil
+	case ExportScene:
+		return "start.scn", nil
 	}
-	return "", fmt.Errorf("unknown export %q (reaper, audacity, csv)", format)
+	return "", fmt.Errorf("unknown export %q (reaper, audacity, csv, scene)", format)
 }
 
 // Export writes an export of the session.
@@ -50,6 +53,14 @@ func (s *Session) Export(w io.Writer, format string) error {
 		return s.writeLabels(w)
 	case ExportCSV:
 		return s.writeCSV(w)
+	case ExportScene:
+		f, err := os.Open(filepath.Join(s.Dir, "start.scn"))
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(w, f)
+		return err
 	}
 	_, err := s.ExportFile(format)
 	return err

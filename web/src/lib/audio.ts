@@ -86,7 +86,7 @@ export interface AudioDevice {
   console?: boolean;
 }
 
-export type ExportFormat = "reaper" | "audacity" | "csv";
+export type ExportFormat = "reaper" | "audacity" | "csv" | "scene";
 
 export const audioApi = {
   get: () => call<AudioView>("GET", "/api/audio"),

@@ -44,6 +44,10 @@ export interface SessionSummary {
 
 export interface SessionDetail extends SessionSummary {
   markers?: SessionEvent[];
+  /** node lines of the console at the start (start.scn and start.nodes) */
+  snapshot?: number;
+  /** whether start.scn, the console at the start as a scene file, is there */
+  scene?: boolean;
 }
 
 export const sessionApi = {
@@ -53,6 +57,7 @@ export const sessionApi = {
   stop: () => call<Record>("POST", "/api/record/stop", {}),
   sessions: () => call<SessionSummary[]>("GET", "/api/sessions"),
   session: (name: string) => call<SessionDetail>("GET", "/api/sessions/" + encodeURIComponent(name)),
+  remove: (name: string) => call<void>("DELETE", "/api/sessions/" + encodeURIComponent(name)),
   replay: (session: string, from: number, speed: number) =>
     call<Record>("POST", "/api/replay/start", { session, from, speed }),
   stopReplay: () => call<Record>("POST", "/api/replay/stop", {}),

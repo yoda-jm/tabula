@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { Record as RecordStatus, SessionDetail, SessionSummary } from "../lib/session";
-import { audioPlan, plural } from "../lib/audio";
+import { audioPlan, exportUrl, formatBytes, plural } from "../lib/audio";
 import { formatDuration, parseTime, sessionApi } from "../lib/session";
 import { useCanWrite, useRecord, useStatus } from "../store/hooks";
 import { store } from "../store/store";
@@ -85,7 +85,18 @@ export function RecordPage() {
           })}
         </div>
       </section>
-      {selected && <Session key={selected} name={selected} rec={rec} />}
+      {selected && (
+        <Session
+          key={selected}
+          name={selected}
+          rec={rec}
+          onDeleted={() => {
+            store.toast(`Session ${selected} deleted`);
+            setSelected(null);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -256,13 +267,14 @@ function Recorder({ rec, audio }: { rec: RecordStatus | null; audio: Audio }) {
   );
 }
 
-function Session({ name, rec }: { name: string; rec: RecordStatus | null }) {
+function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | null; onDeleted(): void }) {
   const can = useCanWrite();
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [error, setError] = useState("");
   const [from, setFrom] = useState("0");
   const [speed, setSpeed] = useState(1);
   const [asking, setAsking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const recordingThis = !!rec?.recording && rec.name === name;
   const markers = rec?.meta?.markers;
 
@@ -292,6 +304,18 @@ function Session({ name, rec }: { name: string; rec: RecordStatus | null }) {
       setError((e as Error).message);
     }
   };
+  const remove = async () => {
+    setDeleting(false);
+    setError("");
+    try {
+      await sessionApi.remove(name);
+      onDeleted();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  const audio = detail?.meta.audio;
+  const audioBytes = audio ? audio.frames * (audio.tracks?.length ?? 0) * (audio.bits / 8) : 0;
 
   return (
     <section className="card">
@@ -303,9 +327,27 @@ function Session({ name, rec }: { name: string; rec: RecordStatus | null }) {
           <dd>{formatStart(detail.meta.start)}</dd>
           <dt>Duration</dt>
           <dd className="mono">{formatDuration(detail.meta.duration)}</dd>
+          <dt>At the start</dt>
+          <dd>
+            {detail.snapshot ? (
+              <>
+                every setting of the console ({detail.snapshot} lines)
+                {detail.scene && (
+                  <>
+                    {" "}
+                    <a className="btn" href={exportUrl(name, "scene")} download title="The console at the start: a scene file that opens in M32-Edit">
+                      ⤓ Scene (.scn)
+                    </a>
+                  </>
+                )}
+              </>
+            ) : (
+              <span className="danger-text">not saved</span>
+            )}
+          </dd>
           <dt>Console</dt>
           <dd>
-            settings at the start, then {plural(detail.meta.events, "change")}; {plural(detail.meta.markers, "marker")}
+            {plural(detail.meta.events, "change")} after the start; {plural(detail.meta.markers, "marker")}
           </dd>
           {detail.meta.console && (
             <>
@@ -415,6 +457,27 @@ function Session({ name, rec }: { name: string; rec: RecordStatus | null }) {
         <p className="error" role="alert">
           {error}
         </p>
+      )}
+      <div className="row session-delete">
+        <button
+          type="button"
+          className="btn danger-text"
+          disabled={recordingThis || replayingThis}
+          title={recordingThis || replayingThis ? "Not while it is recorded or replayed" : undefined}
+          onClick={() => setDeleting(true)}
+        >
+          Delete this session…
+        </button>
+      </div>
+      {deleting && (
+        <ConfirmDialog title="Delete this session?" confirm="Delete" onConfirm={() => void remove()} onCancel={() => setDeleting(false)}>
+          <p>
+            <strong>This removes the folder {name}</strong>: the console at the start, {plural(detail?.meta.events ?? 0, "change")},{" "}
+            {plural(detail?.meta.markers ?? 0, "marker")}
+            {audio ? `, and ${plural(audio.tracks?.length ?? 0, "audio file")} (${formatBytes(audioBytes)})` : ""}.
+          </p>
+          <p className="muted">It cannot be undone: copy the folder first to keep it.</p>
+        </ConfirmDialog>
       )}
       {asking && (
         <ConfirmDialog title="Replay this session?" confirm="Replay" onConfirm={() => void start()} onCancel={() => setAsking(false)}>

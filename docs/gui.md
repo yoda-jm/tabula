@@ -201,7 +201,10 @@ holds, and whether it has audio. Replay a session onto the console or the
 emulator, from a time or a marker, in real time (1×) or faster or slower
 (0.5× to 8×; writes must be armed): it moves the console as recorded, each
 change at its recorded time, and plays no sound. Export it for
-Reaper or Audacity to listen to the audio with the markers. See [recording](recording.md#replaying-a-session) and the
+Reaper or Audacity to listen to the audio with the markers. The details of
+a session also show what it keeps of the console at the start, with
+**⤓ Scene (.scn)** to open it in M32-Edit, and **Delete this session…**
+removes it, audio included, after asking. See [recording](recording.md#replaying-a-session) and the
 [API](API.md#recording-and-replay) for the session format.
 
 ## Access

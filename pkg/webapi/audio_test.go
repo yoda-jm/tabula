@@ -111,6 +111,9 @@ func TestAudioRecording(t *testing.T) {
 		t.Errorf("test while recording: %d", code)
 	}
 	post(t, ts.URL+"/api/record/mark", `{"label":"Song 2"}`)
+	if w := local(h, "DELETE", "/api/sessions/"+v.Name, ""); w.Code != http.StatusConflict {
+		t.Errorf("delete while recording: %d", w.Code)
+	}
 	time.Sleep(100 * time.Millisecond)
 	if code := post(t, ts.URL+"/api/record/stop", ``); code != http.StatusOK {
 		t.Fatalf("stop: %d", code)
@@ -167,6 +170,20 @@ func TestAudioRecording(t *testing.T) {
 		t.Errorf("unknown export: %d", resp.StatusCode)
 	}
 
+	// The console at the start: in the details, and as a scene file.
+	var detail sessionView
+	getJSON(t, ts.URL+"/api/sessions/"+name, &detail)
+	if detail.Snapshot < 3000 || !detail.Scene {
+		t.Errorf("snapshot: %d lines, scene %v", detail.Snapshot, detail.Scene)
+	}
+	resp, _ = http.Get(ts.URL + "/api/sessions/" + name + "/export?format=scene")
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(string(body), "#4.0#") || !strings.Contains(string(body), `/ch/01/config "Hang"`) ||
+		resp.Header.Get("Content-Disposition") != `attachment; filename="`+name+`.scn"` {
+		t.Errorf("scene export: %d %s %.80q", resp.StatusCode, resp.Header, body)
+	}
+
 	// A test of the input: levels of every channel, nothing written.
 	testFor = 1200 * time.Millisecond
 	resp, err = http.Post(ts.URL+"/api/audio/test", "application/json", strings.NewReader(`{"enabled":true,"tracks":"1-4"}`))
@@ -185,6 +202,32 @@ func TestAudioRecording(t *testing.T) {
 		if w := remote(h, "GET", u, "", ""); w.Code != http.StatusForbidden {
 			t.Errorf("viewer %s: %d", u, w.Code)
 		}
+	}
+
+	// Deleting a session: the engineer's, the whole directory.
+	if w := remote(h, "DELETE", "/api/sessions/"+name, "", ""); w.Code != http.StatusForbidden {
+		t.Errorf("viewer delete: %d", w.Code)
+	}
+	for _, bad := range []string{"..", ".hidden", "nope"} {
+		// ".." is cleaned away by the router (a redirect), the others are not sessions
+		if w := local(h, "DELETE", "/api/sessions/"+bad, ""); w.Code != http.StatusNotFound && (bad != ".." || w.Code < 300) {
+			t.Errorf("delete %q: %d", bad, w.Code)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(sessions, "audio.json")); err != nil {
+		t.Fatal("a bad name removed the sessions directory")
+	}
+	if w := local(h, "DELETE", "/api/sessions/"+name, ""); w.Code != http.StatusNoContent {
+		t.Fatalf("delete: %d %s", w.Code, w.Body)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("session directory still there: %v", err)
+	}
+	if w := local(h, "GET", "/api/sessions/"+name, ""); w.Code != http.StatusNotFound {
+		t.Errorf("deleted session: %d", w.Code)
+	}
+	if _, err := os.Stat(filepath.Join(sessions, "audio.json")); err != nil {
+		t.Errorf("audio settings deleted with the session: %v", err)
 	}
 }
 

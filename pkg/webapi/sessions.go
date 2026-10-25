@@ -155,6 +155,10 @@ type sessionView struct {
 	Name    string          `json:"name"`
 	Meta    session.Meta    `json:"meta"`
 	Markers []session.Event `json:"markers,omitempty"`
+	// Snapshot is the number of node lines of the console at the start
+	// (start.scn and start.nodes); Scene whether start.scn is there.
+	Snapshot int  `json:"snapshot,omitempty"`
+	Scene    bool `json:"scene,omitempty"`
 }
 
 func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +202,33 @@ func (s *Server) getSession(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, sessionView{Name: filepath.Base(dir), Meta: ses.Meta, Markers: ses.Markers()})
+	_, err = os.Stat(filepath.Join(dir, "start.scn"))
+	writeJSON(w, http.StatusOK, sessionView{Name: filepath.Base(dir), Meta: ses.Meta, Markers: ses.Markers(),
+		Snapshot: len(ses.Start), Scene: err == nil})
+}
+
+// deleteSession removes a session and its audio files, unless it is being
+// recorded or replayed.
+func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	dir, err := s.sessionDir(name)
+	if err != nil {
+		httpError(w, http.StatusNotFound, err)
+		return
+	}
+	s.mu.Lock()
+	busy := s.rec != nil && filepath.Base(s.rec.Dir()) == name || s.replayCancel != nil && s.replayOf == name
+	s.mu.Unlock()
+	if busy {
+		httpError(w, http.StatusConflict, errors.New("this session is being recorded or replayed"))
+		return
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		httpError(w, http.StatusInternalServerError, err)
+		return
+	}
+	s.log.Info("session deleted", "session", dir)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // replayStart replays a session onto the connected console (writes must be

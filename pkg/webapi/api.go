@@ -87,6 +87,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("POST /api/record/mark", s.recordMark)
 	mux.HandleFunc("GET /api/sessions", s.listSessions)
 	mux.HandleFunc("GET /api/sessions/{name}", s.getSession)
+	mux.HandleFunc("DELETE /api/sessions/{name}", s.deleteSession)
 	mux.HandleFunc("POST /api/replay/start", s.replayStart)
 	mux.HandleFunc("POST /api/replay/stop", s.replayStop)
 	s.accessRoutes(mux)
