@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { AudioConfig } from "./audio";
-import { audioPlan, byteRate, exportUrl, formatBytes, formatHours, formatTracks, parseTracks, plural, trackLabel } from "./audio";
+import type { AudioConfig, AudioInfo, AudioStatus } from "./audio";
+import {
+  audioPlan,
+  audioSummary,
+  audioTrouble,
+  byteRate,
+  exportUrl,
+  formatBytes,
+  formatHours,
+  formatTracks,
+  parseTracks,
+  plural,
+  trackLabel,
+} from "./audio";
 
 describe("audio tracks", () => {
   it("reads track lists as the server does", () => {
@@ -63,5 +75,38 @@ describe("audioPlan", () => {
   });
   it("counts", () => {
     expect([plural(0, "marker"), plural(1, "marker"), plural(2, "marker")]).toEqual(["0 markers", "1 marker", "2 markers"]);
+  });
+});
+
+describe("audio trouble", () => {
+  const info: AudioInfo = { rate: 48000, bits: 24, channels: 32, tracks: [{ channel: 1 }, { channel: 2 }], offset: 0, frames: 0 };
+  const st = (patch: Partial<AudioStatus>): AudioStatus => ({
+    ...info,
+    state: "recording",
+    seconds: 0,
+    bytes: 0,
+    byte_rate: 0,
+    free: -1,
+    remaining: -1,
+    ...patch,
+  });
+  it("says when the audio is not recorded, or in trouble", () => {
+    expect(audioTrouble(undefined)).toBeNull();
+    expect(audioTrouble(st({}))).toBeNull();
+    expect(audioTrouble(st({ state: "failed", error: "Channels count non available" }))).toEqual({
+      level: "failed",
+      text: "Channels count non available",
+    });
+    expect(audioTrouble(st({ state: "failed" }))?.text).toBe("the audio stopped");
+    expect(audioTrouble(st({ warnings: ["not the console's card", "no audio for 5s"] }))).toEqual({
+      level: "warn",
+      text: "not the console's card · no audio for 5s",
+    });
+  });
+  it("sums up the audio of a session", () => {
+    expect(audioSummary(undefined)).toBe("no audio");
+    expect(audioSummary(info)).toBe("audio: 2 tracks");
+    expect(audioSummary({ ...info, error: "the recorder stopped" })).toBe("audio failed");
+    expect(audioSummary({ ...info, frames: 48000, error: "the recorder stopped" })).toBe("audio: 2 tracks, cut short");
   });
 });

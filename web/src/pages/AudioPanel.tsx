@@ -23,11 +23,15 @@ export interface Audio {
   view: AudioView | null;
   error: string;
   setView(v: AudioView): void;
+  /** the settings changed on the page and not saved yet, or null */
+  draft: AudioConfig | null;
+  setDraft(c: AudioConfig | null): void;
 }
 
 /** useAudio loads the audio settings, again when a recording starts or stops (free space, last capture). */
 export function useAudio(recording: boolean): Audio {
   const [view, setView] = useState<AudioView | null>(null);
+  const [draft, setDraft] = useState<AudioConfig | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     try {
@@ -40,11 +44,36 @@ export function useAudio(recording: boolean): Audio {
   useEffect(() => {
     void load();
   }, [load, recording]);
-  return { view, error, setView };
+  return { view, error, setView, draft, setDraft };
 }
 
-/** AudioPanel is the Record page's audio card. */
-export function AudioPanel({ rec, audio }: { rec: RecordStatus | null; audio: Audio }) {
+/**
+ * saveDraft saves the settings changed on the page, if any: a recording
+ * uses the saved ones, so starting one (or its audio) saves them first.
+ */
+export async function saveDraft(audio: Audio): Promise<void> {
+  if (!audio.draft) return;
+  const v = await audioApi.save(audio.draft);
+  audio.setView(v);
+  audio.setDraft(null);
+}
+
+/** toConsoleCard switches the settings to the console's card, when the check found it connected, and saves them. */
+export async function toConsoleCard(audio: Audio): Promise<void> {
+  const card = audio.view?.check?.console;
+  const base = audio.draft ?? audio.view?.config;
+  if (!card || !base) return;
+  const v = await audioApi.save({ ...base, recorder: card.recorder, device: card.id, ...(card.channels ? { channels: card.channels } : {}) });
+  audio.setView(v);
+  audio.setDraft(null);
+}
+
+/**
+ * AudioPanel is the Record page's audio card. While recording, it shows the
+ * capture; when the audio failed before recording anything (or is off), the
+ * settings too, to fix them and start the audio of the recording (onRetry).
+ */
+export function AudioPanel({ rec, audio, onRetry }: { rec: RecordStatus | null; audio: Audio; onRetry(): Promise<void> }) {
   const { view, error, setView } = audio;
   const recording = !!rec?.recording;
 
@@ -57,6 +86,11 @@ export function AudioPanel({ rec, audio }: { rec: RecordStatus | null; audio: Au
     ) : null;
   }
   const live = recording ? rec?.audio : undefined;
+  // the audio of this recording can (re)start: it failed before recording anything, or was off
+  const fixable = recording && (!live || (live.state === "failed" && !live.frames));
+  const settings = (retry?: () => Promise<void>) => (
+    <AudioSettings key={JSON.stringify(view.config)} view={view} audio={audio} onSaved={setView} onRetry={retry} />
+  );
   return (
     <section className="card audio">
       <div className="section-head">
@@ -64,15 +98,23 @@ export function AudioPanel({ rec, audio }: { rec: RecordStatus | null; audio: Au
         {!recording && <span className="muted">{view.config.enabled ? "recorded with every session" : "not recorded"}</span>}
       </div>
       {recording ? (
-        live ? (
-          <AudioLive st={live} />
-        ) : (
-          <p className="muted">This recording has no audio (enable it below, for the next one).</p>
-        )
+        <>
+          {live ? (
+            <AudioLive st={live} />
+          ) : (
+            <p className="muted">This recording has no audio: turn it on below, then Start the audio.</p>
+          )}
+          {fixable && (
+            <>
+              {live && <p className="note">Fix the settings below (Find devices: the console's card is marked ★), then Start the audio.</p>}
+              {settings(onRetry)}
+            </>
+          )}
+        </>
       ) : (
         <>
           {rec?.audio && <LastCapture st={rec.audio} />}
-          <AudioSettings key={JSON.stringify(view.config)} view={view} onSaved={setView} />
+          {settings()}
         </>
       )}
     </section>
@@ -104,13 +146,13 @@ function AudioLive({ st }: { st: AudioStatus }) {
           {w}
         </p>
       ))}
-      {st.state !== "starting" && (
+      {(st.state === "recording" || st.seconds > 0) && (
         <p className="muted">
           First sample {st.offset >= 0 ? "+" : ""}
           {st.offset.toFixed(3)} s after the start of the session{st.format ? ` · ${st.format}` : ""}
         </p>
       )}
-      <TrackLevels tracks={st.tracks ?? []} peaks={st.peaks} />
+      {(st.state !== "failed" || st.seconds > 0) && <TrackLevels tracks={st.tracks ?? []} peaks={st.peaks} />}
     </>
   );
 }
@@ -220,7 +262,34 @@ function LastCapture({ st }: { st: AudioStatus }) {
   );
 }
 
-function AudioSettings({ view, onSaved }: { view: AudioView; onSaved(v: AudioView): void }) {
+/** CheckProblems says why the device configured would not record the console's tracks, with the console's card to use. */
+export function CheckProblems({ audio }: { audio: Audio }) {
+  const [error, setError] = useState("");
+  const check = audio.view?.config.enabled ? audio.view.check : undefined;
+  if (!check?.problems?.length) return null;
+  const card = check.console;
+  return (
+    <div className="warn-box" role="status">
+      {check.problems.map((p) => (
+        <p key={p}>⚠ {p}</p>
+      ))}
+      {card && (
+        <button
+          type="button"
+          className="btn primary"
+          onClick={() => void toConsoleCard(audio).then(() => setError(""), (e: Error) => setError(e.message))}
+        >
+          Record from {card.name.replace(/, .*$/, "")} ({card.id}
+          {card.channels ? `, ${card.channels} channels` : ""})
+        </button>
+      )}
+      {error && <p className="error">{error}</p>}
+    </div>
+  );
+}
+
+function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioView): void; onRetry?: () => Promise<void> }) {
+  const { view, audio, onSaved, onRetry } = props;
   const [cfg, setCfg] = useState<AudioConfig>(view.config);
   const [devices, setDevices] = useState<AudioDevice[] | null>(null);
   const [busy, setBusy] = useState("");
@@ -228,6 +297,12 @@ function AudioSettings({ view, onSaved }: { view: AudioView; onSaved(v: AudioVie
   const [test, setTest] = useState<AudioStatus | null>(null);
   const set = (patch: Partial<AudioConfig>) => setCfg((c) => ({ ...c, ...patch }));
   const dirty = JSON.stringify(cfg) !== JSON.stringify(view.config);
+  // the page knows of changes not saved: starting a recording saves them
+  const { setDraft } = audio;
+  useEffect(() => {
+    setDraft(dirty ? cfg : null);
+  }, [dirty, cfg, setDraft]);
+  useEffect(() => () => setDraft(null), [setDraft]);
 
   const tracks = parseTracks(cfg.tracks ?? "", cfg.channels);
   const rate = byteRate(cfg);
@@ -252,6 +327,10 @@ function AudioSettings({ view, onSaved }: { view: AudioView; onSaved(v: AudioVie
       onSaved(v);
     });
   const find = () => run("find", async () => setDevices(await audioApi.devices()));
+  const retry = () =>
+    run("retry", async () => {
+      await onRetry?.(); // saves the changes first
+    });
   const probe = () =>
     run("test", async () => {
       setTest(null);
@@ -273,6 +352,7 @@ function AudioSettings({ view, onSaved }: { view: AudioView; onSaved(v: AudioVie
         <input type="checkbox" checked={cfg.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
         Record the audio tracks with every recording
       </label>
+      {!dirty && onRetry && <CheckProblems audio={audio} />}
       <div className="row">
         <label>
           <span className="field-label">Recorder</span>
@@ -422,7 +502,20 @@ function AudioSettings({ view, onSaved }: { view: AudioView; onSaved(v: AudioVie
         <button type="button" className="btn" disabled={!!busy || view.testing || typeof tracks === "string"} onClick={() => void probe()}>
           {busy === "test" ? "Listening for 3 s…" : "Test the input"}
         </button>
+        {onRetry && (
+          <button
+            type="button"
+            className="btn primary"
+            disabled={!!busy || !cfg.enabled || typeof tracks === "string"}
+            onClick={() => void retry()}
+          >
+            {busy === "retry" ? "Starting…" : dirty ? "Save and start the audio" : "Start the audio"}
+          </button>
+        )}
       </div>
+      {dirty && !onRetry && (
+        <p className="note">Not saved yet: Save, or Start recording saves these settings first (a recording uses the saved ones).</p>
+      )}
       {(error || view.error) && (
         <p className="error" role="alert">
           {error || view.error}
@@ -477,15 +570,25 @@ export function SessionAudio({ detail }: { detail: SessionDetail }) {
         <>
           <dl className="facts">
             <dt>Tracks</dt>
-            <dd>
-              {a.tracks?.length ?? 0} files in <code>audio/</code> ({a.bits}-bit, {a.rate / 1000} kHz)
-              {a.frames > 0 && `, ${formatDuration(a.frames / a.rate)}`}
-            </dd>
-            <dt>Sync</dt>
-            <dd>
-              first sample at {a.offset.toFixed(3)} s{a.drift_ppm ? `, clock drift ${a.drift_ppm.toFixed(1)} ppm (corrected)` : ""}
-              {a.overruns ? <span className="danger-text"> · {a.overruns} overrun(s): samples were lost</span> : null}
-            </dd>
+            {a.frames > 0 || !a.error ? (
+              <dd>
+                {a.tracks?.length ?? 0} files in <code>audio/</code> ({a.bits}-bit, {a.rate / 1000} kHz)
+                {a.frames > 0 && `, ${formatDuration(a.frames / a.rate)}`}
+              </dd>
+            ) : (
+              <dd className="danger-text">
+                nothing recorded: the files in <code>audio/</code> are empty
+              </dd>
+            )}
+            {a.frames > 0 && (
+              <>
+                <dt>Sync</dt>
+                <dd>
+                  first sample at {a.offset.toFixed(3)} s{a.drift_ppm ? `, clock drift ${a.drift_ppm.toFixed(1)} ppm (corrected)` : ""}
+                  {a.overruns ? <span className="danger-text"> · {a.overruns} overrun(s): samples were lost</span> : null}
+                </dd>
+              </>
+            )}
           </dl>
           {a.error && <p className="error">{a.error}</p>}
         </>

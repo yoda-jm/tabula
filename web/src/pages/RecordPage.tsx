@@ -7,12 +7,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { Record as RecordStatus, SessionDetail, SessionSummary } from "../lib/session";
-import { audioPlan, exportUrl, formatBytes, plural } from "../lib/audio";
+import { audioApi, audioPlan, audioSummary, exportUrl, formatBytes, plural } from "../lib/audio";
 import { formatDuration, parseTime, sessionApi } from "../lib/session";
 import { useCanWrite, useRecord, useStatus } from "../store/hooks";
 import { store } from "../store/store";
 import type { Audio } from "./AudioPanel";
-import { AudioPanel, SessionAudio, useAudio } from "./AudioPanel";
+import { AudioPanel, CheckProblems, SessionAudio, saveDraft, useAudio } from "./AudioPanel";
 
 const SPEEDS = [0.5, 1, 2, 3, 4, 8];
 
@@ -22,6 +22,11 @@ export function RecordPage() {
   const [listError, setListError] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const audio = useAudio(!!rec?.recording);
+  // starts the audio of the recording again, with the settings of the page (saved first)
+  const retryAudio = useCallback(async () => {
+    await saveDraft(audio);
+    store.setRecord(await audioApi.restart());
+  }, [audio]);
 
   const load = useCallback(async () => {
     try {
@@ -47,8 +52,8 @@ export function RecordPage() {
   }
   return (
     <div className="page record">
-      <Recorder rec={rec} audio={audio} />
-      <AudioPanel rec={rec} audio={audio} />
+      <Recorder rec={rec} audio={audio} onRetry={retryAudio} onRestart={() => void load()} />
+      <AudioPanel rec={rec} audio={audio} onRetry={retryAudio} />
       <section className="card">
         <div className="section-head">
           <h2>Sessions</h2>
@@ -78,7 +83,7 @@ export function RecordPage() {
                 <span className="mono">{formatDuration(s.meta.duration)}</span>
                 <span className="muted">{plural(s.meta.events, "change")}</span>
                 <span className="muted">{plural(s.meta.markers, "marker")}</span>
-                <span className="muted">{s.meta.audio ? `audio: ${plural(s.meta.audio.tracks?.length ?? 0, "track")}` : "no audio"}</span>
+                <span className={s.meta.audio?.error ? "danger-text" : "muted"}>{audioSummary(s.meta.audio)}</span>
                 <span className="session-note">{s.meta.note || s.meta.console || ""}</span>
               </button>
             );
@@ -143,7 +148,58 @@ function RecordsWhat({ audio, live }: { audio: string; live?: boolean }) {
   );
 }
 
-function Recorder({ rec, audio }: { rec: RecordStatus | null; audio: Audio }) {
+/** AudioAlarm says, where the recording is watched, that its audio is not recorded, and how to get it back. */
+function AudioAlarm({ rec, onRetry, onRestart }: { rec: RecordStatus; onRetry(): Promise<void>; onRestart(): Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const a = rec.audio;
+  if (!a || a.state !== "failed") return null;
+  const act = async (f: () => Promise<void>) => {
+    setBusy(true);
+    setError("");
+    try {
+      await f();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="rec-alarm" role="alert">
+      <p>
+        <strong>⚠ The audio is NOT recorded.</strong> The console still is.
+      </p>
+      <p className="rec-alarm-error">{a.error || "the audio stopped"}</p>
+      {a.warnings?.map((w) => (
+        <p key={w} className="rec-alarm-error">
+          ⚠ {w}
+        </p>
+      ))}
+      {a.frames ? (
+        <div className="row">
+          <span className="grow">
+            {formatDuration(a.frames / a.rate)} of audio were recorded before it stopped: they stay in this session.
+          </span>
+          <button type="button" className="btn primary" disabled={busy} onClick={() => void act(onRestart)}>
+            {busy ? "Restarting…" : "Stop and record again"}
+          </button>
+        </div>
+      ) : (
+        <div className="row">
+          <span className="grow">Nothing was recorded yet: fix the device under Audio tracks, then start the audio of this recording.</span>
+          <button type="button" className="btn primary" disabled={busy} onClick={() => void act(onRetry)}>
+            {busy ? "Starting…" : "Start the audio"}
+          </button>
+        </div>
+      )}
+      {error && <p className="error">{error}</p>}
+    </div>
+  );
+}
+
+function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Promise<void>; onRestart(): void }) {
+  const { rec, audio, onRetry, onRestart } = props;
   const status = useStatus();
   const [note, setNote] = useState("");
   const [label, setLabel] = useState("");
@@ -212,12 +268,36 @@ function Recorder({ rec, audio }: { rec: RecordStatus | null; audio: Audio }) {
                 </span>
                 <span>console: {plural(rec.meta?.events ?? 0, "change")}</span>
                 <span>{plural(rec.meta?.markers ?? 0, "marker")}</span>
-                <span>{rec.audio ? `audio: ${plural(rec.audio.tracks?.length ?? 0, "track")}` : "no audio"}</span>
+                {rec.audio?.state === "failed" ? (
+                  <strong className="danger-text">⚠ NO AUDIO</strong>
+                ) : (
+                  <span>{rec.audio ? `audio: ${plural(rec.audio.tracks?.length ?? 0, "track")}` : "no audio"}</span>
+                )}
               </div>
               {rec.meta?.note && <p className="muted">{rec.meta.note}</p>}
               <p className="muted mono">{rec.name}</p>
             </div>
           </div>
+          <AudioAlarm
+            rec={rec}
+            onRetry={onRetry}
+            onRestart={async () => {
+              // errors show in this card: the alarm goes with the recording
+              const note = rec.meta?.note ?? "";
+              const ok = await run(async () => {
+                store.setRecord(await sessionApi.stop());
+                await saveDraft(audio);
+                return sessionApi.start(note);
+              });
+              if (ok) onRestart();
+            }}
+          />
+          {rec.audio?.state !== "failed" &&
+            rec.audio?.warnings?.map((w) => (
+              <p key={w} className="warn-box" role="status">
+                ⚠ Audio: {w}
+              </p>
+            ))}
           <form
             className="row"
             onSubmit={(e) => {
@@ -239,12 +319,17 @@ function Recorder({ rec, audio }: { rec: RecordStatus | null; audio: Audio }) {
         </>
       ) : (
         <>
-          <RecordsWhat audio={audioPlan(audio.view?.config)} />
+          <RecordsWhat audio={audioPlan(audio.draft ?? audio.view?.config)} />
+          <CheckProblems audio={audio} />
+          {audio.draft && <p className="note">The audio settings below are not saved yet: Start recording saves them first.</p>}
           <form
             className="row"
             onSubmit={(e) => {
               e.preventDefault();
-              void run(() => sessionApi.start(note.trim())).then((ok) => ok && setNote(""));
+              void run(async () => {
+                await saveDraft(audio); // a recording uses the saved settings
+                return sessionApi.start(note.trim());
+              }).then((ok) => ok && setNote(""));
             }}
           >
             <label className="grow">

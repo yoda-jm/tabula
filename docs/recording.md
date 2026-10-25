@@ -26,7 +26,13 @@ with every recording*, choose the device (**Find devices** lists them; the
 console's card is marked ★), the tracks, and **Save**. **Test the input**
 listens for three seconds and shows the level of every track. From then
 on, **Start recording** records the audio too, and **Stop recording** stops
-both.
+both. A recording uses the saved settings: changes not saved yet are
+saved by **Start recording** first, as the page says.
+
+When the device chosen is not the console's card, or is not connected, the
+page says so above **Start recording**, with a button to record from the
+console's card when it is connected. If the audio fails anyway, every page
+says it in red: see [when the audio is not recorded](#when-the-audio-is-not-recorded).
 
 To record only the tracks you need, click them: the list names each track
 of the card after what the console sends to it (*Setup › Routing › Card
@@ -140,8 +146,9 @@ or PulseAudio running, it may answer *Device or resource busy*. Either:
   alsa_input.usb-…pro-input-0`).
 
 If arecord answers *Sample format non available* or *Channels count non
-available*, check the channel count; `plughw:CARD=…` instead of `hw:` lets
-ALSA convert the format.
+available*, check the device (the laptop's own card, `PCH`, has two
+channels) and the channel count; `plughw:CARD=…` instead of `hw:` lets ALSA
+convert the format. A Midas DN32-USB shows as `hw:CARD=DN32USB,DEV=0`.
 
 ## Disk space
 
@@ -155,8 +162,8 @@ What the files take, at 48 kHz:
 
 The Record page shows the free space where sessions are kept and how much
 audio it holds at the chosen settings; while recording, the space left and
-the time left. Below 20 minutes left, a warning shows on the Record page and
-next to REC in the top bar. When only a minute of audio (256 MB at least)
+the time left. Below 20 minutes left, a warning shows on the Record page,
+next to REC in the top bar and in an amber bar under the pages. When only a minute of audio (256 MB at least)
 is left, the audio stops by itself, cleanly: every file ends at the same
 sample with a correct header, and the session (changes, markers) goes on.
 
@@ -165,6 +172,51 @@ readable: their headers are refreshed every two seconds, so at most the last
 two seconds are missing (Audacity and Reaper read what is there). A file
 past 4 GiB (a single 24-bit track gets there after 8 hours) turns into
 RF64, which Audacity, Reaper and Ardour read.
+
+## When the audio is not recorded
+
+The audio and the console are recorded side by side: when the audio
+fails, the recording of the console goes on, and `tabula` makes the failure
+hard to miss.
+
+- **Before recording**, the Record page checks the device saved (on Linux):
+  it is not connected, it is not the console's card (`hw:CARD=PCH,DEV=0`,
+  the laptop's own card, or `default`, the system's input), or it delivers
+  another number of channels than *Channels of the device*. **Record from
+  DN32-USB (…)** switches to the console's card when it is connected. A
+  device other than the card on purpose (a test at home with the laptop's
+  microphone)? Tick *Name the files “Track 01”…* and only a missing device
+  is reported.
+- **Start recording** saves the audio settings changed on the page first: a
+  device picked in **Find devices** but not saved is the one recorded. It
+  answers once the audio runs or has failed (three seconds at most).
+- **When the audio fails**, the top bar says *REC ⚠ NO AUDIO*, a red bar
+  under the pages says why on every page (*The audio is NOT recorded…
+  The console still is.*), and the Record page shows the error with what
+  to do. The usual recorder errors come with a hint: *Channels count non
+  available* (not the console's card, or another channel count), *Device or
+  resource busy* (PipeWire holds the card, see
+  [Setting up on Linux](#setting-up-on-linux)), a card that is not there.
+  Warnings (not the console's card, no audio for a few seconds, the disk
+  almost full) show in an amber bar.
+- **Start the audio again** without stopping: when the audio failed before
+  recording anything, the Audio tracks card shows the settings during the
+  recording; fix the device (**Find devices**, or the button for the
+  console's card), **Test the input**, then **Start the audio**. The audio
+  goes into the same session (its empty files replaced); its first sample
+  is timed from the start of the session as always, so the tracks still line
+  up with the console changes. When audio was recorded before it stopped
+  (a cable pulled in the middle of the show), it stays in the session:
+  **Stop and record again** starts a new session, audio and console.
+
+![The audio failed at the start: the red bar on every page, NO AUDIO in the top bar, and the error with what to do](img/audio-failed.png)
+
+This came from a real show: the device saved during tests at home was the
+laptop's own card. On stage, the console's card was picked in **Find
+devices** but not saved, so the recording used the laptop's card and its
+audio failed at once (*Channels count non available*). The failure only
+showed as a ⚠ next to REC and further down the page, and the show was
+recorded without its audio.
 
 ## How the tracks line up with the session
 

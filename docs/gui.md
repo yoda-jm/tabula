@@ -194,7 +194,14 @@ Record a show as a session, which keeps two things, as the page says above
   card, one WAV file per track, in step with the console changes. Click
   the tracks to record in the list, named after what the console sends to
   each track of its card ([recording](recording.md#quick-start)); the page
-  says how long the free space lasts with them.
+  says how long the free space lasts with them. It warns when the device
+  is not the console's card or not connected, and **Start recording**
+  saves the audio settings not saved yet.
+
+When the audio of a recording fails, the top bar says *REC ⚠ NO AUDIO* and
+a red bar under the pages says why, on every page; the Record page tells
+what to do, and **Start the audio** starts it again in the same session
+once the device is fixed ([recording](recording.md#when-the-audio-is-not-recorded)).
 
 The session list says for each one how many console changes and markers it
 holds, and whether it has audio. Replay a session onto the console or the

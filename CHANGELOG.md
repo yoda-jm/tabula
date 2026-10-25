@@ -19,6 +19,27 @@
   **Delete this session…** (`DELETE /api/sessions/{name}`), which says what
   it removes and asks first; not while it is recorded or replayed.
 
+- Audio that fails can no longer go unnoticed (it did at a show: the
+  device saved during tests was the laptop's own card, and the show was
+  recorded without its audio):
+  - **Start recording** saves the audio settings changed on the page first
+    (a device picked in Find devices but not saved was ignored), and answers
+    once the audio runs or has failed;
+  - when the audio fails, *REC ⚠ NO AUDIO* in the top bar, a red bar on
+    every page (amber for warnings), and on the Record page the error with
+    a hint for the usual recorder errors (*Channels count non available*,
+    *Device or resource busy*, a card not there) and what to do;
+  - before recording, the Record page says when the device is not
+    connected, is not the console's card or delivers another number of
+    channels, with a button to record from the console's card
+    (`GET /api/audio` → `check`); the same shows as a warning while
+    recording;
+  - **Start the audio** starts the audio of a recording again once the
+    device is fixed, in the same session, when nothing was recorded yet
+    (`POST /api/audio/restart`); **Test the input** works meanwhile;
+  - the session list says *audio failed* for a session whose audio
+    recorded nothing.
+
 ### tabula-emu
 - The debug page says when a subscription expires (`in 8s`), not `-8s ago`.
 

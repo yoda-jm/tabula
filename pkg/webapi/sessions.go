@@ -114,6 +114,7 @@ func (s *Server) recordStart(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, err)
 		return
 	}
+	s.waitAudioStart() // the answer says whether the audio runs
 	s.publishRecord()
 	writeJSON(w, http.StatusOK, s.recordStatus())
 }

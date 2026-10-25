@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -266,6 +268,41 @@ func TestAudioFailure(t *testing.T) {
 		t.Errorf("start failed: %+v %+v", v, v.Audio)
 	}
 	post(t, ts.URL+"/api/record/stop", ``)
+	if code := post(t, ts.URL+"/api/audio/restart", ``); code != http.StatusConflict {
+		t.Errorf("restart, not recording: %d", code)
+	}
+
+	// The device is fixed during the recording: the audio starts again in
+	// the same session, its files replacing the empty ones.
+	time.Sleep(time.Second) // sessions are named by the second
+	post(t, ts.URL+"/api/record/start", ``)
+	failed := getRecord(t, ts.URL)
+	api.audio.source = liveSource(0)
+	resp, err := http.Post(ts.URL+"/api/audio/restart", "application/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v = recordView{}
+	json.NewDecoder(resp.Body).Decode(&v)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || v.Name != failed.Name || v.Audio == nil || v.Audio.State != audio.Recording || v.Audio.Error != "" {
+		t.Errorf("restart: %d %+v %+v", resp.StatusCode, v, v.Audio)
+	}
+	if code := post(t, ts.URL+"/api/audio/restart", ``); code != http.StatusConflict {
+		t.Errorf("restart while recording audio: %d", code)
+	}
+	time.Sleep(200 * time.Millisecond)
+	post(t, ts.URL+"/api/record/stop", ``)
+	ses, err := session.Open(filepath.Join(sessions, failed.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := ses.Meta.Audio; a == nil || a.Error != "" || a.Frames == 0 || len(a.Tracks) != 32 {
+		t.Errorf("restarted audio: %+v", a)
+	} else if fi, err := os.Stat(filepath.Join(ses.Dir, filepath.FromSlash(a.Tracks[0].File))); err != nil || fi.Size() <= 80 {
+		t.Errorf("restarted file: %v %v", fi, err)
+	}
+	os.RemoveAll(ses.Dir) // the list below counts the failures
 
 	// The recorder dies in the middle of the show.
 	api.audio.source = liveSource(9600)
@@ -277,6 +314,9 @@ func TestAudioFailure(t *testing.T) {
 	if !v.Recording || !strings.Contains(v.Audio.Error, "the recorder stopped") {
 		t.Errorf("mid-show: %+v %+v", v, v.Audio)
 	}
+	if code := post(t, ts.URL+"/api/audio/restart", ``); code != http.StatusConflict {
+		t.Errorf("restart after audio was recorded: %d", code)
+	}
 	post(t, ts.URL+"/api/record/mark", `{"label":"after"}`)
 	post(t, ts.URL+"/api/record/stop", ``)
 	var list []sessionView
@@ -285,7 +325,7 @@ func TestAudioFailure(t *testing.T) {
 		!strings.Contains(list[0].Meta.Audio.Error, "the recorder stopped") || !strings.Contains(list[1].Meta.Audio.Error, "device busy") {
 		t.Errorf("sessions: %+v", list)
 	}
-	ses, err := session.Open(filepath.Join(sessions, list[0].Name))
+	ses, err = session.Open(filepath.Join(sessions, list[0].Name))
 	if err != nil || len(ses.Markers()) != 1 {
 		t.Errorf("session: %v", err)
 	}
@@ -333,5 +373,53 @@ func TestCustomRecorderIsLocalOnly(t *testing.T) {
 	}
 	if w := from(h, here, "POST", "/api/audio/config", third, mine); w.Code != http.StatusOK {
 		t.Errorf("signed in on this machine, custom command: %d %s", w.Code, w.Body)
+	}
+}
+
+// A device that is not the console's card is said before recording, with
+// the card to use instead, and while recording.
+func TestAudioDeviceCheck(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("the device check knows Linux devices")
+	}
+	_, emuAddr := startEmu(t)
+	api := New(quiet)
+	api.SetSessionsDir(t.TempDir())
+	cfg := audio.DefaultConfig()
+	cfg.Enabled, cfg.Device = true, "hw:CARD=PCH,DEV=0"
+	api.SetAudioConfig(cfg, "")
+	api.audio.source = liveSource(0)
+	api.audio.devices = func(context.Context) []audio.Device {
+		return []audio.Device{
+			{Recorder: "arecord", ID: "hw:CARD=PCH,DEV=0", Name: "HDA Intel PCH"},
+			{Recorder: "arecord", ID: "hw:CARD=DN32USB,DEV=0", Name: "DN32-USB", Channels: 32, Console: true},
+		}
+	}
+	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
+	defer ts.Close()
+
+	var av audioView
+	getJSON(t, ts.URL+"/api/audio", &av)
+	if av.Check == nil || len(av.Check.Problems) != 1 || !strings.Contains(av.Check.Problems[0], "not the console's card") ||
+		av.Check.Console == nil || av.Check.Console.ID != "hw:CARD=DN32USB,DEV=0" {
+		t.Fatalf("check: %+v", av.Check)
+	}
+
+	post(t, ts.URL+"/api/connect", `{"addr":"`+emuAddr+`"}`)
+	connected(t, ts.URL)
+	post(t, ts.URL+"/api/record/start", ``)
+	v := waitRecord(t, ts.URL, "warning", func(v recordView) bool { return v.Audio != nil && len(v.Audio.Warnings) > 0 })
+	if v.Audio.State != audio.Recording || !strings.Contains(v.Audio.Warnings[0], "HDA Intel PCH, not the console's card") {
+		t.Errorf("live: %+v", v.Audio)
+	}
+	post(t, ts.URL+"/api/record/stop", ``)
+
+	if code := post(t, ts.URL+"/api/audio/config", `{"enabled":true,"recorder":"arecord","device":"hw:CARD=DN32USB,DEV=0","channels":32}`); code != http.StatusOK {
+		t.Fatalf("config: %d", code)
+	}
+	av = audioView{}
+	getJSON(t, ts.URL+"/api/audio", &av)
+	if av.Check != nil {
+		t.Errorf("console card: %+v", av.Check)
 	}
 }

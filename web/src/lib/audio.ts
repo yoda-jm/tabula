@@ -2,6 +2,7 @@
 // docs/recording.md).
 
 import { call } from "./api";
+import type { Record as RecordStatus } from "./session";
 
 export type Recorder = "arecord" | "parecord" | "ffmpeg" | "custom";
 
@@ -74,6 +75,15 @@ export interface AudioView {
   testing: boolean;
   /** what the console's routing sends to each track of its card ("" when nothing named), while connected */
   names?: string[];
+  /** when audio is on: why the device configured would not record the console's tracks */
+  check?: AudioCheck;
+}
+
+/** What the machine says of the device configured (docs/API.md, "Audio"). */
+export interface AudioCheck {
+  problems?: string[];
+  /** the console's card, connected, when it is not the device configured */
+  console?: AudioDevice;
 }
 
 export interface AudioDevice {
@@ -93,7 +103,24 @@ export const audioApi = {
   save: (c: AudioConfig) => call<AudioView>("POST", "/api/audio/config", c),
   devices: () => call<AudioDevice[]>("GET", "/api/audio/devices"),
   test: (c: AudioConfig) => call<AudioStatus>("POST", "/api/audio/test", c),
+  /** starts the audio of the recording again, after it failed before recording anything */
+  restart: () => call<RecordStatus>("POST", "/api/audio/restart", {}),
 };
+
+/** audioTrouble says what is wrong with the audio of a recording: failed (nothing recorded), a warning, or null. */
+export function audioTrouble(st: AudioStatus | undefined): { level: "failed" | "warn"; text: string } | null {
+  if (!st) return null;
+  if (st.state === "failed") return { level: "failed", text: st.error || "the audio stopped" };
+  if (st.warnings?.length) return { level: "warn", text: st.warnings.join(" · ") };
+  return null;
+}
+
+/** audioSummary is the audio of a session in a few words: "audio: 18 tracks", "audio failed", "no audio". */
+export function audioSummary(a: AudioInfo | undefined | null): string {
+  if (!a) return "no audio";
+  if (a.error && !a.frames) return "audio failed";
+  return `audio: ${plural(a.tracks?.length ?? 0, "track")}${a.error ? ", cut short" : ""}`;
+}
 
 /** exportUrl downloads an export of a session. */
 export const exportUrl = (session: string, format: ExportFormat) =>

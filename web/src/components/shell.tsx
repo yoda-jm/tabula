@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../lib/api";
+import { audioTrouble } from "../lib/audio";
 import { formatDuration } from "../lib/session";
 import { useRecord, useStatus, useStream, useToasts } from "../store/hooks";
 import { store } from "../store/store";
@@ -132,6 +133,29 @@ export function ArmControl() {
   );
 }
 
+/**
+ * AudioBanner is a bar under the navigation, on every page, while the audio
+ * of a recording is not recorded (red) or in trouble (amber): the header's
+ * REC is easy to miss during a show.
+ */
+export function AudioBanner({ onOpen }: { onOpen?: () => void }) {
+  const r = useRecord();
+  const trouble = r?.recording ? audioTrouble(r.audio) : null;
+  if (!trouble) return null;
+  const failed = trouble.level === "failed";
+  return (
+    <div className={"audio-banner " + trouble.level} role="alert">
+      <strong>{failed ? "⚠ The audio is NOT recorded" : "⚠ Audio"}</strong>
+      <span className="audio-banner-text">{failed ? `${/[.!?]$/.test(trouble.text) ? trouble.text : trouble.text + "."} The console still is.` : trouble.text}</span>
+      {onOpen && (
+        <button type="button" className="btn" onClick={onOpen}>
+          {failed ? "Fix it" : "See"} on the Record page
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** RecIndicator shows a red REC with the elapsed time while recording (and replay progress). */
 export function RecIndicator({ onClick }: { onClick(): void }) {
   const r = useRecord();
@@ -144,13 +168,21 @@ export function RecIndicator({ onClick }: { onClick(): void }) {
   if (!r) return null;
   if (r.recording) {
     const elapsed = store.recordElapsed();
-    const a = r.audio;
-    const trouble = a && (a.state === "failed" || a.warnings?.length) ? a.error || a.warnings?.[0] : "";
+    const trouble = audioTrouble(r.audio);
     return (
-      <button type="button" className="rec" onClick={onClick} title={trouble ? `Recording. Audio: ${trouble}` : "Recording"}>
+      <button
+        type="button"
+        className={"rec" + (trouble?.level === "failed" ? " no-audio" : "")}
+        onClick={onClick}
+        title={trouble ? `Recording. Audio: ${trouble.text}` : "Recording"}
+      >
         <span className="rec-dot" aria-hidden />
         REC <span className="rec-time">{formatDuration(elapsed)}</span>
-        {trouble && <span aria-label={`audio: ${trouble}`}> ⚠</span>}
+        {trouble?.level === "failed" ? (
+          <span className="rec-warn">⚠ NO AUDIO</span>
+        ) : (
+          trouble && <span aria-label={`audio: ${trouble.text}`}> ⚠</span>
+        )}
       </button>
     );
   }

@@ -1,14 +1,17 @@
 package webapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,6 +33,10 @@ type audioState struct {
 	savedAt time.Time
 	testing bool
 	source  func() (io.ReadCloser, error) // tests: replaces the recorder
+	// problems of the device of the running capture (audio.CheckDevice),
+	// shown as warnings of its status
+	problems []string
+	devices  func(context.Context) []audio.Device // tests: replaces audio.ListDevices
 }
 
 func (s *Server) audioRoutes(mux *http.ServeMux) {
@@ -37,6 +44,7 @@ func (s *Server) audioRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/audio/config", s.setAudioConfig)
 	mux.HandleFunc("GET /api/audio/devices", s.audioDevices)
 	mux.HandleFunc("POST /api/audio/test", s.audioTest)
+	mux.HandleFunc("POST /api/audio/restart", s.restartAudio)
 	mux.HandleFunc("GET /api/sessions/{name}/export", s.exportSession)
 }
 
@@ -57,7 +65,7 @@ func (s *Server) SetAudioConfig(cfg audio.Config, file string) {
 // on without it.
 func (s *Server) startAudioLocked(rec *session.Recorder) {
 	a := &s.audio
-	a.last, a.saved = nil, ""
+	a.last, a.saved, a.problems = nil, "", nil
 	cfg := a.cfg.Normalized()
 	if !cfg.Enabled {
 		return
@@ -69,8 +77,12 @@ func (s *Server) startAudioLocked(rec *session.Recorder) {
 	c, err := audio.Start(cfg, filepath.Join(rec.Dir(), "audio"), opt)
 	if err != nil {
 		s.log.Error("audio not recorded", "err", err)
+		msg := "audio not recorded: " + err.Error()
+		if h := audio.Hint(msg); h != "" {
+			msg += ". " + h
+		}
 		st := audio.Status{State: audio.Failed, Info: audio.Info{Rate: cfg.Rate, Bits: cfg.Bits, Channels: cfg.Channels,
-			Device: cfg.Device, Error: "audio not recorded: " + err.Error()}, Free: -1, Remaining: -1}
+			Device: cfg.Device, Error: msg}, Free: -1, Remaining: -1}
 		a.last = &st
 		rec.SetAudio(&st.Info)
 		return
@@ -78,6 +90,102 @@ func (s *Server) startAudioLocked(rec *session.Recorder) {
 	a.cap, a.saved, a.savedAt = c, audio.Starting, time.Now()
 	info := c.Info()
 	rec.SetAudio(&info)
+	go func() { // a device that is not the console's card records, but not the show
+		problems := audio.CheckDevice(cfg, s.listDevices(context.Background()), runtime.GOOS).Problems
+		for _, p := range problems {
+			s.log.Warn("audio device", "problem", p)
+		}
+		s.mu.Lock()
+		if a.cap == c {
+			a.problems = problems
+		}
+		s.mu.Unlock()
+	}()
+}
+
+// listDevices lists the capture devices (audio.ListDevices).
+func (s *Server) listDevices(ctx context.Context) []audio.Device {
+	s.mu.Lock()
+	list := s.audio.devices
+	s.mu.Unlock()
+	if list == nil {
+		list = audio.ListDevices
+	}
+	return list(ctx)
+}
+
+// audioStartWait is how long starting a recording waits for its audio to
+// deliver samples or fail, so that the answer says whether it runs.
+var audioStartWait = 3 * time.Second
+
+// waitAudioStart waits until the audio of the recording runs or has
+// failed (at most audioStartWait) and writes its state in meta.json.
+func (s *Server) waitAudioStart() {
+	s.mu.Lock()
+	rec, c := s.rec, s.audio.cap
+	s.mu.Unlock()
+	if rec == nil || c == nil {
+		return
+	}
+	for deadline := time.Now().Add(audioStartWait); c.Status().State == audio.Starting && time.Now().Before(deadline); {
+		select {
+		case <-c.Done():
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	s.tickAudio(rec)
+}
+
+// restartAudio starts the audio of the recording again, with the current
+// configuration, after it failed before recording anything (a wrong
+// device, the card not plugged in): in the same session, the first sample
+// timed from its start as always. Audio already recorded is never
+// replaced: then a new recording is the way to record more.
+func (s *Server) restartAudio(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	rec, old, st := s.rec, s.audio.cap, s.audioStatusLocked()
+	enabled, testing := s.audio.cfg.Enabled, s.audio.testing
+	s.mu.Unlock()
+	switch {
+	case rec == nil:
+		httpError(w, http.StatusConflict, errors.New("not recording"))
+		return
+	case testing:
+		httpError(w, http.StatusConflict, errors.New("the input is being tested"))
+		return
+	case !enabled:
+		httpError(w, http.StatusBadRequest, errors.New("audio tracks are off: turn them on first"))
+		return
+	case st != nil && st.State != audio.Failed && st.State != audio.Stopped:
+		httpError(w, http.StatusConflict, errors.New("the audio is being recorded"))
+		return
+	case st != nil && st.Frames > 0:
+		httpError(w, http.StatusConflict, errors.New("this session has audio already: stop it and start a new recording to record more"))
+		return
+	}
+	if old != nil {
+		old.Stop() // over already: waits for its files to be finished
+	}
+	s.mu.Lock()
+	defer func() {
+		s.mu.Unlock()
+		s.waitAudioStart()
+		s.publishRecord()
+		writeJSON(w, http.StatusOK, s.recordStatus())
+	}()
+	if s.rec != rec || s.audio.cap != old {
+		return // stopped or restarted meanwhile: say how it is
+	}
+	s.audio.cap = nil
+	if st != nil {
+		for _, t := range st.Tracks { // headers without samples
+			if t.File != "" {
+				os.Remove(filepath.Join(rec.Dir(), "audio", path.Base(t.File)))
+			}
+		}
+	}
+	s.log.Info("audio restarted", "session", rec.Dir())
+	s.startAudioLocked(rec)
 }
 
 // tickAudio keeps the session's meta.json up to date with the capture:
@@ -140,6 +248,9 @@ func (s *Server) endRecordingLocked() {
 func (s *Server) audioStatusLocked() *audio.Status {
 	if s.audio.cap != nil {
 		st := s.audio.cap.Status()
+		if len(s.audio.problems) > 0 {
+			st.Warnings = append(slices.Clone(s.audio.problems), st.Warnings...)
+		}
 		return &st
 	}
 	return s.audio.last
@@ -172,6 +283,9 @@ type audioView struct {
 	// Names is what the console's routing sends to each track of its card
 	// ("" when nothing named), while connected: to choose the tracks.
 	Names []string `json:"names,omitempty"`
+	// Check says whether the device configured is there and is the
+	// console's card, when audio is on.
+	Check *audio.Check `json:"check,omitempty"`
 }
 
 func (s *Server) audioView() audioView {
@@ -205,6 +319,11 @@ func (s *Server) audioView() audioView {
 	}
 	if mirror != nil {
 		v.Names = audio.TrackNames(mirror)
+	}
+	if cfg.Enabled {
+		if c := audio.CheckDevice(cfg, s.listDevices(context.Background()), runtime.GOOS); len(c.Problems) > 0 {
+			v.Check = &c
+		}
 	}
 	return v
 }
@@ -278,7 +397,7 @@ func (s *Server) setAudioConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) audioDevices(w http.ResponseWriter, r *http.Request) {
-	devs := audio.ListDevices(r.Context())
+	devs := s.listDevices(r.Context())
 	if devs == nil {
 		devs = []audio.Device{}
 	}
@@ -291,7 +410,8 @@ func (s *Server) audioDevices(w http.ResponseWriter, r *http.Request) {
 func (s *Server) audioTest(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	cfg := s.audio.cfg
-	busy := s.audio.cap != nil || s.audio.testing
+	// a capture that failed holds no device: test the fix before restarting it
+	busy := s.audio.cap != nil && s.audio.cap.Status().State != audio.Failed || s.audio.testing
 	source, mirror := s.audio.source, s.mirror
 	if !busy {
 		s.audio.testing = true

@@ -140,8 +140,8 @@ card 2: XUSB [X-USB], device 0: USB Audio [USB Audio]
 	}
 	got := listDevices(context.Background(), "linux", run, read)
 	want := []Device{
-		{Recorder: "arecord", ID: "hw:CARD=PCH,DEV=0", Name: "HDA Intel PCH, ALC892 Analog"},
-		{Recorder: "arecord", ID: "hw:CARD=XUSB,DEV=0", Name: "X-USB, USB Audio", Channels: 32, Format: "S32_LE, 24 bits", Rates: "44100, 48000", Console: true},
+		{Recorder: "arecord", ID: "hw:CARD=PCH,DEV=0", Name: "HDA Intel PCH, ALC892 Analog", card: "0"},
+		{Recorder: "arecord", ID: "hw:CARD=XUSB,DEV=0", Name: "X-USB, USB Audio", Channels: 32, Format: "S32_LE, 24 bits", Rates: "44100, 48000", Console: true, card: "2"},
 		{Recorder: "parecord", ID: "alsa_input.usb-Behringer_X-USB-00.pro-input-0", Name: "alsa_input.usb-Behringer_X-USB-00.pro-input-0", Channels: 32, Format: "s32le", Rates: "48000", Console: true},
 	}
 	if !reflect.DeepEqual(got, want) {

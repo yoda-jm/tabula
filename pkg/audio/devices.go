@@ -24,6 +24,8 @@ type Device struct {
 	// Console is true for what looks like the console's USB card (X-USB,
 	// DN32-USB).
 	Console bool `json:"console,omitempty"`
+
+	card string // ALSA card number of an arecord device ("1")
 }
 
 var consoleCard = regexp.MustCompile(`(?i)x-?usb|dn32|m32|x32|midas|behringer`)
@@ -83,7 +85,7 @@ func parseArecordList(text string, read func(string) ([]byte, error)) []Device {
 		if m == nil {
 			continue
 		}
-		d := Device{Recorder: "arecord", ID: fmt.Sprintf("hw:CARD=%s,DEV=%s", m[2], m[4]), Name: m[3]}
+		d := Device{Recorder: "arecord", ID: fmt.Sprintf("hw:CARD=%s,DEV=%s", m[2], m[4]), Name: m[3], card: m[1]}
 		if m[6] != "" && m[6] != m[3] {
 			d.Name += ", " + m[6]
 		}

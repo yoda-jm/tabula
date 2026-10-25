@@ -194,7 +194,7 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | Method | Path | Body | Answer |
 |---|---|---|---|
 | GET | `/api/record` | | `Record` |
-| POST | `/api/record/start` | `{"note": "set 1"}` | `Record` (409 if not connected or already recording) |
+| POST | `/api/record/start` | `{"note": "set 1"}` | `Record` (409 if not connected or already recording). With audio, it answers once the audio delivers samples or has failed (3 s at most), so `audio.state` says whether it runs |
 | POST | `/api/record/mark` | `{"label": "Song 2"}` (default: `Marker 12m34s`, the time since the start) | `Record` |
 | POST | `/api/record/stop` | | `Record` |
 | GET | `/api/sessions` | | `[{"name", "meta"}]`, newest first |
@@ -223,15 +223,17 @@ When audio is enabled, starting a recording also records the tracks of the
 console's USB card into the session's `audio/` directory, one WAV file per
 track, and stopping the recording stops it (see
 [recording](recording.md)). An audio capture that fails is reported
-(`Record.audio.state` `failed`, `error`) and the recording of the changes
-goes on. Engineer only.
+(`Record.audio.state` `failed`, `error`, with a hint for the usual recorder
+errors) and the recording of the changes goes on; `POST /api/audio/restart`
+starts it again once fixed. Engineer only.
 
 | Method | Path | Body | Answer |
 |---|---|---|---|
 | GET | `/api/audio` | | `AudioView` |
 | POST | `/api/audio/config` | `AudioConfig` | `AudioView`; 400 if not valid. Used from the next recording, saved in `<sessions>/audio.json` |
 | GET | `/api/audio/devices` | | `[{"recorder", "id", "name", "channels"?, "format"?, "rates"?, "console"?}]`: what the recorders can record from (`id` is the device to use); `console` marks what looks like the console's card. Lists only, opens nothing |
-| POST | `/api/audio/test` | `AudioConfig` (optional: default the saved one) | `AudioStatus` after 3 s of capture, nothing written: the stream format, `peaks`, or `error`; 409 while recording |
+| POST | `/api/audio/test` | `AudioConfig` (optional: default the saved one) | `AudioStatus` after 3 s of capture, nothing written: the stream format, `peaks`, or `error`; 409 while the audio is being recorded (allowed once it failed) |
+| POST | `/api/audio/restart` | | `Record`, once the audio delivers samples or has failed (3 s at most): starts the audio of the recording again with the saved settings, in the same session (its empty files replaced, the first sample timed from the session start). Only before any audio was recorded: 409 when the audio runs, when the session already has audio (stop and start a new recording), when not recording or while testing; 400 when audio is off |
 | GET | `/api/sessions/{name}/export?format=` | | a download: `reaper` (`<name>.rpp`), `audacity` (`<name> labels.txt`: `start⇥end⇥label` per marker, in seconds of the audio files), `csv` (`<name>.csv`: `time,audio_time,clock,type,address,text,value,origin,label`), `scene` (`<name>.scn`: `start.scn`, the console at the start, for M32-Edit; 404 without it) |
 
 `AudioConfig`: `{"enabled", "recorder": "arecord"|"parecord"|"ffmpeg"|"custom",
@@ -243,11 +245,18 @@ writing raw samples in the `input` format (`s16le`, `s24le`, `s24-32le`,
 
 `AudioView`: `{"config", "command"? (what the configuration runs), "error"?
 (what is wrong with it), "templates": {recorder: command}, "byte_rate",
-"dir", "free", "remaining", "status"?: AudioStatus, "testing", "names"?}` — `free`
+"dir", "free", "remaining", "status"?: AudioStatus, "testing", "names"?,
+"check"?}` — `free`
 is the free space in the sessions directory (bytes, -1 unknown),
 `remaining` how many seconds of audio it holds at `byte_rate` (the chosen
 tracks only), `names` what the console's routing sends to each of the 32
-tracks of its card (`""` when nothing named), while connected.
+tracks of its card (`""` when nothing named), while connected. `check`,
+when audio is on and something is wrong with the device: `{"problems":
+[text], "console"?: device}` — the device is not connected, is not the
+console's card, or delivers another number of channels (Linux: ALSA devices
+and PipeWire/PulseAudio sources; with `plain_names`, only a missing device
+counts); `console` is the console's card, connected, to record from
+instead (a device as `/api/audio/devices` lists them).
 
 `AudioInfo` (the `audio` section of a session's `meta.json`): `{"rate",
 "bits", "channels", "tracks": [{"channel", "name"?, "file"}], "offset",
@@ -260,6 +269,7 @@ first sample in seconds after the session start; a session time `t` is at
 "warnings"?, "format"?, "seconds", "bytes", "byte_rate", "free",
 "remaining", "peaks"?}`: `remaining` is the audio the disk still holds
 before the capture stops itself (seconds), `peaks` the peak level of each
-track over the last second (linear, 1 = full scale). Warnings: the disk is
-almost full (under 20 minutes), the recorder lost samples, no audio for a
-while.
+track over the last second (linear, 1 = full scale). Warnings: the device
+is not the console's card (the `check` problems, found when the capture
+starts), the disk is almost full (under 20 minutes), the recorder lost
+samples, no audio for a while.

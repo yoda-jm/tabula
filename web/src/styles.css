@@ -209,6 +209,45 @@ h4 {
   letter-spacing: 0.06em;
   cursor: pointer;
 }
+.rec.no-audio {
+  background: var(--danger);
+  color: #fff;
+}
+.rec.no-audio .rec-dot {
+  background: #fff;
+}
+.rec-warn {
+  letter-spacing: 0.02em;
+}
+/* the audio of a recording is not recorded (red) or in trouble (amber), on every page */
+.audio-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 16px;
+  font-weight: 600;
+}
+.audio-banner.failed {
+  background: var(--danger);
+  color: #fff;
+}
+.audio-banner.warn {
+  background: var(--busy);
+  color: #1a1300;
+}
+.audio-banner-text {
+  flex: 1 1 22em;
+  min-width: 0;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.audio-banner .btn {
+  min-height: 32px;
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: inherit;
+}
 .rec.replay {
   border-color: var(--accent);
   color: var(--accent);
@@ -1267,6 +1306,29 @@ div.scribble {
   border: 1px solid var(--busy);
   background: rgba(210, 153, 34, 0.1);
   margin: 0 0 12px;
+}
+.warn-box p {
+  margin: 0 0 8px;
+}
+.warn-box p:last-child {
+  margin-bottom: 0;
+}
+.rec-alarm {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 2px solid var(--danger);
+  border-radius: var(--radius);
+  background: rgba(242, 85, 79, 0.14);
+}
+.rec-alarm p {
+  margin: 0 0 8px;
+}
+.rec-alarm strong {
+  color: #ff7b72;
+  font-size: 1.15em;
+}
+.rec-alarm-error {
+  overflow-wrap: anywhere;
 }
 
 /* ---------- headamp ---------- */

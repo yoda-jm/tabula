@@ -345,7 +345,7 @@ func (c *Capture) run() {
 		if len(c.stderr) > 0 {
 			msg += ": " + strings.Join(c.stderr, " / ")
 		}
-		c.err, c.state = errors.New(msg), Failed
+		c.err, c.state = errors.New(withHint(msg)), Failed
 	}
 	c.log.Info("audio stopped", "state", c.state, "frames", c.frames, "err", c.err)
 }
