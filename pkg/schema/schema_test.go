@@ -95,6 +95,28 @@ func TestSchemaShape(t *testing.T) {
 	t.Logf("%d nodes, %d parameters", len(s.Nodes), len(s.Leaves()))
 }
 
+// Frequencies are truncated in kilo notation, but not below the value they
+// stand for: the log scale lands a hair under 2 kHz and 20 kHz.
+func TestFrequencyText(t *testing.T) {
+	s := Build("M32C")
+	for _, c := range []struct {
+		addr string
+		norm float32
+		want string
+	}{
+		{"/ch/01/eq/1/f", 1, "20k00"},
+		{"/ch/01/eq/1/f", 0, "20.0"},
+		{"/config/osc/f1", 80.0 / 120, "2k00"},
+		{"/config/osc/f1", 79.0 / 120, "1k88"}, // 1888.1
+		{"/ch/01/gate/filter/f", 113.0 / 200, "990.9"},
+	} {
+		l := s.Leaf(c.addr)
+		if got := l.Type().Format(osc.Float(c.norm)); got != c.want {
+			t.Errorf("%s %v: got %q, want %q", c.addr, c.norm, got, c.want)
+		}
+	}
+}
+
 // Known values from the protocol document.
 func TestDocumentedValues(t *testing.T) {
 	s := Build("M32C")

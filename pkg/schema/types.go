@@ -412,12 +412,14 @@ func levelFmt(v float64) string {
 }
 
 // freqFmt prints frequencies as 295.8 below 1 kHz and 1k49 (truncated) above.
+// Like kilo, it truncates a hair above the value: the log scale gives
+// 19999.999999999996 for 20 kHz, which is "20k00".
 func freqFmt(v float64) string {
-	if v < 1000 {
+	tens := int(math.Floor(v/10 + 1e-9)) // in tens of Hz
+	if tens < 100 {
 		return fixed(1, false, 0)(v)
 	}
-	k := int(v / 1000)
-	return fmt.Sprintf("%dk%02d", k, int((v-float64(k)*1000)/10))
+	return fmt.Sprintf("%dk%02d", tens/100, tens%100)
 }
 
 // holdFmt prints three significant digits on 4 characters: 0.02, 50.2, " 502".
