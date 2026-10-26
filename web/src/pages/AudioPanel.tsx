@@ -11,6 +11,7 @@ import {
   byteRate,
   channelRange,
   configChanges,
+  sameConfig,
   exportUrl,
   formatBytes,
   formatHours,
@@ -424,7 +425,7 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
   const [error, setError] = useState("");
   const [test, setTest] = useState<AudioStatus | null>(null);
   const set = (patch: Partial<AudioConfig>) => setCfg((c) => ({ ...c, ...patch }));
-  const dirty = JSON.stringify(cfg) !== JSON.stringify(view.config);
+  const dirty = !sameConfig(view.config, cfg);
   // the page knows of changes not saved: starting a recording saves them
   const { setDraft } = audio;
   useEffect(() => {

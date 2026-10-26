@@ -4,7 +4,7 @@
 import type { Band } from "../lib/eq";
 import { butterworthDb, logFrequencies, response } from "../lib/eq";
 import { toDisplay } from "../lib/values";
-import { useNodes } from "../store/hooks";
+import { useMeterGroup, useNodes } from "../store/hooks";
 import { store } from "../store/store";
 import { rtaRects } from "./RtaBars";
 
@@ -49,8 +49,7 @@ export function EqCurve(props: {
   strip: string;
   bands: string[];
   eqOn: boolean;
-  /** RTA bands to draw behind, when the RTA listens to this strip */
-  rta?: number[];
+  /** the dB range of the RTA, drawn behind when the RTA listens to this strip */
   rtaWindow?: { top: number; bottom: number };
 }) {
   const { strip, bands, eqOn } = props;
@@ -80,7 +79,7 @@ export function EqCurve(props: {
     <figure className="eqcurve">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="EQ frequency response (approximate)">
         <rect x={PAD_L} y={0} width={W - PAD_L} height={H - PAD_B} className="eq-bg" />
-        {props.rta && props.rtaWindow && <g className="eq-rta">{rtaRects(props.rta, props.rtaWindow, x, PAD_L, W, H - PAD_B)}</g>}
+        {props.rtaWindow && <EqRta win={props.rtaWindow} />}
         {GRID_F.map((f) => (
           <g key={f}>
             <line x1={x(f)} x2={x(f)} y1={0} y2={H - PAD_B} className="eq-grid" />
@@ -114,8 +113,14 @@ export function EqCurve(props: {
       <figcaption className="muted">
         Approximate response (standard biquads at 48 kHz{extra.length ? ", including the preamp low cut" : ""}).
         {!eqOn && " EQ is off."}
-        {props.rta && props.rtaWindow && ` RTA behind, ${props.rtaWindow.bottom} to ${props.rtaWindow.top} dB.`}
+        {props.rtaWindow && ` RTA behind, ${props.rtaWindow.bottom} to ${props.rtaWindow.top} dB.`}
       </figcaption>
     </figure>
   );
+}
+
+/** EqRta draws the RTA bands behind the curve: it alone re-renders with them, not the curve or the band editors. */
+function EqRta({ win }: { win: { top: number; bottom: number } }) {
+  const rta = useMeterGroup("15");
+  return rta ? <g className="eq-rta">{rtaRects(rta, win, x, PAD_L, W, H - PAD_B)}</g> : null;
 }

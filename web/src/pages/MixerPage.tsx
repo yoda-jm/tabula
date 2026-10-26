@@ -70,7 +70,7 @@ function StripView({ m, selected, onSelect }: { m: MixerStrip; selected: boolean
           <span className="link-badge">LINKED</span>
         </div>
       ) : a.pan ? (
-        <Pan addr={a.pan} disabled={!can} />
+        <Pan addr={a.pan} label={shown.label} disabled={!can} />
       ) : (
         <div className="pan-slot" />
       )}
@@ -78,7 +78,7 @@ function StripView({ m, selected, onSelect }: { m: MixerStrip; selected: boolean
         <StripMeter strip={strip} partner={partner} />
         {a.fader && <StripFader addr={a.fader} label={shown.label} disabled={!can} />}
       </div>
-      {a.on && <Mute addr={a.on} disabled={!can} />}
+      {a.on && <Mute addr={a.on} label={shown.label} disabled={!can} />}
     </div>
   );
 }
@@ -103,7 +103,7 @@ function StripFader({ addr, label, disabled }: { addr: string; label: string; di
   );
 }
 
-function Mute({ addr, disabled }: { addr: string; disabled: boolean }) {
+function Mute({ addr, label, disabled }: { addr: string; label: string; disabled: boolean }) {
   const val = useValue(addr);
   const muted = val !== undefined && Number(val.value) === 0;
   return (
@@ -111,6 +111,7 @@ function Mute({ addr, disabled }: { addr: string; disabled: boolean }) {
       type="button"
       className={"btn mute" + (muted ? " lit" : "")}
       aria-pressed={muted}
+      aria-label={`Mute ${label}`}
       disabled={disabled || val === undefined}
       onClick={() => store.set(addr, muted ? 1 : 0)}
     >
@@ -119,7 +120,7 @@ function Mute({ addr, disabled }: { addr: string; disabled: boolean }) {
   );
 }
 
-function Pan({ addr, disabled }: { addr: string; disabled: boolean }) {
+function Pan({ addr, label, disabled }: { addr: string; label: string; disabled: boolean }) {
   const val = useValue(addr);
   const leaf = useLeaf(addr);
   const steps = leaf?.field.type.steps ?? 101;
@@ -134,7 +135,7 @@ function Pan({ addr, disabled }: { addr: string; disabled: boolean }) {
         step={1 / (steps - 1)}
         value={Number(val?.value ?? 0.5)}
         disabled={disabled || val === undefined}
-        aria-label="Pan"
+        aria-label={`Pan ${label}`}
         aria-valuetext={shown}
         onChange={(e) => store.set(addr, Number(e.target.value))}
         onPointerUp={() => store.flush(addr)}

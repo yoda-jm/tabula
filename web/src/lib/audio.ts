@@ -131,6 +131,12 @@ const FIELDS: { key: keyof AudioConfig; label: string; show?(c: AudioConfig): st
   { key: "plain_names", label: "File names", show: (c) => (c.plain_names ? "Track 01…" : "from the routing") },
 ];
 
+/**
+ * sameConfig tells whether the page's settings are the saved ones, field by
+ * field: the server leaves empty fields out (no tracks: all of them).
+ */
+export const sameConfig = (saved: AudioConfig, draft: AudioConfig) => configChanges(saved, draft).length === 0;
+
 /** configChanges lists what differs between the saved settings and the page's: "Device: hw:… → hw:…". */
 export function configChanges(saved: AudioConfig, draft: AudioConfig): { label: string; from: string; to: string }[] {
   return FIELDS.flatMap((f) => {

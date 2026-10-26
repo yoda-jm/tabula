@@ -41,6 +41,9 @@ export const slotPath = (k: KindInfo, slot: number) => `${k.listing}/${three(slo
 /** slotLabel numbers a slot as the console shows it: scenes 00-99, presets 1-100. */
 export const slotLabel = (k: KindInfo, slot: number) => (k.first ? String(slot + 1) : String(slot).padStart(2, "0"));
 
+/** slotKey tells the slots of the libraries apart (React keys): an open slot form does not carry over to another library. */
+export const slotKey = (k: KindInfo, slot: number) => `${k.kind}/${slot}`;
+
 export interface Slot {
   slot: number;
   name: string;

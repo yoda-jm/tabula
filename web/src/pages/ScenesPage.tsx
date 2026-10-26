@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { KindInfo, LibKind, LibraryRequest, Slot } from "../lib/library";
-import { KINDS, SCOPE_ALL, SCOPE_PARTS, describe, firstFree, libraryApi, readSlots, slotLabel, slotPath } from "../lib/library";
+import { KINDS, SCOPE_ALL, SCOPE_PARTS, describe, firstFree, libraryApi, readSlots, slotKey, slotLabel, slotPath } from "../lib/library";
 import { usePersistent } from "../lib/route";
 import { stripName } from "../lib/routing";
 import { INDEXED_STRIPS } from "../lib/strips";
@@ -96,7 +96,8 @@ export function ScenesPage() {
               Recalling, saving or changing the library changes the console: it needs armed writes (top right).
             </p>
           )}
-          <SaveForm k={k} slots={slots} actions={actions} />
+          {/* keyed by kind, like the slots: a form's state belongs to its library */}
+          <SaveForm key={k.kind} k={k} slots={slots} actions={actions} />
           <section className="card">
             <header className="section-head">
               <h3>
@@ -109,7 +110,7 @@ export function ScenesPage() {
             {!shown.length && <p className="muted">The console holds no {k.one}.</p>}
             <div className="slots">
               {shown.map((s) => (
-                <SlotRow key={s.slot} k={k} s={s} slots={slots} current={s.slot === current} actions={actions} />
+                <SlotRow key={slotKey(k, s.slot)} k={k} s={s} slots={slots} current={s.slot === current} actions={actions} />
               ))}
             </div>
             {k.kind === "scene" && (

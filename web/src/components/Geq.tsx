@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { two } from "../lib/num";
 import { usePersistent } from "../lib/route";
-import { GEQ_LABELS, geqPosition, geqRtaSource, isDualGeq, rtaSourceLabel, rtaWindow } from "../lib/rta";
+import { GEQ_LABELS, geqPosition, geqRtaSource, isDualGeq, rtaSourceLabel, rtaWindow, rtaWrite } from "../lib/rta";
 import { fromDisplay, toDisplay } from "../lib/values";
 import { useCanWrite, useMeterGroup, useNodes, useValue } from "../store/hooks";
 import { store } from "../store/store";
@@ -45,23 +45,28 @@ export function GeqEditor({ slot, type }: { slot: number; type: string }) {
   const [selected, setSelected] = useState(17);
   const [flat, setFlat] = useState(false);
 
-  // the RTA source this editor wants, written only when writes are armed
+  // the RTA source this editor wants, written only when writes are armed: once when it opens or its side or tap changes
   const want = geqRtaSource(slot, type, side, post);
   const canRta = useCanWrite("/-action/setrtasrc");
   const src = useValue("/-stat/rtasource");
   const current = src === undefined ? -1 : Number(src.value);
-  const written = useRef(-1);
+  const handled = useRef(-1); // the source this editor set, or found set
+  const unconfirmed = useRef(false); // written, not reported back in /-stat/rtasource yet
   useEffect(() => {
-    if (canRta && current !== want && written.current !== want) {
-      written.current = want;
+    const r = rtaWrite(handled.current, want, Number(store.getValue("/-stat/rtasource")?.value ?? -1), canRta);
+    handled.current = r.handled;
+    if (r.write) {
+      unconfirmed.current = true;
       store.set("/-action/setrtasrc", want);
     }
-    if (current === want) written.current = -1;
-  }, [canRta, current, want]);
+  }, [canRta, want]);
+  useEffect(() => {
+    if (current === want) unconfirmed.current = false;
+  }, [current, want]);
   const asked = useValue("/-action/setrtasrc");
   const rta = useMeterGroup("15");
   // a console that does not report /-stat/rtasource back still shows what was asked
-  const showing = current === want || (written.current === want && Number(asked?.value) === want);
+  const showing = current === want || (unconfirmed.current && Number(asked?.value) === want);
 
   const win = useRtaWindow();
 

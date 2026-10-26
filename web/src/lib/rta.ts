@@ -38,6 +38,19 @@ export function geqRtaSource(slot: number, type: string, side: 0 | 1, post: bool
   return base + (post ? RTA_POST : 0);
 }
 
+/**
+ * rtaWrite tells whether a graphic EQ editor writes its RTA source now: once
+ * for each source it wants (when it opens, or its side or tap changes), when
+ * it may write, and not when the RTA listens there already. Never again
+ * because the source moved away (the console's surface or another tab chose
+ * another): that would ping-pong. handled is the source it dealt with last
+ * (-1 at first); the answer gives the next one.
+ */
+export function rtaWrite(handled: number, want: number, current: number, can: boolean): { handled: number; write: boolean } {
+  if (!can || handled === want) return { handled, write: false };
+  return { handled: want, write: current !== want };
+}
+
 /** stripRtaSource is the RTA source number of a strip (before its EQ): its strip index, or null. */
 export function stripRtaSource(path: string): number | null {
   const i = stripIndex(path);

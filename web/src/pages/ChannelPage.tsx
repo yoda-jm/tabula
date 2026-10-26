@@ -11,7 +11,7 @@ import type { Strip } from "../lib/strips";
 import { ALL_STRIPS, BANKS, eqBandsOf, linkOf, sectionsOf, sendsOf, sourceLabel, stripAddrs, stripByPath } from "../lib/strips";
 import type { Send } from "../lib/strips";
 import { prettyText } from "../lib/values";
-import { useCanWrite, useLeaf, useMeterGroup, useNodes, useSchema, useValue } from "../store/hooks";
+import { useCanWrite, useLeaf, useNodes, useSchema, useValue } from "../store/hooks";
 import { lookup } from "../store/lookup";
 import { store } from "../store/store";
 import { FieldRow, Fields, NotConnected, Section } from "./common";
@@ -182,11 +182,11 @@ function EqSection({ strip }: { strip: Strip }) {
   const src = useValue("/-stat/rtasource");
   const cur = src === undefined ? -1 : Number(src.value);
   const here = idx !== null && cur >= 0 && cur % RTA_POST === idx;
-  const rta = useMeterGroup(here ? "15" : null);
   const win = useRtaWindow();
   return (
     <Section title="EQ" on={`${strip.path}/eq/on`} className="eq">
-      <EqCurve strip={strip.path} bands={bands} eqOn={on ? Number(on.value) === 1 : true} rta={here ? rta : undefined} rtaWindow={win} />
+      {/* the curve subscribes to the RTA itself: its ~20 updates a second re-render only the bars */}
+      <EqCurve strip={strip.path} bands={bands} eqOn={on ? Number(on.value) === 1 : true} rtaWindow={here ? win : undefined} />
       {idx !== null && <RtaPicker source={idx} current={cur} />}
       <div className="bands">
         {bands.map((b, i) => (

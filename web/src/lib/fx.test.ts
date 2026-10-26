@@ -11,6 +11,7 @@ import {
   rtaFreq,
   rtaSourceLabel,
   rtaWindow,
+  rtaWrite,
   stripRtaSource,
 } from "./rta";
 
@@ -119,5 +120,21 @@ describe("RTA", () => {
     expect(rtaFraction(-33, w)).toBe(0.5);
     expect(rtaFraction(0, w)).toBe(1);
     expect(rtaFraction(-Infinity, w)).toBe(0);
+  });
+});
+
+describe("rtaWrite", () => {
+  it("sets the RTA source once per side and tap, without fighting another choice", () => {
+    let r = rtaWrite(-1, 90, -1, false); // not armed: nothing
+    expect(r).toEqual({ handled: -1, write: false });
+    r = rtaWrite(r.handled, 90, 12, true); // armed: the editor points the RTA at its EQ
+    expect(r).toEqual({ handled: 90, write: true });
+    r = rtaWrite(r.handled, 90, 90, true); // the console reports it
+    expect(r.write).toBe(false);
+    r = rtaWrite(r.handled, 90, 12, true); // the surface picks another source: left alone
+    expect(r.write).toBe(false);
+    r = rtaWrite(r.handled, 188, 12, true); // the tap changes: once more
+    expect(r).toEqual({ handled: 188, write: true });
+    expect(rtaWrite(-1, 90, 90, true)).toEqual({ handled: 90, write: false }); // already there
   });
 });

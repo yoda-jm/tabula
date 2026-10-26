@@ -12,6 +12,7 @@ import {
   formatTracks,
   parseTracks,
   plural,
+  sameConfig,
   tooManyChannels,
   trackLabel,
 } from "./audio";
@@ -154,5 +155,12 @@ describe("saving the audio settings", () => {
       { label: "Rate", from: "48 kHz", to: "44.1 kHz" },
       { label: "File names", from: "from the routing", to: "Track 01…" },
     ]);
+  });
+
+  it("takes the empty fields the server leaves out for the same settings", () => {
+    const fromServer: AudioConfig = { enabled: true, recorder: "arecord", device: "hw:CARD=PCH,DEV=0", channels: 32, rate: 48000, bits: 24 };
+    // "All" tracks picked on the page, and the fields the forms fill in
+    expect(sameConfig(fromServer, { ...fromServer, tracks: "", plain_names: false, command: "", input: "" })).toBe(true);
+    expect(sameConfig(fromServer, { ...fromServer, tracks: "1-2" })).toBe(false);
   });
 });

@@ -1,13 +1,17 @@
 // Generic parameter editors, chosen by type kind: they read the value from
 // the store and write through it, and are disabled unless writes are armed.
+// A headamp's phantom power asks first, as on the Channel page.
 
 import { useEffect, useState } from "react";
 import type { KeyboardEvent } from "react";
 import type { TypeInfo } from "../lib/api";
+import type { PhantomAsk } from "../lib/phantom";
+import { isPhantom, phantomAsk, phantomPort, phantomTarget } from "../lib/phantom";
 import { isOnOff, prettyText, setBit, stepSize } from "../lib/values";
 import { useCanWrite, useLeaf, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import type { Val } from "../store/store";
+import { PhantomDialog, PhantomToggle } from "./Phantom";
 
 export interface ControlProps {
   addr: string;
@@ -24,6 +28,7 @@ export function ParamControl(props: ControlProps) {
   const val = useValue(props.addr);
   const can = useCanWrite(props.addr);
   if (!leaf) return <span className="muted">—</span>;
+  if (isPhantom(props.addr)) return <PhantomToggle addr={props.addr} />;
   const t = leaf.field.type;
   const disabled = !can || val === undefined;
   switch (t.kind) {
@@ -220,31 +225,53 @@ function NumSlider({ addr, t, val, disabled }: EditorProps) {
 export function TextSetter({ addr }: { addr: string }) {
   const can = useCanWrite(addr);
   const [text, setText] = useState("");
+  const [ask, setAsk] = useState<PhantomAsk | null>(null);
   const send = async () => {
     if (!text.trim()) return;
-    if (await store.setText(addr, text)) setText("");
+    if (!isPhantom(addr)) {
+      if (await store.setText(addr, text)) setText("");
+      return;
+    }
+    // phantom power pops through the PA: asked first, as on its button
+    const target = phantomTarget(text);
+    if (target === null) store.toast(`${addr}: type ON or OFF.`, "warn");
+    else setAsk(phantomAsk(target));
   };
   return (
-    <form
-      className="textset"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void send();
-      }}
-    >
-      <input
-        className="input"
-        type="text"
-        placeholder="node text"
-        value={text}
-        disabled={!can}
-        spellCheck={false}
-        aria-label={`${addr} as node text`}
-        onChange={(e) => setText(e.target.value)}
-      />
-      <button type="submit" className="btn" disabled={!can || !text.trim()}>
-        Set
-      </button>
-    </form>
+    <>
+      <form
+        className="textset"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void send();
+        }}
+      >
+        <input
+          className="input"
+          type="text"
+          placeholder="node text"
+          value={text}
+          disabled={!can}
+          spellCheck={false}
+          aria-label={`${addr} as node text`}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <button type="submit" className="btn" disabled={!can || !text.trim()}>
+          Set
+        </button>
+      </form>
+      {ask && (
+        <PhantomDialog
+          ask={ask}
+          port={phantomPort(addr)}
+          onConfirm={() => {
+            setAsk(null);
+            setText("");
+            store.set(addr, ask.target);
+          }}
+          onCancel={() => setAsk(null)}
+        />
+      )}
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from "vitest";
-import { describe, firstFree, kindInfo, readSlots, slotLabel, slotPath } from "./library";
+import { describe, firstFree, kindInfo, readSlots, slotKey, slotLabel, slotPath } from "./library";
 import type { Lookup } from "./routing";
 
 function lookup(v: Record<string, number | string>): Lookup {
@@ -43,5 +43,10 @@ group("library", () => {
     expect(describe({ op: "rename", kind: "snippet", index: 0, name: "Intro" }, "Old")).toBe(
       "Rename snippet 00 “Old” to “Intro”",
     );
+  });
+
+  it("tells the slots of two libraries apart", () => {
+    expect(slotKey(kindInfo("scene"), 3)).not.toBe(slotKey(kindInfo("snippet"), 3));
+    expect(slotKey(kindInfo("scene"), 3)).toBe(slotKey(kindInfo("scene"), 3));
   });
 });
