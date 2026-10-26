@@ -2,13 +2,13 @@
 // console that does not answer is asked again by tabula: another address
 // can replace it at any time. Both end a running recording: asked first.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConfirmDialog } from "../components/shell";
-import type { Discovered } from "../lib/api";
+import type { About, Discovered } from "../lib/api";
 import { api } from "../lib/api";
 import { usePersistent } from "../lib/route";
 import type { EndsRecording } from "../lib/session";
-import { endsRecording } from "../lib/session";
+import { endsRecording, sinceText } from "../lib/session";
 import { useRecord, useStatus } from "../store/hooks";
 import { store } from "../store/store";
 
@@ -159,6 +159,7 @@ export function ConnectPage() {
           </ul>
         )}
       </section>
+      <AboutCard />
       {ask && (
         <ConfirmDialog
           title={ask.title}
@@ -177,3 +178,43 @@ export function ConnectPage() {
     </div>
   );
 }
+
+/** AboutCard says which tabula runs, since when, and where it keeps its files: its log first, for after a show. */
+function AboutCard() {
+  const [about, setAbout] = useState<About | null>(null);
+  useEffect(() => {
+    api.about().then(setAbout, () => setAbout(null));
+  }, []);
+  if (!about) return null;
+  const started = new Date(about.started);
+  return (
+    <section className="card">
+      <h2>This tabula</h2>
+      <dl className="facts about">
+        <dt>Version</dt>
+        <dd>{about.version}</dd>
+        <dt>Running since</dt>
+        <dd>
+          {started.toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })} ({sinceText(started)})
+        </dd>
+        <dt>Log</dt>
+        <dd>{about.log ? <code>{about.log}</code> : <span className="muted">the terminal only (-log none)</span>}</dd>
+        <dt>Sessions</dt>
+        <dd>
+          <code>{about.sessions}</code>
+        </dd>
+        <dt>Scene files</dt>
+        <dd>
+          <code>{about.scenes}</code>
+        </dd>
+        <dt>Access links</dt>
+        <dd>{about.access ? <code>{about.access}</code> : <span className="muted">kept in memory only</span>}</dd>
+        <dt>GUI</dt>
+        <dd>
+          <code>{about.listen}</code>
+        </dd>
+      </dl>
+    </section>
+  );
+}
+

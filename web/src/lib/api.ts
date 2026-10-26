@@ -25,6 +25,19 @@ export interface Status {
   connecting: boolean;
   error?: string;
   console?: ConsoleStatus;
+  /** tabula's version ("v0.2.0", "dev 9f91019") */
+  version?: string;
+}
+
+/** About is which tabula runs, since when, and where it keeps its files (GET /api/about, the engineer's). */
+export interface About {
+  version: string;
+  started: string;
+  log: string; // "": the terminal only
+  sessions: string;
+  scenes: string;
+  access: string;
+  listen: string;
 }
 
 export type Kind = "enum" | "int" | "bitmap" | "string" | "lin" | "log" | "level" | "unused" | "raw";
@@ -204,6 +217,7 @@ export async function call<T>(method: "GET" | "POST" | "DELETE", url: string, bo
 
 export const api = {
   status: () => call<Status>("GET", "/api/status"),
+  about: () => call<About>("GET", "/api/about"),
   discover: () => call<Discovered[]>("GET", "/api/discover"),
   connect: (addr: string) => call<Status>("POST", "/api/connect", { addr }),
   disconnect: () => call<Status>("POST", "/api/disconnect", {}),

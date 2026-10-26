@@ -10,6 +10,7 @@ client accepts it.
 | Method | Path | Body | Answer |
 |---|---|---|---|
 | GET | `/api/status` | | `Status` |
+| GET | `/api/about` | | `About` |
 | GET | `/api/discover` | | consoles answering a broadcast `/xinfo` within 1.5 s: `[{ip, name, model, firmware}]` |
 | POST | `/api/connect` | `{"addr": "192.168.1.62"}` (port 10023 by default) | 202 + `Status`; connection and sync go on in the background, follow `status` events. A console that does not answer is asked again (every 1 s, then up to every 10 s) until it does or another address is chosen: `connecting` stays true, `error` says why. A recording running ends (its files are finished in the background) |
 | POST | `/api/disconnect` | | `Status`; a recording running ends |
@@ -31,6 +32,15 @@ client accepts it.
 ```
 
 `connecting` stays true until the initial sync is over (`synced` reaches `total`).
+
+`Status` also has `version`, tabula's version (`v0.2.0`, or `dev 9f91019`
+for a build from a git clone, `+` when it holds changes not committed): a
+page that sees it change was opened before tabula was updated.
+
+`About` (the engineer's) is which tabula runs and where it keeps its files,
+as absolute paths: `{"version", "started", "log", "sessions", "scenes",
+"access", "listen"}`; `log` is `""` when the log goes to the terminal only
+(`-log none`), `access` when the access links are kept in memory only.
 
 ## Schema
 

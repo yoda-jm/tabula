@@ -99,6 +99,14 @@ export function formatDuration(seconds: number): string {
   return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
+/** sinceText is how long ago a time was: "3 min", "2 h 05", "4 days". */
+export function sinceText(t: Date, now = new Date()): string {
+  const min = Math.max(0, Math.floor((now.getTime() - t.getTime()) / 60000));
+  if (min < 60) return `${min} min`;
+  if (min < 48 * 60) return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}`;
+  return `${Math.floor(min / 1440)} days`;
+}
+
 /** damagedText says which lines of a session's change log could not be read, or "" when every line could. */
 export function damagedText(lines: number[] | undefined): string {
   if (!lines?.length) return "";

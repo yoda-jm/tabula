@@ -7,14 +7,18 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/yoda-jm/tabula/pkg/buildinfo"
 	"github.com/yoda-jm/tabula/pkg/webapi"
 	"github.com/yoda-jm/tabula/web"
 )
@@ -23,49 +27,93 @@ import (
 var version = "dev"
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	code := run(ctx, os.Args[1:], os.Stdout, os.Stderr, nil)
+	stop()
+	os.Exit(code)
+}
+
+// run is tabula with its command line: it serves the GUI until ctx is done
+// and returns the exit status (2 for a bad flag). ready, when set, is told
+// the address the GUI listens on.
+func run(ctx context.Context, args []string, stdout, stderr io.Writer, ready func(net.Addr)) int {
+	fs := flag.NewFlagSet("tabula", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	var (
-		httpAddr = flag.String("http", "localhost:8033", "address to serve the GUI on (use :8033 to reach it from other devices)")
-		consoleA = flag.String("console", "", "console (or tabula-emu) to connect to at start, e.g. 192.168.1.62")
-		webDir   = flag.String("web-dir", "", "serve the GUI from this directory instead of the embedded build")
-		sessions = flag.String("sessions", "sessions", "directory where recorded sessions are kept")
-		scenes   = flag.String("scenes", "scenes", "directory of the scene files (.scn) to load into the console, or to save it as")
-		record   = flag.Bool("record", false, "start recording as soon as the console is connected and synced (stops on exit)")
-		accessF  = flag.String("access", "access.json", "file keeping the access links made on the Access page")
-		guest    = flag.String("guest", "none", "role of other devices without an access link: none, viewer or engineer")
-		resetPw  = flag.Bool("reset-password", false, "remove the engineer password (and its sessions) from the access file, then exit")
-		hosts    = flag.String("allowed-hosts", "", "other host names the GUI is opened by, comma-separated (a DNS name, a reverse proxy); IP addresses, localhost and this machine's name always work")
-		showVer  = flag.Bool("version", false, "print the version and exit")
-		audioF   = addAudioFlags(flag.CommandLine) // audio.go
+		httpAddr = fs.String("http", "localhost:8033", "address to serve the GUI on (use :8033 to reach it from other devices)")
+		consoleA = fs.String("console", "", "console (or tabula-emu) to connect to at start, e.g. 192.168.1.62")
+		webDir   = fs.String("web-dir", "", "serve the GUI from this directory instead of the embedded build")
+		sessions = fs.String("sessions", "sessions", "directory where recorded sessions are kept")
+		scenes   = fs.String("scenes", "scenes", "directory of the scene files (.scn) to load into the console, or to save it as")
+		record   = fs.Bool("record", false, "start recording as soon as the console is connected and synced (stops on exit)")
+		accessF  = fs.String("access", "access.json", "file keeping the access links made on the Access page")
+		guest    = fs.String("guest", "none", "role of other devices without an access link: none, viewer or engineer")
+		resetPw  = fs.Bool("reset-password", false, "remove the engineer password (and its sessions) from the access file, then exit")
+		hosts    = fs.String("allowed-hosts", "", "other host names the GUI is opened by, comma-separated (a DNS name, a reverse proxy); IP addresses, localhost and this machine's name always work")
+		logF     = fs.String("log", "", `file the log is appended to, besides the terminal (default tabula.log in the -sessions directory; "none": the terminal only)`)
+		showVer  = fs.Bool("version", false, "print the version and exit")
+		audioF   = addAudioFlags(fs) // audio.go
 	)
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "tabula: unexpected argument %q (flags start with -)\n", fs.Arg(0))
+		return 2
+	}
+	ver := buildinfo.Version(version)
 	if *showVer {
-		fmt.Println("tabula", version)
-		return
+		fmt.Fprintln(stdout, "tabula", ver)
+		return 0
 	}
 	if *audioF.list {
-		listAudioDevices(os.Stdout)
-		return
+		listAudioDevices(stdout)
+		return 0
 	}
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	log.Info("tabula", "version", version)
+
+	// the log goes to a file too: after a show, the terminal tabula ran in is often gone
+	out := stderr
+	logFile := logPath(*logF, *sessions)
+	var logErr error
+	if logFile != "" {
+		f, err := openLog(logFile)
+		if err != nil {
+			logErr, logFile = err, ""
+		} else {
+			defer f.Close()
+			out = io.MultiWriter(stderr, f)
+			if abs, err := filepath.Abs(logFile); err == nil {
+				logFile = abs
+			}
+		}
+	}
+	log := slog.New(slog.NewTextHandler(out, nil))
+	log.Info("tabula", "version", ver, "args", strings.Join(args, " "))
+	if logErr != nil {
+		log.Warn("-log: the log goes to the terminal only", "err", logErr)
+	}
 
 	api := webapi.New(log)
+	api.SetBuild(ver, logFile)
 	if *resetPw {
 		if err := api.SetAccessFile(*accessF); err != nil {
 			log.Error("-access", "err", err)
-			os.Exit(1)
+			return 1
 		}
 		had, err := api.ResetPassword()
 		if err != nil {
 			log.Error("-reset-password", "err", err)
-			os.Exit(1)
+			return 1
 		}
 		if had {
-			fmt.Println("engineer password removed from", *accessF)
+			fmt.Fprintln(stdout, "engineer password removed from", *accessF)
 		} else {
-			fmt.Println("no engineer password in", *accessF)
+			fmt.Fprintln(stdout, "no engineer password in", *accessF)
 		}
-		return
+		return 0
 	}
 	if *hosts != "" {
 		api.SetAllowedHosts(strings.Split(*hosts, ","))
@@ -76,39 +124,38 @@ func main() {
 	}
 	if err != nil {
 		log.Error("-guest", "err", err)
-		os.Exit(2)
+		return 2
 	}
 	api.SetGuestRole(guestRole)
 	if err := api.SetAccessFile(*accessF); err != nil {
 		log.Error("-access", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	if guestRole == webapi.RoleEngineer && api.HasPassword() {
 		log.Error("-guest engineer makes every device the engineer, but an engineer password is set: choose another guest role, or remove the password with -reset-password")
-		os.Exit(2)
+		return 2
 	}
 	api.SetSessionsDir(*sessions)
 	api.SetScenesDir(*scenes)
 	audioCfg, audioFile, err := audioF.load(*sessions)
 	if err != nil {
 		log.Error("audio", "err", err)
-		os.Exit(2)
+		return 2
 	}
 	api.SetAudioConfig(audioCfg, audioFile)
 	api.RecordOnSync(*record)
-	defer api.StopRecording()
-	if *consoleA != "" {
-		api.Connect(*consoleA)
-	}
 	ln, err := webapi.Listen(*httpAddr)
 	if err != nil {
 		log.Error("listen", "err", err)
-		os.Exit(1)
+		return 1
+	}
+	defer api.Disconnect()
+	defer api.StopRecording() // first: a recording ends cleanly, then the console is let go
+	if *consoleA != "" {
+		api.Connect(*consoleA)
 	}
 	api.SetListenAddr(ln.Addr().String())
 	srv := &http.Server{Handler: api.Handler(web.Handler(*webDir)), ReadHeaderTimeout: 5 * time.Second}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	go func() {
 		<-ctx.Done()
 		shut, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -116,8 +163,13 @@ func main() {
 		srv.Shutdown(shut)
 	}()
 	log.Info("GUI", "url", "http://"+ln.Addr().String())
+	if ready != nil {
+		ready(ln.Addr())
+	}
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Error("http", "err", err)
-		os.Exit(1)
+		return 1
 	}
+	log.Info("tabula stopped")
+	return 0
 }

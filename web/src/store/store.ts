@@ -62,6 +62,8 @@ export class Store {
   status: Status = { connected: false, connecting: false };
   /** whether a status came from the server yet */
   statusKnown = false;
+  /** tabula's version when this page got its first status: another one later means tabula was updated */
+  firstVersion: string | null = null;
   /** who this browser is for tabula; null until known */
   access: Whoami | null = null;
   stream: StreamState = "connecting";
@@ -331,6 +333,7 @@ export class Store {
     const prev = this.status;
     this.status = s;
     this.statusKnown = true;
+    if (s.version && !this.firstVersion) this.firstVersion = s.version;
     if ((s.connecting && !prev.connecting) || (!s.console && !s.connecting && this.stateLoaded)) {
       this.clearState();
     }

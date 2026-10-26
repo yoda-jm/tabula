@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { ArmControl, AudioBanner, ConnectionPill, RecIndicator, StreamBanner, Toasts } from "./components/shell";
+import { ArmControl, AudioBanner, ConnectionPill, RecIndicator, StreamBanner, Toasts, UpdateBanner } from "./components/shell";
 import { atLeast } from "./lib/access";
 import type { Role } from "./lib/api";
 import { api } from "./lib/api";
@@ -81,7 +81,7 @@ function ConsoleApp({ role }: { role: Role }) {
     <div className="app">
       <div className="header">
         <header className="topbar">
-          <a className="brand" href="#/mixer" aria-label="tabula: mixer">
+          <a className="brand" href="#/mixer" aria-label="tabula: mixer" title={status.version ? `tabula ${status.version}` : undefined}>
             tabula
           </a>
           <ConnectionPill onClick={() => engineer && go({ page: "connect" })} />
@@ -104,6 +104,7 @@ function ConsoleApp({ role }: { role: Role }) {
           ))}
         </nav>
         <StreamBanner />
+        <UpdateBanner />
         {engineer && <AudioBanner onOpen={page !== "record" ? () => go({ page: "record" }) : undefined} />}
       </div>
       <main className="main">

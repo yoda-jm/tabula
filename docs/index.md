@@ -176,6 +176,13 @@ it again until it answers, when the laptop starts first), for unattended
 recording of a concert (`-audio-device hw:CARD=X32,DEV=0
 -audio-tracks 1-16` adds the audio).
 
+**The log** goes to the terminal and to `tabula.log` in the sessions
+directory, kept across runs (appended; over 10 MB it starts again, the
+previous one kept as `tabula.log.1`): after a show, the terminal tabula ran
+in is often gone. `-log file` puts it elsewhere, `-log none` keeps it in
+the terminal only. Its first line has the version and the command line;
+the Connect page says where it is.
+
 Later: more band-specific screens.
 
 ## Reference

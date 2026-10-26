@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addsMarker, damagedText, endsRecording, formatDuration, parseTime } from "./session";
+import { addsMarker, damagedText, endsRecording, formatDuration, parseTime, sinceText } from "./session";
 
 describe("session times", () => {
   it("formats durations", () => {
@@ -45,5 +45,13 @@ describe("sessions", () => {
     const rec = { recording: true, replaying: false };
     expect(endsRecording("disconnect", rec)?.body).toBe("A recording is running: disconnecting ends it, with its audio.");
     expect(endsRecording("connect", rec)?.body).toBe("Connecting to another console ends the recording, with its audio.");
+  });
+
+  it("says how long ago tabula started", () => {
+    const now = new Date("2026-10-26T22:00:00");
+    expect(sinceText(new Date("2026-10-26T21:57:30"), now)).toBe("2 min");
+    expect(sinceText(new Date("2026-10-26T19:55:00"), now)).toBe("2 h 05");
+    expect(sinceText(new Date("2026-10-22T08:00:00"), now)).toBe("4 days");
+    expect(sinceText(new Date("2026-10-26T22:00:30"), now)).toBe("0 min"); // a clock a little ahead
   });
 });

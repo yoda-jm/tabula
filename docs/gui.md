@@ -404,3 +404,14 @@ console that does not answer is asked again every few seconds (the page
 says why) until it does; connecting to another address replaces it, so the
 buttons stay usable meanwhile. While a recording runs, **Disconnect** and
 every connect button ask first: they end the recording, with its audio.
+
+**This tabula** says which version runs (`v0.2.0`; a build from a git
+clone says its commit, `dev 9f91019`, with a `+` when it holds changes not
+committed), since when (a tabula restarted during the show shows it), and
+where it keeps its files: its log, the sessions, the scene files and the
+access links. The version is also in the tooltip of the **tabula** logo, on
+every page.
+
+**Updated while a page is open.** A page left open on a phone while tabula
+was updated (or restarted with another version) still runs the old GUI: a
+bar asks to reload it, on the in-ear page too.

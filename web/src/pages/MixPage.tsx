@@ -11,7 +11,7 @@ import type { ReactNode, RefObject } from "react";
 import { Fader } from "../components/Fader";
 import { StripMeter } from "../components/Meter";
 import { Scribble } from "../components/Scribble";
-import { StreamBanner, Toasts } from "../components/shell";
+import { StreamBanner, Toasts, UpdateBanner } from "../components/shell";
 import { busLinkAddr, mixBuses } from "../lib/access";
 import { api } from "../lib/api";
 import type { MixSource } from "../lib/mix";
@@ -36,6 +36,7 @@ export function MusicianApp() {
   return (
     <div className="app iem-app">
       <StreamBanner />
+      <UpdateBanner />
       <main className="main">
         <MixPage bus={who?.bus} />
       </main>

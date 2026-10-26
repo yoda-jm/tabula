@@ -226,7 +226,8 @@ h4 {
   background: var(--danger);
   color: #fff;
 }
-.iem-app .stream-banner {
+.iem-app .stream-banner,
+.iem-app .update-banner {
   padding-top: calc(8px + env(safe-area-inset-top, 0px));
 }
 /* the audio of a recording is not recorded (red) or in trouble (amber), on every page */

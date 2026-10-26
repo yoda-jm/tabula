@@ -148,6 +148,17 @@
   below; on a phone the drawing is taller and a touch on a handle drags it
   instead of scrolling. The slope of a low cut now runs out of the drawing
   instead of lying flat along its bottom edge, as if it stopped at -18 dB.
+- tabula's log goes to `tabula.log` in the sessions directory too, not only
+  to the terminal, which is often gone after a show (appended; over 10 MB
+  it starts again, the previous one kept as `tabula.log.1`). `-log file`
+  puts it elsewhere, `-log none` keeps the terminal only. Its first line
+  has the version and the command line, its last *tabula stopped*.
+- The GUI says which tabula runs: the Connect page has a **This tabula**
+  card (version, running since, where the log, sessions, scene files and
+  access links are; `GET /api/about`), the **tabula** logo's tooltip has the
+  version (`version` in the status), and a page left open while tabula was
+  updated asks to be reloaded. A build from a git clone names its commit
+  (`tabula -version`: `dev 9f91019`), for tabula-emu too.
 - Stopping a recording and starting another within the same second failed
   (*already holds a session*): the second one is named `…-2`. A console
   change arriving while a recording starts no longer races with the

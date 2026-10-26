@@ -63,10 +63,14 @@ type Server struct {
 	scenes    sceneLoadState // scenefiles.go
 	usb       usbState       // usb.go
 	backup    usbBackupState // usbbackup.go
+
+	version string    // about.go
+	logFile string    // about.go
+	started time.Time // about.go
 }
 
 func New(log *slog.Logger) *Server {
-	s := &Server{log: log, model: "M32C", schema: schema.Build("M32C"), sessionsDir: "sessions", scenesDir: "scenes"}
+	s := &Server{log: log, model: "M32C", schema: schema.Build("M32C"), sessionsDir: "sessions", scenesDir: "scenes", version: "dev", started: time.Now()}
 	s.hub.init()
 	s.acc.init()
 	return s
@@ -78,6 +82,7 @@ func New(log *slog.Logger) *Server {
 func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/status", s.getStatus)
+	mux.HandleFunc("GET /api/about", s.getAbout)
 	mux.HandleFunc("GET /api/discover", s.discover)
 	mux.HandleFunc("POST /api/connect", s.connect)
 	mux.HandleFunc("POST /api/disconnect", s.disconnect)
@@ -238,12 +243,13 @@ type statusView struct {
 	Connecting bool            `json:"connecting"`
 	Error      string          `json:"error,omitempty"`
 	Console    *console.Status `json:"console,omitempty"`
+	Version    string          `json:"version"` // tabula's (a page open across an update sees it change)
 }
 
 func (s *Server) status() statusView {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v := statusView{Connecting: s.connecting, Error: s.lastErr}
+	v := statusView{Connecting: s.connecting, Error: s.lastErr, Version: s.version}
 	if s.client != nil {
 		st := s.client.Status()
 		v.Console = &st

@@ -148,6 +148,28 @@ export function StreamBanner() {
 }
 
 /**
+ * UpdateBanner asks to reload a page opened before tabula was updated (a
+ * phone left open while the laptop got a new tabula): it still runs the old
+ * GUI, which may not match the new tabula.
+ */
+export function UpdateBanner() {
+  const s = useStatus();
+  const was = store.firstVersion;
+  if (!was || !s.version || s.version === was) return null;
+  return (
+    <div className="audio-banner warn update-banner" role="status">
+      <strong>tabula was updated</strong>
+      <span className="audio-banner-text">
+        {was} → {s.version}: reload the page to use the new version.
+      </span>
+      <button type="button" className="btn" onClick={() => location.reload()}>
+        Reload
+      </button>
+    </div>
+  );
+}
+
+/**
  * AudioBanner is a bar under the navigation, on every page, while the audio
  * of a recording is not recorded (red) or in trouble (amber): the header's
  * REC is easy to miss during a show.

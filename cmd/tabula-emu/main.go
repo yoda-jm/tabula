@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yoda-jm/tabula/pkg/buildinfo"
 	"github.com/yoda-jm/tabula/pkg/emu"
 	"github.com/yoda-jm/tabula/pkg/scene"
 	"github.com/yoda-jm/tabula/pkg/schema"
@@ -46,8 +47,9 @@ func main() {
 		showVer   = flag.Bool("version", false, "print the version and exit")
 	)
 	flag.Parse()
+	ver := buildinfo.Version(version)
 	if *showVer {
-		fmt.Println("tabula-emu", version)
+		fmt.Println("tabula-emu", ver)
 		return
 	}
 
@@ -56,7 +58,7 @@ func main() {
 		level = slog.LevelDebug
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
-	log.Info("tabula-emu", "version", version)
+	log.Info("tabula-emu", "version", ver)
 	if err := run(log, *listen, *model, *name, *firmware, *sceneFile, *save, *libDir, *presets, *usbDir, *httpAddr, *unhandled); err != nil {
 		log.Error("tabula-emu", "err", err)
 		os.Exit(1)
