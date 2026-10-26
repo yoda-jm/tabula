@@ -142,7 +142,9 @@
   files tabula writes and reads (sessions, scene files): node text has no
   escape for it, so it is written with an apostrophe.
 - Stopping a recording and starting another within the same second failed
-  (*already holds a session*): the second one is named `…-2`.
+  (*already holds a session*): the second one is named `…-2`. A console
+  change arriving while a recording starts no longer races with the
+  writing of its `meta.json`.
 
 ### tabula-emu
 - Recording to the USB stick: `/-stat/tape/state` 4 records and 3 pauses

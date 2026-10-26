@@ -104,7 +104,10 @@ func Start(dir string, st *state.Store, consoleName, note string) (*Recorder, er
 		r.Stop()
 		return nil, err
 	}
-	if err := writeMeta(r.dir, r.meta); err != nil {
+	r.mu.Lock()
+	m := r.meta // the changes recorded meanwhile count in it
+	r.mu.Unlock()
+	if err := writeMeta(r.dir, m); err != nil {
 		r.Stop()
 		return nil, err
 	}
