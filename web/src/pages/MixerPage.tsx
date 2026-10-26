@@ -1,10 +1,14 @@
-// The mixer: banks of strips with scribble strip, meter, fader, mute and pan.
-// Linked pairs show as one stereo strip: its fader and mute drive the odd
-// strip, which the console mirrors to the even one.
+// The mixer: banks of strips with scribble strip, meter, fader, solo, mute
+// and pan, and the mute groups and Clear solo above them. Linked pairs show
+// as one stereo strip: its fader and mute drive the odd strip, which the
+// console mirrors to the even one. A strip silenced by a mute group or a
+// muted DCA shows it on its MUTE button.
 
 import { Fader } from "../components/Fader";
 import { StripMeter } from "../components/Meter";
 import { Scribble } from "../components/Scribble";
+import { MUTE_GROUPS, SOLO_ADDRS, muteGroupAddr, silencedBy, soloAddr } from "../lib/monitor";
+import { range } from "../lib/num";
 import { usePersistent } from "../lib/route";
 import type { MixerStrip } from "../lib/strips";
 import { BANKS, pairStrips, stripAddrs } from "../lib/strips";
@@ -20,19 +24,22 @@ export function MixerPage({ selected, onSelect }: { selected?: string; onSelect(
   const strips = pairStrips(bank.strips, linked);
   return (
     <div className="page mixer">
-      <div className="banks" role="tablist" aria-label="Banks">
-        {BANKS.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            role="tab"
-            aria-selected={b.id === bank.id}
-            className={"bank" + (b.id === bank.id ? " active" : "")}
-            onClick={() => setBank(b.id)}
-          >
-            {b.label}
-          </button>
-        ))}
+      <div className="mixer-head">
+        <div className="banks" role="tablist" aria-label="Banks">
+          {BANKS.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              role="tab"
+              aria-selected={b.id === bank.id}
+              className={"bank" + (b.id === bank.id ? " active" : "")}
+              onClick={() => setBank(b.id)}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+        <MixerTools />
       </div>
       <NotConnected />
       <div className="strips" role="tabpanel" aria-label={bank.label}>
@@ -45,6 +52,47 @@ export function MixerPage({ selected, onSelect }: { selected?: string; onSelect(
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+/** MixerTools are the mute groups, and the solo count with Clear solo. */
+function MixerTools() {
+  const schema = useSchema();
+  const can = useCanWrite();
+  useNodes(["/config/mute", "/-stat/solosw"]);
+  if (!schema) return null;
+  const soloed = SOLO_ADDRS.filter((s) => Number(store.getValue(s.addr)?.value) === 1);
+  return (
+    <div className="mixer-tools">
+      <div className="mute-groups" role="group" aria-label="Mute groups">
+        <span className="tools-label">Mute groups</span>
+        {MUTE_GROUPS.map((n) => {
+          const on = Number(store.getValue(muteGroupAddr(n))?.value) === 1;
+          return (
+            <button
+              key={n}
+              type="button"
+              className={"btn mute-group" + (on ? " lit" : "")}
+              aria-pressed={on}
+              aria-label={`Mute group ${n}`}
+              disabled={!can}
+              onClick={() => store.set(muteGroupAddr(n), on ? 0 : 1)}
+            >
+              {n}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        className={"btn clear-solo" + (soloed.length ? " lit" : "")}
+        disabled={!can || !soloed.length}
+        title={soloed.map((s) => s.strip.label).join(", ")}
+        onClick={() => store.set("/-action/clearsolo", 1)}
+      >
+        {soloed.length ? `Clear solo (${soloed.length})` : "No solo"}
+      </button>
     </div>
   );
 }
@@ -62,6 +110,7 @@ function StripView({ m, selected, onSelect }: { m: MixerStrip; selected: boolean
   const { strip, partner } = m;
   const a = stripAddrs(schema, strip);
   const shown = partner ? { ...strip, label: m.label } : strip;
+  const solo = soloAddr(strip);
   return (
     <div className={"strip" + (partner ? " pair" : "") + (selected ? " selected" : "")}>
       <Scribble strip={shown} nameAddr={a.name} colorAddr={a.color} selected={selected} onClick={onSelect} />
@@ -78,8 +127,45 @@ function StripView({ m, selected, onSelect }: { m: MixerStrip; selected: boolean
         <StripMeter strip={strip} partner={partner} />
         {a.fader && <StripFader addr={a.fader} label={shown.label} disabled={!can} />}
       </div>
-      {a.on && <Mute addr={a.on} label={shown.label} disabled={!can} />}
+      <div className="strip-buttons">
+        {solo && <Solo addr={solo} label={shown.label} disabled={!can} />}
+        {a.on && <Mute addr={a.on} path={strip.path} label={shown.label} disabled={!can} />}
+      </div>
     </div>
+  );
+}
+
+/** What can silence a strip besides its own mute: the mute groups, and the DCAs (/dca/N/on). */
+const SILENCERS = ["/config/mute", ...range(1, 8).map((n) => `/dca/${n}`)];
+
+/** useSilenced lists the mute groups on and the DCAs muted that silence the strip at path. */
+function useSilenced(path: string): string[] {
+  const mute = useValue(`${path}/grp/mute`);
+  const dca = useValue(`${path}/grp/dca`);
+  useNodes(SILENCERS);
+  if (mute === undefined && dca === undefined) return [];
+  const on = (addr: string) => Number(store.getValue(addr)?.value) === 1;
+  return silencedBy(
+    { mute: Number(mute?.value ?? 0), dca: Number(dca?.value ?? 0) },
+    (n) => on(muteGroupAddr(n)),
+    (n) => on(`/dca/${n}/on`),
+  );
+}
+
+function Solo({ addr, label, disabled }: { addr: string; label: string; disabled: boolean }) {
+  const val = useValue(addr);
+  const on = val !== undefined && Number(val.value) === 1;
+  return (
+    <button
+      type="button"
+      className={"btn solo" + (on ? " lit" : "")}
+      aria-pressed={on}
+      aria-label={`Solo ${label}`}
+      disabled={disabled || val === undefined}
+      onClick={() => store.set(addr, on ? 0 : 1)}
+    >
+      SOLO
+    </button>
   );
 }
 
@@ -103,15 +189,18 @@ function StripFader({ addr, label, disabled }: { addr: string; label: string; di
   );
 }
 
-function Mute({ addr, label, disabled }: { addr: string; label: string; disabled: boolean }) {
+function Mute({ addr, path, label, disabled }: { addr: string; path: string; label: string; disabled: boolean }) {
   const val = useValue(addr);
+  const silenced = useSilenced(path);
   const muted = val !== undefined && Number(val.value) === 0;
+  const by = !muted && silenced.length ? `silenced by ${silenced.join(", ")}` : "";
   return (
     <button
       type="button"
-      className={"btn mute" + (muted ? " lit" : "")}
+      className={"btn mute" + (muted ? " lit" : by ? " silenced" : "")}
       aria-pressed={muted}
-      aria-label={`Mute ${label}`}
+      aria-label={`Mute ${label}` + (by ? ` (${by})` : "")}
+      title={by ? `${label} is ${by}` : undefined}
       disabled={disabled || val === undefined}
       onClick={() => store.set(addr, muted ? 1 : 0)}
     >

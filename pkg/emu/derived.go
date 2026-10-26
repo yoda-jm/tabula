@@ -22,6 +22,7 @@ const originConsole = "console"
 type derived struct {
 	mu                 sync.Mutex
 	solo, inserts, has bool
+	soloOn             string // the last solo switch turned on by a client
 	kick               chan struct{}
 }
 
@@ -34,6 +35,9 @@ func (s *Server) watchDerived(changes []state.Change) {
 		case c.Origin == originConsole:
 		case strings.HasPrefix(a, "/-stat/solosw/"):
 			d.solo = true
+			if c.Value.Int == 1 {
+				d.soloOn = a
+			}
 		case strings.HasSuffix(a, "/insert/sel"):
 			d.inserts = true
 		case strings.HasSuffix(a, "/config/source") || strings.HasPrefix(a, "/config/routing"):
@@ -50,11 +54,11 @@ func (s *Server) watchDerived(changes []state.Change) {
 func (s *Server) runDerived(ctx context.Context) {
 	for {
 		s.derived.mu.Lock()
-		solo, ins, has := s.derived.solo, s.derived.inserts, s.derived.has
-		s.derived.solo, s.derived.inserts, s.derived.has = false, false, false
+		solo, ins, has, soloOn := s.derived.solo, s.derived.inserts, s.derived.has, s.derived.soloOn
+		s.derived.solo, s.derived.inserts, s.derived.has, s.derived.soloOn = false, false, false, ""
 		s.derived.mu.Unlock()
 		if solo {
-			s.deriveSolo()
+			s.deriveSolo(soloOn)
 		}
 		if ins {
 			s.deriveInserts()
@@ -77,14 +81,22 @@ func (s *Server) intAt(addr string) int32 {
 
 func (s *Server) setInt(addr string, v int32) { s.store.Set(addr, osc.Int(v), originConsole) }
 
-// deriveSolo: /-stat/solo is ON while any solo switch is.
-func (s *Server) deriveSolo() {
+// deriveSolo: /-stat/solo is ON while any solo switch is. With exclusive
+// solo (/config/solo/exclusive), the switch just turned on (last) turns the
+// others off.
+func (s *Server) deriveSolo(last string) {
+	exclusive := last != "" && s.intAt("/config/solo/exclusive") == 1
 	on := int32(0)
 	for i := 1; i <= 80; i++ {
-		if s.intAt(fmt.Sprintf("/-stat/solosw/%02d", i)) == 1 {
-			on = 1
-			break
+		a := fmt.Sprintf("/-stat/solosw/%02d", i)
+		if s.intAt(a) != 1 {
+			continue
 		}
+		if exclusive && a != last {
+			s.setInt(a, 0)
+			continue
+		}
+		on = 1
 	}
 	s.setInt("/-stat/solo", on)
 }

@@ -178,7 +178,7 @@ func (s *Server) Serve(ctx context.Context, conn *net.UDPConn) error {
 		conn.Close()
 	}()
 	// Computed status values are right before the first request.
-	s.deriveSolo()
+	s.deriveSolo("")
 	s.deriveInserts()
 	s.deriveHeadamps()
 	go s.runSubscriptions(ctx)

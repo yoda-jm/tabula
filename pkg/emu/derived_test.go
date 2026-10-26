@@ -36,9 +36,22 @@ func TestDerivedValues(t *testing.T) {
 
 	p.send("/-stat/solosw/05", osc.Int(1))
 	eventually(t, p, "/-stat/solo", 1)
+	p.send("/-stat/solosw/49", osc.Int(1)) // not exclusive: both
+	eventually(t, p, "/-stat/solosw/49", 1)
+	if got := p.ask("/-stat/solosw/05").Args[0].Int; got != 1 {
+		t.Errorf("solo 05 turned off without exclusive solo")
+	}
 	p.send("/-action/clearsolo", osc.Int(1))
 	eventually(t, p, "/-stat/solosw/05", 0)
 	eventually(t, p, "/-stat/solo", 0)
+
+	p.send("/config/solo/exclusive", osc.Int(1)) // one at a time
+	p.send("/-stat/solosw/05", osc.Int(1))
+	eventually(t, p, "/-stat/solo", 1)
+	p.send("/-stat/solosw/49", osc.Int(1))
+	eventually(t, p, "/-stat/solosw/05", 0)
+	eventually(t, p, "/-stat/solosw/49", 1)
+	eventually(t, p, "/-stat/solo", 1)
 }
 
 func TestActions(t *testing.T) {

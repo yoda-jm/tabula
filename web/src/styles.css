@@ -673,6 +673,78 @@ input[type="range"] {
   color: var(--text);
   border-color: var(--accent);
 }
+.mixer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0 12px;
+}
+.mixer-head .banks {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mixer-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding-bottom: 10px;
+}
+.mute-groups {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tools-label {
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.btn.mute-group {
+  min-width: 36px;
+  padding: 6px 8px;
+  font-weight: 800;
+}
+.btn.mute-group.lit {
+  background: var(--mute);
+  border-color: #ff7b7f;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(229, 72, 77, 0.5);
+}
+.btn.solo.lit,
+.btn.clear-solo.lit {
+  background: var(--accent);
+  border-color: #ffd27a;
+  color: #1d1400;
+}
+.btn.solo.lit {
+  box-shadow: 0 0 12px rgba(242, 179, 61, 0.5);
+}
+.strip-buttons {
+  display: grid;
+  gap: 4px;
+}
+.strip-buttons .btn.solo {
+  width: 100%;
+  min-height: 30px;
+  padding: 3px 2px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.strip-buttons .btn.solo:not(.lit) {
+  color: #c6ccd6;
+}
+/* silenced by a mute group or a muted DCA, its own mute off */
+.btn.mute.silenced {
+  border-color: var(--mute);
+  color: #ff9da0;
+  background: repeating-linear-gradient(135deg, rgba(229, 72, 77, 0.2) 0 6px, transparent 6px 12px), var(--panel-3);
+}
+.page.mixer {
+  --fader-h: clamp(190px, calc(100vh - 426px), 560px);
+}
 .strips {
   display: flex;
   gap: 5px;
@@ -2311,6 +2383,13 @@ code.wrap {
   overflow-wrap: anywhere;
 }
 
+/* the mute groups wrap under the banks */
+@media (min-width: 721px) and (max-width: 1240px) {
+  .page.mixer {
+    --fader-h: clamp(190px, calc(100vh - 476px), 560px);
+  }
+}
+
 /* ---------- narrow screens ---------- */
 
 @media (max-width: 720px) {
@@ -2321,6 +2400,17 @@ code.wrap {
   .btn.mute {
     font-size: 0.75rem;
     letter-spacing: 0.02em;
+  }
+  /* the mute groups and Clear solo on one row */
+  .page.mixer {
+    --fader-h: clamp(170px, calc(100vh - 504px), 560px);
+  }
+  .tools-label {
+    display: none;
+  }
+  .btn.mute-group {
+    min-width: 34px;
+    padding: 6px;
   }
   .strip .scribble {
     padding: 4px 2px;
@@ -2811,4 +2901,57 @@ code.wrap {
   color: var(--muted);
   font-family: system-ui, sans-serif;
   font-size: 0.72rem;
+}
+
+/* ---------- monitor ---------- */
+.solo-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.talk {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.talk .field-label {
+  margin: 0;
+}
+.btn.talk-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  touch-action: none;
+  user-select: none;
+}
+.btn.talk-btn.lit {
+  background: #1f6f3a;
+  border-color: var(--ok);
+  color: #eaffef;
+  box-shadow: 0 0 12px rgba(63, 185, 80, 0.45);
+}
+.talk-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.btn.talk-btn.lit .talk-hint {
+  color: inherit;
+}
+.named-bits .btn.bit {
+  min-width: 64px;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+.btn.osc-btn.lit {
+  background: var(--danger);
+  border-color: #ff8a85;
+  color: #fff;
 }
