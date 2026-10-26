@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/yoda-jm/tabula/pkg/schema"
 	"github.com/yoda-jm/tabula/pkg/state"
 )
 
@@ -16,7 +17,7 @@ const headerWidth = 127
 
 // Header builds a scene header line: #4.0# "name" "note" %000000000 1
 func Header(name, note string) string {
-	h := fmt.Sprintf("#4.0# %q %q %%000000000 1", name, note)
+	h := "#4.0# " + schema.Quote(name) + " " + schema.Quote(note) + " %000000000 1"
 	if len(h) < headerWidth {
 		h += strings.Repeat(" ", headerWidth-len(h))
 	}

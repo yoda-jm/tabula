@@ -6,6 +6,7 @@ package schema
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/yoda-jm/tabula/pkg/osc"
 )
@@ -166,8 +167,34 @@ func SplitLine(line string) (path, rest string) {
 	return path, rest
 }
 
+// Quote writes s between double quotes, as node text does. Node text cannot
+// escape a double quote, so one inside s is written as an apostrophe; a
+// control character, which would cut the line, as a space.
+func Quote(s string) string {
+	return `"` + strings.Map(func(r rune) rune {
+		switch {
+		case r == '"':
+			return '\''
+		case unicode.IsControl(r):
+			return ' '
+		}
+		return r
+	}, s) + `"`
+}
+
+// Unquote takes the double quotes off a token of node text, the outer ones
+// only.
+func Unquote(tok string) string {
+	if len(tok) >= 2 && tok[0] == '"' && tok[len(tok)-1] == '"' {
+		return tok[1 : len(tok)-1]
+	}
+	return tok
+}
+
 // Tokenize splits node text on spaces (and other blanks such as a trailing
-// line feed), keeping "quoted strings" whole.
+// line feed), keeping "quoted strings" whole. A quote ends a string only
+// before a blank or the end of the text, so a name written with its quotes
+// as they are ("Vox "Lead"") still reads back.
 func Tokenize(s string) []string {
 	blank := func(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' }
 	var toks []string
@@ -178,12 +205,15 @@ func Tokenize(s string) []string {
 		}
 		start := i
 		if s[i] == '"' {
-			end := strings.IndexByte(s[i+1:], '"')
-			if end < 0 {
+			end := i + 1
+			for end < len(s) && (s[end] != '"' || end+1 < len(s) && !blank(s[end+1])) {
+				end++
+			}
+			if end == len(s) {
 				toks = append(toks, s[i:])
 				break
 			}
-			i += end + 2
+			i = end + 1
 		} else {
 			for i < len(s) && !blank(s[i]) {
 				i++

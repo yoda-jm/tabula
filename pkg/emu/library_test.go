@@ -107,6 +107,44 @@ func TestLibrary(t *testing.T) {
 	}
 }
 
+// Names holding double quotes survive a scene save and recall: node text
+// writes them as apostrophes rather than cut the line.
+func TestQuotedNames(t *testing.T) {
+	s, addr := start(t)
+	dir := t.TempDir()
+	if _, err := s.LoadLibrary(dir); err != nil {
+		t.Fatal(err)
+	}
+	p := dial(t, addr)
+	p.send("/ch/05/config/name", osc.String(`Vox "Lead"`))
+	if m := p.ask("/ch/05/config/name"); m.Args[0].Str != `Vox "Lead"` {
+		t.Errorf("name kept as sent over OSC: %v", m)
+	}
+	if got := p.node("ch/05/config"); !strings.HasPrefix(got, `/ch/05/config "Vox 'Lead'" `) {
+		t.Errorf("node text: %q", got)
+	}
+	if st := status(t, p, "/save", osc.String("scene"), osc.Int(2), osc.String(`The "best"`), osc.String(`a\b`)); st != 1 {
+		t.Fatalf("save scene: %d", st)
+	}
+	if got := p.node("-show/showfile/scene/002"); got != `/-show/showfile/scene/002 "The 'best'" "a\b" %000000000 1` {
+		t.Errorf("listing: %q", got)
+	}
+	p.send("/ch/05/config/name", osc.String("Other"))
+	if st := status(t, p, "/load", osc.String("scene"), osc.Int(2)); st != 1 {
+		t.Fatalf("load scene: %d", st)
+	}
+	if m := p.ask("/ch/05/config/name"); m.Args[0].Str != "Vox 'Lead'" {
+		t.Errorf("name after recall: %v", m)
+	}
+	s2, _ := start(t)
+	if n, err := s2.LoadLibrary(dir); err != nil || n != 1 {
+		t.Fatalf("reload: %d items, %v", n, err)
+	}
+	if v, _, _ := s2.Store().Get("/-show/showfile/scene/002/name"); v.Str != "The 'best'" {
+		t.Errorf("reloaded scene name %v", v)
+	}
+}
+
 func TestRoutingPreset(t *testing.T) {
 	_, addr := start(t)
 	p := dial(t, addr)

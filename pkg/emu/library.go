@@ -271,7 +271,7 @@ func (s *Server) listEntry(kind string, idx int, e *entry, origin string) {
 	}
 	switch kind {
 	case "scene":
-		s.store.ApplyText(fmt.Sprintf("/-show/showfile/scene/%03d %q %q %%000000000 %d", idx, name, note, has), origin)
+		s.store.ApplyText(fmt.Sprintf("/-show/showfile/scene/%03d %s %s %%000000000 %d", idx, schema.Quote(name), schema.Quote(note), has), origin)
 	case "snippet":
 		p := fmt.Sprintf("/-show/showfile/snippet/%03d", idx)
 		s.store.Set(p+"/name", osc.String(name), origin)
@@ -343,7 +343,7 @@ func (l *library) persist(kind string, idx int, e *entry) {
 		return
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "#4.0# %q %q\n", e.Name, e.Note)
+	fmt.Fprintf(&b, "#4.0# %s %s\n", schema.Quote(e.Name), schema.Quote(e.Note))
 	for _, line := range e.Lines {
 		fmt.Fprintf(&b, "%s %s\n", line.Suffix, line.Rest)
 	}
@@ -402,9 +402,9 @@ func readEntry(file string) (*entry, error) {
 				toks := schema.Tokenize(line)
 				switch {
 				case len(toks) >= 3 && strings.HasPrefix(toks[1], `"`): // ours: #4.0# "name" "note"
-					e.Name, e.Note = strings.Trim(toks[1], `"`), strings.Trim(toks[2], `"`)
+					e.Name, e.Note = schema.Unquote(toks[1]), schema.Unquote(toks[2])
 				case len(toks) >= 3: // M32-Edit: #2.0# <pos> "name" <type> %flags <hasdata>
-					e.Name = strings.Trim(toks[2], `"`)
+					e.Name = schema.Unquote(toks[2])
 				}
 				continue
 			}

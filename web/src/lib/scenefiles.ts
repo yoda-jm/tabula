@@ -69,10 +69,12 @@ export function sceneFileName(name: string): string {
   return (f || "scene").slice(0, 100) + ".scn";
 }
 
-/** headerOf reads the name and note of a scene file's first line: #4.0# "name" "note" … */
+/** headerOf reads the name and note of a scene file's first line: #4.0# "name" "note" …. Nothing is escaped
+ * in scene files: a quote ends a string only before a blank, as the server reads them. */
 export function headerOf(text: string): { name: string; note: string } | null {
-  const m = /^#[^#\n]*#\s*"((?:[^"\\\n]|\\.)*)"(?:\s+"((?:[^"\\\n]|\\.)*)")?/.exec(text.trimStart());
-  return m ? { name: m[1].replace(/\\(.)/g, "$1"), note: (m[2] ?? "").replace(/\\(.)/g, "$1") } : null;
+  const str = String.raw`"((?:[^"\n]|"(?!\s|$))*)"(?=\s|$)`;
+  const m = new RegExp(String.raw`^#[^#\n]*#\s*${str}(?:\s+${str})?`).exec(text.trimStart());
+  return m ? { name: m[1], note: m[2] ?? "" } : null;
 }
 
 /** looksLikeScene tells a scene file from another file opened by mistake. */

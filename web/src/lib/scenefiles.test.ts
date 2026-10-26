@@ -15,7 +15,8 @@ describe("scene files", () => {
       note: "Rappel 10 m",
     });
     expect(headerOf('#2.1# "Old" %000000000 1')).toEqual({ name: "Old", note: "" });
-    expect(headerOf('#4.0# "say \\"hi\\"" ""')).toEqual({ name: 'say "hi"', note: "" });
+    expect(headerOf('#4.0# "say "hi"" ""')).toEqual({ name: 'say "hi"', note: "" });
+    expect(headerOf('#4.0# "a\\b" "it\'s"')).toEqual({ name: "a\\b", note: "it's" });
     expect(headerOf("/ch/01/config")).toBeNull();
   });
 

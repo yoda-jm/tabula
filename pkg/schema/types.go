@@ -148,8 +148,8 @@ func (b Bitmap) Coerce(a osc.Arg) (osc.Arg, error) {
 	return osc.Arg{}, errTag(a, b)
 }
 
-// Str is a string written between double quotes in node text. Max 0 is
-// no known limit.
+// Str is a string written between double quotes in node text (see Quote).
+// Max 0 is no known limit.
 type Str struct {
 	Max int
 	Def string
@@ -157,7 +157,7 @@ type Str struct {
 
 func (Str) Tag() byte                 { return 's' }
 func (s Str) Default() osc.Arg        { return osc.String(s.Def) }
-func (s Str) Format(v osc.Arg) string { return `"` + v.Str + `"` }
+func (s Str) Format(v osc.Arg) string { return Quote(v.Str) }
 
 func (s Str) Describe() string {
 	if s.Max == 0 {
@@ -166,12 +166,7 @@ func (s Str) Describe() string {
 	return fmt.Sprintf("string (max %d)", s.Max)
 }
 
-func (s Str) Parse(tok string) (osc.Arg, error) {
-	if len(tok) >= 2 && tok[0] == '"' && tok[len(tok)-1] == '"' {
-		tok = tok[1 : len(tok)-1]
-	}
-	return s.Coerce(osc.String(tok))
-}
+func (s Str) Parse(tok string) (osc.Arg, error) { return s.Coerce(osc.String(Unquote(tok))) }
 
 func (s Str) Coerce(a osc.Arg) (osc.Arg, error) {
 	if a.Tag != 's' {

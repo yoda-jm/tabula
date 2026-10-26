@@ -150,3 +150,37 @@ func TestDocumentedValues(t *testing.T) {
 		}
 	}
 }
+
+// Node text cannot escape a double quote: one in a name is written as an
+// apostrophe, and a name written with its quotes as they are still reads.
+func TestQuotesInNames(t *testing.T) {
+	n := Build("M32C").Node("/ch/01/config")
+	vals, err := n.ParseTokens(Tokenize(`"Vox" 1 RD 1`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vals[0] = osc.String("Vox \"Lead\"\n")
+	line := n.FormatLine(vals)
+	if want := `/ch/01/config "Vox 'Lead' " 1 RD 1`; line != want {
+		t.Errorf("formatted %q, want %q", line, want)
+	}
+	_, rest := SplitLine(line)
+	if back, err := n.ParseTokens(Tokenize(rest)); err != nil || back[0].Str != "Vox 'Lead' " {
+		t.Errorf("read back %v %v", back, err)
+	}
+
+	for text, want := range map[string][]string{
+		`"Vox "Lead"" 1 RD 1`: {`"Vox "Lead""`, "1", "RD", "1"},
+		`"" "a b"  "c"`:       {`""`, `"a b"`, `"c"`},
+		`"""`:                 {`"""`},
+		`"open 1`:             {`"open 1`},
+		"\"x\"\n":             {`"x"`},
+	} {
+		if got := Tokenize(text); strings.Join(got, "|") != strings.Join(want, "|") {
+			t.Errorf("Tokenize(%q) = %q, want %q", text, got, want)
+		}
+	}
+	if v, err := n.ParseTokens(Tokenize(`"Vox "Lead"" 1 RD 1`)); err != nil || v[0].Str != `Vox "Lead"` {
+		t.Errorf("raw quotes: %v %v", v, err)
+	}
+}
