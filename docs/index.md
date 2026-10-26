@@ -46,8 +46,9 @@ Versioned releases, with their notes, are on the
 ## tabula-emu — a console on your laptop
 
 `tabula-emu` speaks the console's OSC protocol on UDP port 10023, so remote
-apps — X32-Edit, M32-Edit, Mixing Station, the tabula client — can connect to
-it as if it were a console. Use it to prepare a show offline, to develop and
+apps can connect to it as if it were a console: M32-Edit and the tabula
+client are checked against it; X32-Edit and Mixing Station speak the same
+protocol but have not been tried yet. Use it to prepare a show offline, to develop and
 test software, or to learn the console without one.
 
 ```sh
@@ -68,7 +69,12 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   WAV files play (time running, previous/next, folder mode, no sound) and its
   scenes load, as the console's USB recorder does
   ([details](emulator.md#usb-stick)); try `-usb testdata/usb`.
-- `-model` picks what `/info` reports: X32, X32RACK, X32C, X32P, X32CORE, M32, M32R, M32C.
+- `-model` picks what `/info` reports: X32, X32RACK, X32C, X32P, X32CORE, M32, M32R, M32C;
+  `-firmware` the firmware version (4.06 by default), `-name` the console's
+  network name.
+- `-listen` the UDP address served (`:10023` by default; `127.0.0.1:10123`
+  for a second emulator on the same machine).
+- `-v` logs every unhandled request, not only the first of each kind.
 
 ![The debug page: the connected clients and their meter subscriptions, the requests the emulator did not understand, and every parameter](img/emulator.png)
 

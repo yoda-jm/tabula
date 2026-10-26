@@ -9,7 +9,7 @@ them, and later share them with live viewers.
 
 | Binary | Role |
 |---|---|
-| `tabula-emu` | **Pure console emulator.** Speaks the console's OSC protocol on UDP 10023 so that X32-Edit, M32-Edit, Mixing Station, Maillot's tools — and the tabula client — can connect to it. Optional read-only HTTP debug page showing the stored state, the traffic and every request it did not understand. It is not a console UI. |
+| `tabula-emu` | **Pure console emulator.** Speaks the console's OSC protocol on UDP 10023 so that X32-Edit, M32-Edit, Mixing Station, Maillot's tools — and the tabula client — can connect to it (checked with M32-Edit, Maillot's tools and the tabula client so far). Optional read-only HTTP debug page showing the stored state, the traffic and every request it did not understand. It is not a console UI. |
 | `tabula` | **Client.** Connects to a console or to `tabula-emu` over OSC and serves a web GUI on an HTTP port: connection setup, every console menu, recording, replay… |
 
 Both share the same library (`pkg/`).
@@ -23,7 +23,7 @@ Both share the same library (`pkg/`).
 | `pkg/scene` | Scene file (`.scn`) read/write. |
 | `pkg/state` | In-memory state store with a change feed; used by the emulator (as the console's memory) and by the client (as a mirror of the console). |
 | `pkg/emu` | The emulator's protocol server and debug HTTP page. |
-| `pkg/console` | The client side of the protocol: discovery, full sync, `/xremote` keepalive, meters, rate-limited writes, library commands. |
+| `pkg/console` | The client side of the protocol: discovery, full sync, `/xremote` keepalive, meters, writes (refused until armed; the GUI throttles fader drags), library commands. |
 | `pkg/session` | Recording and replay; exports for audio editors. |
 | `pkg/audio` | Audio capture of the console's USB card: one WAV file per track, sync with the session. |
 
@@ -50,7 +50,8 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Factory presets: `-presets` imports M32-Edit's library (channel, effect and routing presets).
 - [x] RTA of the source chosen with `/-action/setrtasrc` (channels, buses, graphic EQs, pre/post EQ), shaped by low cut, EQ and graphic EQ.
 - [x] Linked strips (channels, aux, FX returns, buses, matrices) kept in step, following `/config/linkcfg`, with the rules of M32-Edit's offline logic (see `docs/emulator.md`).
-- [ ] Connect X32-Edit and M32-Edit, work through the unhandled-request log (guide: `docs/testing-with-editors.md`).
+- [x] Connect M32-Edit and work through the unhandled-request log: Mixer → PC runs without an unhandled request (`docs/emulator.md`, "Verified with M32-Edit").
+- [ ] Connect X32-Edit and Mixing Station the same way (guide: `docs/testing-with-editors.md`).
 
 ### 3. Client — connection and GUI v1 *(in progress)*
 - [x] `pkg/console`: discovery (broadcast `/xinfo`), full sync via `/node` (window of 32 requests), `/xremote` renewal, writes refused until armed; tested end to end against the emulator.

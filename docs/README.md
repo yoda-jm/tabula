@@ -1,7 +1,11 @@
 # Documentation
 
+- [index.md](index.md) — the site's home page: what tabula is, downloads.
 - [PLAN.md](PLAN.md) — goals, architecture and milestones.
 - [gui.md](gui.md) — the pages of the tabula GUI.
+- [recording.md](recording.md) — recording a show (console and audio), replays, exports.
+- [access.md](access.md) — the engineer password, musicians' in-ear links, viewers.
+- [emulator.md](emulator.md) — what `tabula-emu` emulates and how.
 - [API.md](API.md) — the tabula client's HTTP API.
 - [testing-with-editors.md](testing-with-editors.md) — connecting X32-Edit / M32-Edit to the emulator.
 

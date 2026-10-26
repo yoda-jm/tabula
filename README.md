@@ -91,6 +91,8 @@ make dev     # emulator + tabula + Vite dev server with hot reload (http://local
 
 The GUI lives in `web/` (React, TypeScript, Vite) and is embedded in the
 `tabula` binary; a plain `go build` without it serves a page saying so.
+`tabula -web-dir web/dist` serves the GUI from that folder instead of the
+one built in (a GUI just rebuilt, without rebuilding tabula).
 
 ## Name
 

@@ -92,7 +92,7 @@ write, so this holds for anything talking to its API, not only its pages.
 - Accesses are kept in `access.json` (or the file given with `-access`),
   readable by its owner only since it holds the secrets.
 - Changes made through a link are recorded with its name (`web Theo`) in
-  [recorded sessions](index.md), so a replay shows who moved what.
+  [recorded sessions](recording.md), so a replay shows who moved what.
 
 ## Engineer password
 
