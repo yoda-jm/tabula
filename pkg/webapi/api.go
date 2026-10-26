@@ -62,6 +62,7 @@ type Server struct {
 	scenesDir string         // scenefiles.go
 	scenes    sceneLoadState // scenefiles.go
 	usb       usbState       // usb.go
+	backup    usbBackupState // usbbackup.go
 }
 
 func New(log *slog.Logger) *Server {
@@ -89,6 +90,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("POST /api/record/start", s.recordStart)
 	mux.HandleFunc("POST /api/record/stop", s.recordStop)
 	mux.HandleFunc("POST /api/record/mark", s.recordMark)
+	mux.HandleFunc("POST /api/record/usb", s.setUSBBackup)
 	mux.HandleFunc("GET /api/sessions", s.listSessions)
 	mux.HandleFunc("GET /api/sessions/{name}", s.getSession)
 	mux.HandleFunc("DELETE /api/sessions/{name}", s.deleteSession)

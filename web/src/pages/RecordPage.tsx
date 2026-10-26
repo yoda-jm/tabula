@@ -1,7 +1,8 @@
 // Recording and replay of shows: start/stop with a note, markers (M key),
 // the recorded sessions, and replaying one onto the console. A session is
 // the console (a snapshot of its settings, then every change) and, when the
-// audio card is on, the sound of the console's USB card.
+// audio card is on, the sound of the console's USB card; the console can
+// keep a stereo backup on its own USB stick (UsbBackup.tsx).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/shell";
@@ -13,6 +14,7 @@ import { useCanWrite, useRecord, useStatus } from "../store/hooks";
 import { store } from "../store/store";
 import type { Audio } from "./AudioPanel";
 import { AudioPanel, CheckProblems, SessionAudio, saveDraft, useAudio, useUnsaved } from "./AudioPanel";
+import { UsbBackupCard } from "./UsbBackup";
 
 const SPEEDS = [0.5, 1, 2, 3, 4, 8];
 
@@ -56,6 +58,7 @@ export function RecordPage() {
     <div className="page record">
       <Recorder rec={rec} audio={audio} onRetry={restartAudio} onRestart={() => void load()} />
       <AudioPanel rec={rec} audio={audio} onRetry={saveAndRestart} />
+      <UsbBackupCard rec={rec} />
       <section className="card">
         <div className="section-head">
           <h2>Sessions</h2>
@@ -124,8 +127,8 @@ function useTick(on: boolean, ms: number) {
   }, [on, ms]);
 }
 
-/** RecordsWhat lists what a session keeps: the console always, the audio when its card is on. */
-function RecordsWhat({ audio, live }: { audio: string; live?: boolean }) {
+/** RecordsWhat lists what a session keeps: the console always, the audio when its card is on, and the backup on the stick. */
+function RecordsWhat({ audio, live, usb }: { audio: string; live?: boolean; usb?: boolean }) {
   return (
     <ul className="records-what">
       <li>
@@ -144,6 +147,14 @@ function RecordsWhat({ audio, live }: { audio: string; live?: boolean }) {
             : live
               ? "not recorded in this session."
               : "not recorded: turn on Audio tracks below to record the sound too."}
+        </span>
+      </li>
+      <li className={usb ? "" : "off"}>
+        <span className="rec-kind">USB stick</span>
+        <span>
+          {usb
+            ? "a stereo backup made by the console on its own USB stick, from what feeds its recorder (the main mix by default)."
+            : "no backup on the console's stick: turn it on below."}
         </span>
       </li>
     </ul>
@@ -284,6 +295,9 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
                 ) : (
                   <span>{rec.audio ? `audio: ${plural(rec.audio.tracks?.length ?? 0, "track")}` : "no audio"}</span>
                 )}
+                {rec.usb?.on && !rec.usb.starting && (
+                  rec.usb.error ? <strong className="danger-text">⚠ NO USB BACKUP</strong> : <span>USB stick: backup</span>
+                )}
               </div>
               {rec.meta?.note && <p className="muted">{rec.meta.note}</p>}
               <p className="muted mono">{rec.name}</p>
@@ -346,7 +360,7 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
         </>
       ) : (
         <>
-          <RecordsWhat audio={audioPlan(audio.draft ?? audio.view?.config)} />
+          <RecordsWhat audio={audioPlan(audio.draft ?? audio.view?.config)} usb={rec.usb?.on} />
           <CheckProblems audio={audio} />
           {audio.draft && <p className="note">The audio settings below are not saved yet: Start recording asks whether to save them.</p>}
           <form
@@ -470,6 +484,19 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
             <>
               <dt>Note</dt>
               <dd>{detail.meta.note}</dd>
+            </>
+          )}
+          {detail.meta.usb_backup && (
+            <>
+              <dt>USB stick</dt>
+              {detail.meta.usb_backup.error ? (
+                <dd className="danger-text">no backup: {detail.meta.usb_backup.error}</dd>
+              ) : (
+                <dd>
+                  backup in <code>{detail.meta.usb_backup.file}</code> on the console's stick
+                  {detail.meta.usb_backup.already && " (a recording started on the console)"}
+                </dd>
+              )}
             </>
           )}
         </dl>

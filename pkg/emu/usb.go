@@ -25,14 +25,18 @@ import (
 // /-action/recselect n "selects and executes" entry n: enters a directory,
 // plays a WAV file, loads a scene or a snippet. /-stat/tape/state stops (0),
 // pauses (1) and resumes (2) the player; /-action/playtrack -1 and 1 play
-// the previous and next WAV file. No sound comes out, and nothing is
-// recorded to the stick.
+// the previous and next WAV file. No sound comes out. /-stat/tape/state 4
+// records (3 pauses the recording): the file is named as the console names
+// it, R_20261026-203512.wav in the current directory, and its time counts,
+// but nothing is written to the stick.
 
 // Tape states, as /-stat/tape/state numbers them.
 const (
-	tapeStop  = 0
-	tapePause = 1
-	tapePlay  = 2
+	tapeStop     = 0
+	tapePause    = 1
+	tapePlay     = 2
+	tapeRecPause = 3
+	tapeRecord   = 4
 )
 
 // usbMaxEntries is the most entries a directory listing holds.
@@ -180,8 +184,20 @@ func (s *Server) tapeLocked() {
 	s.setInt("/-stat/tape/state", u.state)
 	s.setStr("/-stat/tape/file", file)
 	s.setInt("/-stat/tape/etime", u.etime)
-	s.setInt("/-stat/tape/rtime", max(u.dur-u.etime, 0))
+	s.setInt("/-stat/tape/rtime", s.rtimeLocked())
 }
+
+// rtimeLocked is /-stat/tape/rtime: the time left to play, or while
+// recording -(dropouts + 1), and no dropout happens here.
+func (s *Server) rtimeLocked() int32 {
+	u := &s.usb
+	if recording(u.state) {
+		return -1
+	}
+	return max(u.dur-u.etime, 0)
+}
+
+func recording(state int32) bool { return state == tapeRecord || state == tapeRecPause }
 
 // usbControl runs a client's set of /-stat/usbmounted or /-stat/tape/state.
 func (s *Server) usbControl(addr string, v osc.Arg, origin string) {
@@ -205,9 +221,23 @@ func (s *Server) usbControl(addr string, v osc.Arg, origin string) {
 	case "/-stat/tape/state":
 		switch {
 		case v.Int == tapeStop:
+			if recording(u.state) {
+				u.file = "" // the recording is not on the emulated stick: nothing to play
+			}
 			u.state, u.etime = tapeStop, 0
 		case !u.mounted:
 			reject(ReasonRejected, "no USB stick in the console")
+		case v.Int == tapeRecord && u.state == tapeRecPause:
+			u.state = tapeRecord
+		case v.Int == tapeRecord && u.state != tapeRecord:
+			u.file = path.Join(u.dir, time.Now().Format("R_20060102-150405.wav"))
+			u.dur, u.etime, u.state = 0, 0, tapeRecord
+		case v.Int == tapeRecPause:
+			if u.state == tapeRecord {
+				u.state = tapeRecPause
+			}
+		case recording(u.state):
+			// the player waits for the recording to stop
 		case v.Int == tapePause:
 			if u.state == tapePlay {
 				u.state = tapePause
@@ -216,8 +246,8 @@ func (s *Server) usbControl(addr string, v osc.Arg, origin string) {
 			if u.file != "" {
 				u.state = tapePlay // resumes, or plays again from the start
 			}
-		default:
-			reject(ReasonUnimplemented, "recording to the USB stick, fast forward and rewind are not emulated")
+		case v.Int != tapeRecord:
+			reject(ReasonUnimplemented, "fast forward and rewind are not emulated")
 		}
 		s.tapeLocked() // what the player does, whatever was asked
 	}
@@ -239,6 +269,10 @@ func (s *Server) recselect(n int, origin string) {
 	}
 	if n < 1 || n > len(u.entries) {
 		reject(ReasonRejected, fmt.Sprintf("no entry %d in the current directory (1 to %d)", n, len(u.entries)))
+		return
+	}
+	if recording(u.state) {
+		reject(ReasonRejected, "the console is recording to the stick")
 		return
 	}
 	e := u.entries[n-1]
@@ -295,7 +329,7 @@ func (s *Server) playtrack(step int) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	defer s.setInt("/-action/playtrack", 0)
-	if !u.mounted || step == 0 {
+	if !u.mounted || step == 0 || recording(u.state) {
 		return
 	}
 	if next := s.siblingLocked(step); next != "" {
@@ -352,7 +386,15 @@ func (s *Server) tickUSB() {
 	u := &s.usb
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if !u.mounted || u.state != tapePlay {
+	if !u.mounted {
+		return
+	}
+	if u.state == tapeRecord {
+		u.etime++
+		s.setInt("/-stat/tape/etime", u.etime)
+		return
+	}
+	if u.state != tapePlay {
 		return
 	}
 	u.etime++

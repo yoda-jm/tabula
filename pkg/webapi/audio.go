@@ -266,6 +266,7 @@ func (s *Server) endRecordingLocked() {
 	}
 	rec, c, prev := s.rec, s.audio.cap, s.audio.ending
 	s.rec, s.audio.cap = nil, nil
+	s.stopUSBBackupLocked() // before the console link closes
 	done := make(chan struct{})
 	s.audio.ending = done
 	go func() {
@@ -461,6 +462,7 @@ func (s *Server) setAudioConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	cfg.USBBackup = s.audio.cfg.USBBackup // set with POST /api/record/usb
 	s.audio.cfg = cfg
 	file := s.audio.file
 	s.mu.Unlock()

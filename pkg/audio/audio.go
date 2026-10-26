@@ -56,6 +56,11 @@ type Config struct {
 	// s16le, s24le (3 bytes), s24-32le (24 bits in 4 bytes, ALSA's S24_LE),
 	// s32le (default) or f32le.
 	Input string `json:"input,omitempty"`
+	// USBBackup also starts the console's own recorder on its USB stick
+	// with every recording (a stereo backup made by the console). It is
+	// set apart, with POST /api/record/usb: saving the other settings keeps
+	// it.
+	USBBackup bool `json:"usb_backup,omitempty"`
 }
 
 // Recorders known by name; "custom" runs Config.Command.

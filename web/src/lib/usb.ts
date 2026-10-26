@@ -99,6 +99,9 @@ export const TAPE_STATES: Record<string, string> = {
   REW: "rewind",
 };
 
+/** dropouts is the number of dropouts of a recording to the stick: the console tells them in rtime, as −(dropouts + 1). */
+export const dropouts = (rtime: number) => (rtime < -1 ? -rtime - 1 : 0);
+
 /** recordsToStick tells whether the console records to its stick (/-stat/tape/state RECORD, or paused): Stop asks first. */
 export const recordsToStick = (state: string) => state === "RECORD" || state === "RPAUSE";
 

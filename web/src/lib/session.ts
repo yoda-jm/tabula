@@ -15,6 +15,25 @@ export interface SessionMeta {
   duration: number; // seconds
   /** the audio tracks recorded with the session */
   audio?: AudioInfo;
+  /** the console's own recording of the session on its USB stick */
+  usb_backup?: UsbBackupInfo;
+}
+
+/** UsbBackupInfo is where the console recorded a session on its USB stick, or why it did not. */
+export interface UsbBackupInfo {
+  /** on the stick, e.g. /R_20261026-203512.wav */
+  file?: string;
+  /** the console was recording already: it was left on */
+  already?: boolean;
+  error?: string;
+}
+
+/** UsbBackup is the backup on the console's USB stick: the setting, and the recording's backup (or the last one's). */
+export interface UsbBackup extends UsbBackupInfo {
+  /** started with every recording */
+  on: boolean;
+  /** being started */
+  starting?: boolean;
 }
 
 export interface Record {
@@ -27,6 +46,7 @@ export interface Record {
   error?: string;
   /** the audio capture of the recording (or of the last one) */
   audio?: AudioStatus;
+  usb?: UsbBackup;
 }
 
 export interface SessionEvent {
@@ -60,6 +80,8 @@ export const sessionApi = {
   start: (note: string) => call<Record>("POST", "/api/record/start", { note }, LONG),
   mark: (label: string) => call<Record>("POST", "/api/record/mark", { label }),
   stop: () => call<Record>("POST", "/api/record/stop", {}, LONG),
+  /** usbBackup turns the backup on the console's USB stick on or off */
+  usbBackup: (on: boolean) => call<Record>("POST", "/api/record/usb", { on }),
   sessions: () => call<SessionSummary[]>("GET", "/api/sessions", undefined, SLOW),
   session: (name: string) => call<SessionDetail>("GET", "/api/sessions/" + encodeURIComponent(name), undefined, LONG),
   remove: (name: string) => call<void>("DELETE", "/api/sessions/" + encodeURIComponent(name), undefined, LONG),

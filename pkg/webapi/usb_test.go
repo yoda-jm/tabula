@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -173,4 +174,106 @@ func TestUSB(t *testing.T) {
 		t.Errorf("no stick: %+v", v)
 	}
 	open(1, http.StatusConflict)
+}
+
+// TestUSBBackup records the show on the console's stick too: started and
+// stopped with the recording without writes armed, and noted in the
+// session; not without a stick, nor over the player or a recording made on
+// the console.
+func TestUSBBackup(t *testing.T) {
+	emuSrv, emuAddr := startEmu(t)
+	api := New(quiet)
+	api.SetSessionsDir(t.TempDir())
+	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
+	defer ts.Close()
+	post(t, ts.URL+"/api/connect", `{"addr":"`+emuAddr+`"}`)
+	connected(t, ts.URL)
+	tape := func() int32 {
+		v, _, _ := emuSrv.Store().Get("/-stat/tape/state")
+		return v.Int
+	}
+	waitTape := func(want int32) {
+		t.Helper()
+		for deadline := time.Now().Add(3 * time.Second); tape() != want; time.Sleep(20 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatalf("console recorder %d, want %d", tape(), want)
+			}
+		}
+	}
+	record := func(what string) recordView {
+		t.Helper()
+		if err := api.StartRecording(""); err != nil {
+			t.Fatalf("record start (%s): %v", what, err)
+		}
+		return waitRecord(t, ts.URL, what, func(v recordView) bool { return !v.USB.Starting })
+	}
+
+	if code := post(t, ts.URL+"/api/record/usb", `{"on":true}`); code != http.StatusOK {
+		t.Fatalf("turn on: %d", code)
+	}
+	if v := record("no stick"); !strings.Contains(v.USB.Error, "no USB stick") || !v.USB.On {
+		t.Errorf("without a stick: %+v", v.USB)
+	}
+	api.StopRecording()
+
+	stick := t.TempDir()
+	copyDir(t, "../../testdata/usb", stick)
+	if _, err := emuSrv.MountUSB(stick); err != nil {
+		t.Fatal(err)
+	}
+	v := record("the backup")
+	if !regexp.MustCompile(`^/R_\d{8}-\d{6}\.wav$`).MatchString(v.USB.File) || v.USB.Error != "" || v.USB.Already {
+		t.Fatalf("backup: %+v", v.USB)
+	}
+	waitTape(tapeRecord)
+	if b := getRecord(t, ts.URL).Meta.USBBackup; b == nil || b.File != v.USB.File {
+		t.Errorf("session meta: %+v", b)
+	}
+	if code := post(t, ts.URL+"/api/record/stop", `{}`); code != http.StatusOK {
+		t.Fatalf("stop: %d", code)
+	}
+	waitTape(tapeStop)
+	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		if v, _, _ := api.mirror.Get("/-stat/tape/state"); v.Int == tapeStop {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("tabula still sees the console recording")
+		}
+	}
+	if v := getRecord(t, ts.URL); v.USB.File == "" || !v.USB.On {
+		t.Errorf("after the stop: %+v", v.USB)
+	}
+
+	// walk-in music from the stick: not interrupted
+	post(t, ts.URL+"/api/arm", `{"armed":true}`)
+	if code := post(t, ts.URL+"/api/usb", `{"op":"open","index":2}`); code != http.StatusOK {
+		t.Fatalf("play: %d", code)
+	}
+	waitTape(tapePlay)
+	if v := record("the player in use"); !strings.Contains(v.USB.Error, "player is in use") {
+		t.Errorf("over the player: %+v", v.USB)
+	}
+	api.StopRecording()
+	if tape() != tapePlay {
+		t.Errorf("the music stopped: %d", tape())
+	}
+
+	// a recording started on the console: left on
+	post(t, ts.URL+"/api/usb", `{"op":"stop"}`)
+	waitTape(tapeStop)
+	api.client.Set("/-stat/tape/state", osc.Int(tapeRecord))
+	waitTape(tapeRecord)
+	if v := record("the console recording"); !v.USB.Already || v.USB.File == "" {
+		t.Errorf("console recording: %+v", v.USB)
+	}
+	api.StopRecording()
+	time.Sleep(100 * time.Millisecond)
+	if tape() != tapeRecord {
+		t.Errorf("the console's own recording was stopped: %d", tape())
+	}
+
+	if code := post(t, ts.URL+"/api/record/usb", `{"on":false}`); code != http.StatusOK || getRecord(t, ts.URL).USB.On {
+		t.Errorf("turn off: %d", code)
+	}
 }

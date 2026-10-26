@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ type recordView struct {
 	ReplayAt  float64       `json:"replay_at,omitempty"`
 	Error     string        `json:"error,omitempty"`
 	Audio     *audio.Status `json:"audio,omitempty"` // the audio capture of the recording, or of the last one
+	USB       usbBackupView `json:"usb"`             // the backup on the console's USB stick (usbbackup.go)
 }
 
 // SetSessionsDir sets where sessions are kept.
@@ -39,7 +41,8 @@ func (s *Server) recordStatus() recordView {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	v := recordView{Replaying: s.replayCancel != nil, ReplayOf: s.replayOf, ReplayAt: s.replayAt, Error: s.recordErr,
-		Audio: publicAudio(s.audioStatusLocked())}
+		Audio: publicAudio(s.audioStatusLocked()), USB: s.backup.view}
+	v.USB.On = s.audio.cfg.USBBackup
 	if s.rec != nil {
 		m := s.rec.Meta()
 		v.Recording, v.Name, v.Meta = true, filepath.Base(s.rec.Dir()), &m
@@ -70,6 +73,13 @@ func (s *Server) StartRecording(note string) error {
 		return errors.New("the audio input is being tested: try again in a few seconds")
 	}
 	name := time.Now().Format("2006-01-02_150405")
+	// stopped and started again within the second: 2026-10-26_203512-2
+	for i, base := 2, name; ; i++ {
+		if _, err := os.Stat(filepath.Join(s.sessionsDir, name, "meta.json")); err != nil {
+			break
+		}
+		name = base + "-" + strconv.Itoa(i)
+	}
 	st := s.client.Status()
 	rec, err := session.Start(filepath.Join(s.sessionsDir, name), s.mirror, strings.TrimSpace(st.Info.Model+" "+st.Info.Name), note)
 	if err != nil {
@@ -78,6 +88,7 @@ func (s *Server) StartRecording(note string) error {
 	s.rec, s.recordErr = rec, ""
 	s.log.Info("recording", "session", rec.Dir())
 	s.startAudioLocked(rec)
+	s.startUSBBackupLocked(rec)
 	go s.tickRecord(rec)
 	return nil
 }
@@ -111,6 +122,9 @@ func (s *Server) StopRecording() error {
 	s.mu.Lock()
 	rec, c, ending := s.rec, s.audio.cap, s.audio.ending
 	s.rec, s.audio.cap = nil, nil
+	if rec != nil {
+		s.stopUSBBackupLocked()
+	}
 	s.mu.Unlock()
 	if ending != nil {
 		<-ending

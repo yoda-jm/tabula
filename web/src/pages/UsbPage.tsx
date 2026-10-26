@@ -8,7 +8,7 @@ import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { UsbEntry, UsbOp, UsbView } from "../lib/usb";
 import { KIND_LABEL, TAPE_STATES, entryAction, formatClock, isPlaying, recordsToStick, usbApi } from "../lib/usb";
-import { useCanWrite, useStatus, useValue } from "../store/hooks";
+import { useCanWrite, useRecord, useStatus, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
 
@@ -137,6 +137,7 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
   const rtime = useValue("/-stat/tape/rtime");
   const autoplay = useValue("/config/tape/autoplay");
   const [stopping, setStopping] = useState(false); // asking before stopping the console's own recording
+  const backup = useRecord()?.usb;
   const st = String(state?.text ?? "STOP").trim();
   const recording = recordsToStick(st);
   const elapsed = Number(etime?.value ?? 0);
@@ -145,6 +146,8 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
   const path = String(file?.value ?? "");
   const name = path.split("/").filter(Boolean).pop() ?? "";
   const playing = st === "PLAY";
+  // tabula's backup of the recording (Record page), not one started on the console
+  const ours = !!backup?.file && backup.file === path && !backup.already;
   return (
     <section className="card player">
       <header className="section-head">
@@ -196,7 +199,13 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
           Then the next file of the folder
         </label>
       </div>
-      {recording && <p className="note">The console records to the stick (from its own USB recorder screen).</p>}
+      {recording && (
+        <p className="note">
+          {ours
+            ? "The console records the backup of tabula's recording to the stick (Record page): Stop recording stops it."
+            : "The console records to the stick (from its own USB recorder screen)."}
+        </p>
+      )}
       {stopping && (
         <ConfirmDialog
           title="The console is recording to its USB stick: stop it?"
@@ -207,7 +216,11 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
             onOp("stop");
           }}
         >
-          <p>The recording was started on the console (its USB recorder screen): Stop ends it there.</p>
+          <p>
+            {ours
+              ? "It is the backup of tabula's recording: Stop ends it, while the recording goes on without it."
+              : "The recording was started on the console (its USB recorder screen): Stop ends it there."}
+          </p>
         </ConfirmDialog>
       )}
     </section>

@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
 
@@ -209,10 +210,57 @@ func TestUSBPlayer(t *testing.T) {
 	p.send("/-stat/tape/state", osc.Int(tapePlay)) // from the start again
 	eventually(t, p, "/-stat/tape/state", tapePlay)
 
-	p.send("/-stat/tape/state", osc.Int(4)) // record
+	p.send("/-stat/tape/state", osc.Int(5)) // fast forward
 	eventually(t, p, "/-stat/tape/state", tapePlay)
 	if !unhandled(s, "/-stat/tape/state", ReasonUnimplemented) {
-		t.Errorf("recording not reported as not emulated: %+v", s.Unhandled.List())
+		t.Errorf("fast forward not reported as not emulated: %+v", s.Unhandled.List())
+	}
+}
+
+// TestUSBRecord records to the stick: the file is named and its time
+// counts, nothing is written.
+func TestUSBRecord(t *testing.T) {
+	dir := t.TempDir()
+	writeWAV(t, filepath.Join(dir, "Intro.wav"), 10)
+	s, p := startUSB(t, dir)
+
+	p.send("/-stat/tape/state", osc.Int(tapeRecord))
+	eventually(t, p, "/-stat/tape/state", tapeRecord)
+	if f := p.str("/-stat/tape/file"); !regexp.MustCompile(`^/R_\d{8}-\d{6}\.wav$`).MatchString(f) {
+		t.Errorf("recorded file %q", f)
+	}
+	if r := p.int("/-stat/tape/rtime"); r != -1 {
+		t.Errorf("rtime while recording %d, want -1 (no dropout)", r)
+	}
+	for deadline := time.Now().Add(2 * time.Second); p.int("/-stat/tape/etime") < 3 && time.Now().Before(deadline); {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if e := p.int("/-stat/tape/etime"); e < 3 {
+		t.Errorf("recording time %d", e)
+	}
+	p.send("/-action/recselect", osc.Int(1)) // the player waits
+	p.int("/-stat/tape/state")               // answered once the recselect is handled
+	if !unhandled(s, "/-action/recselect", ReasonRejected) {
+		t.Errorf("playing while recording not refused: %+v", s.Unhandled.List())
+	}
+
+	p.send("/-stat/tape/state", osc.Int(tapeRecPause))
+	eventually(t, p, "/-stat/tape/state", tapeRecPause)
+	e := p.int("/-stat/tape/etime")
+	time.Sleep(50 * time.Millisecond)
+	if got := p.int("/-stat/tape/etime"); got != e {
+		t.Errorf("time runs while the recording is paused: %d then %d", e, got)
+	}
+	p.send("/-stat/tape/state", osc.Int(tapeRecord))
+	eventually(t, p, "/-stat/tape/state", tapeRecord)
+
+	p.send("/-stat/tape/state", osc.Int(tapeStop))
+	eventually(t, p, "/-stat/tape/state", tapeStop)
+	if f := p.str("/-stat/tape/file"); f != "" {
+		t.Errorf("player file after the recording: %q", f)
+	}
+	if des, _ := os.ReadDir(dir); len(des) != 1 {
+		t.Errorf("files written to the stick: %v", des)
 	}
 }
 

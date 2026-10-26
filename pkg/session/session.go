@@ -41,6 +41,17 @@ type Meta struct {
 	Duration float64   `json:"duration"` // seconds
 	// Audio describes the audio tracks recorded with the session.
 	Audio *audio.Info `json:"audio,omitempty"`
+	// USBBackup is the console's own recording on its USB stick, started
+	// with the session.
+	USBBackup *USBBackup `json:"usb_backup,omitempty"`
+}
+
+// USBBackup is where the console recorded the session on its USB stick, or
+// why it did not.
+type USBBackup struct {
+	File    string `json:"file,omitempty"`    // on the stick, e.g. /R_20261026-203512.wav
+	Already bool   `json:"already,omitempty"` // the console was recording already: it was left on
+	Error   string `json:"error,omitempty"`
 }
 
 // Event is a change or a marker, at T seconds after the start.
@@ -196,6 +207,20 @@ func (r *Recorder) SetAudio(a *audio.Info) error {
 	r.meta.Audio = a
 	if r.closed {
 		return nil
+	}
+	m := r.meta
+	m.Duration = time.Since(r.start).Seconds()
+	return writeMeta(r.dir, m)
+}
+
+// SetUSBBackup records the console's own recording of the session in
+// meta.json.
+func (r *Recorder) SetUSBBackup(b *USBBackup) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.meta.USBBackup = b
+	if r.closed {
+		return writeMeta(r.dir, r.meta)
 	}
 	m := r.meta
 	m.Duration = time.Since(r.start).Seconds()
