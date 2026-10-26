@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, parseTime } from "./session";
+import { addsMarker, damagedText, endsRecording, formatDuration, parseTime } from "./session";
 
 describe("session times", () => {
   it("formats durations", () => {
@@ -17,5 +17,33 @@ describe("session times", () => {
     expect(parseTime("12.5")).toBe(12.5);
     expect(parseTime("abc")).toBeNaN();
     expect(parseTime("1:2:3:4")).toBeNaN();
+  });
+});
+
+describe("sessions", () => {
+  it("says which lines of the change log could not be read", () => {
+    expect(damagedText(undefined)).toBe("");
+    expect(damagedText([])).toBe("");
+    expect(damagedText([812, 813, 2040])).toBe(
+      "3 lines of the change log could not be read: their changes are missing from this session (lines 812-813, 2040).",
+    );
+    expect(damagedText([1])).toBe("1 line of the change log could not be read: its changes are missing from this session (line 1).");
+  });
+
+  it("adds one marker per press of M, however long it is held", () => {
+    const m = { key: "m", ctrlKey: false, metaKey: false, altKey: false, repeat: false };
+    expect(addsMarker(m)).toBe(true);
+    expect(addsMarker({ ...m, key: "M" })).toBe(true);
+    expect(addsMarker({ ...m, repeat: true })).toBe(false);
+    expect(addsMarker({ ...m, ctrlKey: true })).toBe(false);
+    expect(addsMarker({ ...m, key: "n" })).toBe(false);
+  });
+
+  it("asks before connecting or disconnecting ends a recording", () => {
+    expect(endsRecording("disconnect", null)).toBeNull();
+    expect(endsRecording("connect", { recording: false, replaying: false })).toBeNull();
+    const rec = { recording: true, replaying: false };
+    expect(endsRecording("disconnect", rec)?.body).toBe("A recording is running: disconnecting ends it, with its audio.");
+    expect(endsRecording("connect", rec)?.body).toBe("Connecting to another console ends the recording, with its audio.");
   });
 });

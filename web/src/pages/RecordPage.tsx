@@ -8,7 +8,7 @@ import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { Record as RecordStatus, SessionDetail, SessionSummary } from "../lib/session";
 import { audioApi, audioPlan, audioSummary, exportUrl, formatBytes, plural } from "../lib/audio";
-import { formatDuration, parseTime, sessionApi } from "../lib/session";
+import { addsMarker, damagedText, formatDuration, parseTime, sessionApi } from "../lib/session";
 import { useCanWrite, useRecord, useStatus } from "../store/hooks";
 import { store } from "../store/store";
 import type { Audio } from "./AudioPanel";
@@ -214,6 +214,7 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
   const [label, setLabel] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [stopping, setStopping] = useState(false); // asking before the show stops being recorded
   const recording = !!rec?.recording;
   const unsaved = useUnsaved(audio);
   useTick(recording, 250);
@@ -251,7 +252,7 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
     if (!recording) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (e.key.toLowerCase() !== "m" || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!addsMarker(e)) return; // M held down: one marker, not one per key repeat
       if (t.closest("input, textarea, select, [contenteditable]")) return;
       e.preventDefault();
       void mark(labelRef.current);
@@ -322,10 +323,26 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
             <button type="submit" className="btn big">
               Marker
             </button>
-            <button type="button" className="btn big danger" disabled={busy} onClick={() => void run(sessionApi.stop)}>
+            <button type="button" className="btn big danger" disabled={busy} onClick={() => setStopping(true)}>
               Stop recording
             </button>
           </form>
+          {stopping && (
+            <ConfirmDialog
+              title="Stop the recording?"
+              confirm="Stop recording"
+              onCancel={() => setStopping(false)}
+              onConfirm={() => {
+                setStopping(false);
+                void run(sessionApi.stop);
+              }}
+            >
+              <p>
+                <strong>The session and its audio end there</strong>: what follows is not recorded, unless a new recording is
+                started.
+              </p>
+            </ConfirmDialog>
+          )}
         </>
       ) : (
         <>
@@ -457,6 +474,11 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
           )}
         </dl>
       )}
+      {detail?.damaged?.length ? (
+        <p className="warn-box" role="status">
+          ⚠ {damagedText(detail.damaged)}
+        </p>
+      ) : null}
 
       {detail?.markers && detail.markers.length > 0 && (
         <>

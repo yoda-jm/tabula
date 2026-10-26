@@ -1,10 +1,15 @@
-// Connection setup: find consoles on the network, or type an address.
+// Connection setup: find consoles on the network, or type an address. A
+// console that does not answer is asked again by tabula: another address
+// can replace it at any time. Both end a running recording: asked first.
 
 import { useState } from "react";
+import { ConfirmDialog } from "../components/shell";
 import type { Discovered } from "../lib/api";
 import { api } from "../lib/api";
 import { usePersistent } from "../lib/route";
-import { useStatus } from "../store/hooks";
+import type { EndsRecording } from "../lib/session";
+import { endsRecording } from "../lib/session";
+import { useRecord, useStatus } from "../store/hooks";
 import { store } from "../store/store";
 
 export function ConnectPage() {
@@ -13,7 +18,16 @@ export function ConnectPage() {
   const [found, setFound] = useState<Discovered[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
+  const rec = useRecord();
+  const [ask, setAsk] = useState<(EndsRecording & { run(): void }) | null>(null);
   const c = s.console;
+
+  /** unlessRecording runs f, or asks first when it would end a recording. */
+  const unlessRecording = (action: "connect" | "disconnect", f: () => Promise<void>) => {
+    const q = endsRecording(action, rec);
+    if (q) setAsk({ ...q, run: () => void f() });
+    else void f();
+  };
 
   const discover = async () => {
     setSearching(true);
@@ -85,7 +99,7 @@ export function ConnectPage() {
         )}
         {(c || s.connecting) && (
           <div className="row">
-            <button type="button" className="btn" onClick={() => void disconnect()}>
+            <button type="button" className="btn" onClick={() => unlessRecording("disconnect", disconnect)}>
               Disconnect
             </button>
           </div>
@@ -98,7 +112,7 @@ export function ConnectPage() {
           className="row"
           onSubmit={(e) => {
             e.preventDefault();
-            void connect(addr);
+            unlessRecording("connect", () => connect(addr));
           }}
         >
           <label className="grow">
@@ -114,7 +128,8 @@ export function ConnectPage() {
               placeholder="192.168.1.62"
             />
           </label>
-          <button type="submit" className="btn primary" disabled={!addr.trim() || s.connecting}>
+          {/* enabled while connecting: a new address replaces one that does not answer */}
+          <button type="submit" className="btn primary" disabled={!addr.trim()}>
             Connect
           </button>
         </form>
@@ -133,7 +148,7 @@ export function ConnectPage() {
           <ul className="found">
             {found.map((d) => (
               <li key={d.ip}>
-                <button type="button" className="btn found-item" onClick={() => void connect(d.ip)} disabled={s.connecting}>
+                <button type="button" className="btn found-item" onClick={() => unlessRecording("connect", () => connect(d.ip))}>
                   <strong>{d.name || d.ip}</strong>
                   <span className="muted">
                     {d.model} · fw {d.firmware} · {d.ip}
@@ -144,6 +159,21 @@ export function ConnectPage() {
           </ul>
         )}
       </section>
+      {ask && (
+        <ConfirmDialog
+          title={ask.title}
+          confirm={ask.confirm}
+          onCancel={() => setAsk(null)}
+          onConfirm={() => {
+            setAsk(null);
+            ask.run();
+          }}
+        >
+          <p>
+            <strong>{ask.body}</strong>
+          </p>
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

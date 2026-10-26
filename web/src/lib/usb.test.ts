@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entryAction, formatClock, isPlaying } from "./usb";
+import { entryAction, formatClock, isPlaying, recordsToStick } from "./usb";
 
 describe("USB stick", () => {
   it("shows times as the console does", () => {
@@ -23,5 +23,12 @@ describe("USB stick", () => {
     expect(isPlaying("/Breaks/Interval music.wav", "", "Interval music.wav")).toBe(false);
     expect(isPlaying("/a/Breaks/x.wav", "Breaks", "x.wav")).toBe(true);
     expect(isPlaying("", "", "x.wav")).toBe(false);
+  });
+
+  it("asks before stopping a recording to the stick only", () => {
+    expect(recordsToStick("RECORD")).toBe(true);
+    expect(recordsToStick("RPAUSE")).toBe(true);
+    expect(recordsToStick("PLAY")).toBe(false);
+    expect(recordsToStick("PPAUSE")).toBe(false);
   });
 });

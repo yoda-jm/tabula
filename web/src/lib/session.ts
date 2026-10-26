@@ -2,6 +2,7 @@
 
 import { LONG, SLOW, call } from "./api";
 import type { AudioInfo, AudioStatus } from "./audio";
+import { formatTracks } from "./audio";
 
 export interface SessionMeta {
   format?: number;
@@ -48,6 +49,8 @@ export interface SessionDetail extends SessionSummary {
   snapshot?: number;
   /** whether start.scn, the console at the start as a scene file, is there */
   scene?: boolean;
+  /** lines of the change log (events.jsonl, from 1) that could not be read: their changes are missing */
+  damaged?: number[];
 }
 
 export const sessionApi = {
@@ -72,6 +75,40 @@ export function formatDuration(seconds: number): string {
   const m = Math.floor((s % 3600) / 60);
   const ss = String(s % 60).padStart(2, "0");
   return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
+/** damagedText says which lines of a session's change log could not be read, or "" when every line could. */
+export function damagedText(lines: number[] | undefined): string {
+  if (!lines?.length) return "";
+  const one = lines.length === 1;
+  const which = formatTracks(lines, Math.max(...lines) + 1).replace(/,/g, ", "); // one past the last: never "all"
+  return one
+    ? `1 line of the change log could not be read: its changes are missing from this session (line ${which}).`
+    : `${lines.length} lines of the change log could not be read: their changes are missing from this session (lines ${which}).`;
+}
+
+/** A question asked before something that ends the recording. */
+export interface EndsRecording {
+  title: string;
+  body: string;
+  confirm: string;
+}
+
+/**
+ * endsRecording is the question asked before disconnecting or connecting to
+ * a console (another one or the same) while a recording runs: tabula ends
+ * the recording, audio included. null when nothing is recorded.
+ */
+export function endsRecording(action: "connect" | "disconnect", rec: Record | null): EndsRecording | null {
+  if (!rec?.recording) return null;
+  return action === "disconnect"
+    ? { title: "Disconnect while recording?", body: "A recording is running: disconnecting ends it, with its audio.", confirm: "Disconnect" }
+    : { title: "Connect while recording?", body: "Connecting to another console ends the recording, with its audio.", confirm: "Connect" };
+}
+
+/** addsMarker tells whether a key press adds a marker: M without Ctrl, Cmd or Alt, once however long it is held. */
+export function addsMarker(e: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; repeat: boolean }): boolean {
+  return e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat;
 }
 
 /** parseTime reads "90", "1:30" or "1:02:03" as seconds; NaN if unreadable. */

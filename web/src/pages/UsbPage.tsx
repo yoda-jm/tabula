@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { UsbEntry, UsbOp, UsbView } from "../lib/usb";
-import { KIND_LABEL, TAPE_STATES, entryAction, formatClock, isPlaying, usbApi } from "../lib/usb";
+import { KIND_LABEL, TAPE_STATES, entryAction, formatClock, isPlaying, recordsToStick, usbApi } from "../lib/usb";
 import { useCanWrite, useStatus, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
@@ -136,8 +136,9 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
   const etime = useValue("/-stat/tape/etime");
   const rtime = useValue("/-stat/tape/rtime");
   const autoplay = useValue("/config/tape/autoplay");
+  const [stopping, setStopping] = useState(false); // asking before stopping the console's own recording
   const st = String(state?.text ?? "STOP").trim();
-  const recording = st === "RECORD" || st === "RPAUSE";
+  const recording = recordsToStick(st);
   const elapsed = Number(etime?.value ?? 0);
   const left = recording ? 0 : Math.max(0, Number(rtime?.value ?? 0));
   const total = elapsed + left;
@@ -174,7 +175,12 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
             ▶ Play
           </button>
         )}
-        <button type="button" className="btn big" disabled={!can || st === "STOP"} onClick={() => onOp("stop")}>
+        <button
+          type="button"
+          className="btn big"
+          disabled={!can || st === "STOP"}
+          onClick={() => (recording ? setStopping(true) : onOp("stop"))}
+        >
           ■ Stop
         </button>
         <button type="button" className="btn big" disabled={!can} onClick={() => onOp("next")} aria-label="Next file">
@@ -191,6 +197,19 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
         </label>
       </div>
       {recording && <p className="note">The console records to the stick (from its own USB recorder screen).</p>}
+      {stopping && (
+        <ConfirmDialog
+          title="The console is recording to its USB stick: stop it?"
+          confirm="■ Stop"
+          onCancel={() => setStopping(false)}
+          onConfirm={() => {
+            setStopping(false);
+            onOp("stop");
+          }}
+        >
+          <p>The recording was started on the console (its USB recorder screen): Stop ends it there.</p>
+        </ConfirmDialog>
+      )}
     </section>
   );
 }

@@ -99,6 +99,9 @@ export const TAPE_STATES: Record<string, string> = {
   REW: "rewind",
 };
 
+/** recordsToStick tells whether the console records to its stick (/-stat/tape/state RECORD, or paused): Stop asks first. */
+export const recordsToStick = (state: string) => state === "RECORD" || state === "RPAUSE";
+
 /** isPlaying tells whether the player's file is this entry of the directory shown. */
 export function isPlaying(file: string, path: string, name: string): boolean {
   const parts = file.split("/").filter(Boolean);
