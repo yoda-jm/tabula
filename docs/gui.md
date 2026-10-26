@@ -80,14 +80,16 @@ Where the signals come from and where they go, in seven views.
 
 ### Patchbay
 
-Every path a signal takes through the console, drawn in five columns:
+Every path a signal takes through the console, drawn in seven columns in
+the order the signal goes through them:
 
 - **Inputs**: the sockets a signal comes in by: the stage box inputs on
   AES50 A and B (`A 12`, with the gain of its preamp and `48V` when phantom
   power is on), the card's playback channels, the USB stick's player, the
   console's own inputs on the models that have them;
 - **Channels**: the channels, aux inputs and FX returns fed by them;
-- **Mixes**: the buses, LR, M/C and the matrices;
+- **Buses**, **Main** (LR and M/C) and **Matrices**, each fed by the columns
+  before it;
 - **Outputs**: the outputs 1-16 (with their delay), the aux, P16, AES/EBU and
   2-track outputs;
 - **Goes out on**: the sockets a signal goes out by: the stage box outputs
@@ -95,9 +97,11 @@ Every path a signal takes through the console, drawn in five columns:
   records with the sessions) and the console's XLR outputs, each with what
   it carries.
 
-The lines are the routing (patches), the sends and assigns to the mixes
-(thinner; only sends above −∞), a bus feeding an effect that comes back on
-its FX return (dashed), and the lines from a muted strip (dotted). Only
+A signal comes into a box on its left and leaves it on its right. The lines
+are the routing (patches), the sends and assigns to the mixes (thinner;
+only sends above −∞), a bus feeding an effect that comes back on its FX
+return (dashed: the loop leaves the bus, runs under the columns and comes
+up into the FX return), and the lines from a muted strip (dotted). Only
 what is on a path shows: **Show unused** shows every socket and strip, and
 AES50 channels 17-48 (a stage box plays channels 1-16 on its outputs).
 The chips above choose the output ports shown; AES50 B shows by itself

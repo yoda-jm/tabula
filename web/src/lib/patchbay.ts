@@ -2,8 +2,9 @@
 // socket it comes in by (a stage box preamp on AES50, the card, a local
 // input) to the sockets it goes out by (the stage box outputs, the card
 // tracks a computer records, local outputs), through the channels, the
-// mixes and the outputs 1-16. A graph of nodes in five columns and the
-// links between them, built from the mirrored values (a Lookup) by pure
+// buses, the main mix, the matrices and the outputs 1-16. A graph of nodes
+// in seven columns, in the order a signal goes through them, and the links
+// between them, built from the mirrored values (a Lookup) by pure
 // functions, so everything here is unit tested.
 
 import { range, two } from "./num";
@@ -21,8 +22,14 @@ import {
   userSource,
 } from "./routing";
 
-export const COLUMNS = ["Inputs", "Channels", "Mixes", "Outputs", "Goes out on"];
-export type Column = 0 | 1 | 2 | 3 | 4;
+export const COLUMNS = ["Inputs", "Channels", "Buses", "Main", "Matrices", "Outputs", "Goes out on"];
+export type Column = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/** COL numbers the columns: a link always goes to a column on the right, but for an effect's return. */
+export const COL = { in: 0, strip: 1, bus: 2, main: 3, mtx: 4, out: 5, port: 6 } as const;
+
+/** isMix tells the buses, the main mix and the matrices. */
+const isMix = (n: PbNode) => n.col >= COL.bus && n.col <= COL.mtx && n.id !== "mon";
 
 export interface PbNode {
   id: string;
@@ -123,11 +130,11 @@ const STRIPS = [
   })),
 ];
 
-const MIXES = [
-  ...range(1, 16).map((n) => ({ path: `/bus/${two(n)}`, label: `Bus ${two(n)}`, group: "Buses", order: n })),
-  { path: "/main/st", label: "LR", group: "Main", order: 100 },
-  { path: "/main/m", label: "M/C", group: "Main", order: 101 },
-  ...range(1, 6).map((n) => ({ path: `/mtx/${two(n)}`, label: `Mtx ${n}`, group: "Matrices", order: 200 + n })),
+const MIXES: { path: string; label: string; group: string; order: number; col: Column }[] = [
+  ...range(1, 16).map((n) => ({ path: `/bus/${two(n)}`, label: `Bus ${two(n)}`, group: "Buses", order: n, col: COL.bus })),
+  { path: "/main/st", label: "LR", group: "Main", order: 100, col: COL.main },
+  { path: "/main/m", label: "M/C", group: "Main", order: 101, col: COL.main },
+  ...range(1, 6).map((n) => ({ path: `/mtx/${two(n)}`, label: `Mtx ${n}`, group: "Matrices", order: 200 + n, col: COL.mtx })),
 ];
 
 const OUTPUTS = [
@@ -180,7 +187,7 @@ class Builder {
     const id = `in:${kind}:${n}`;
     if (this.nodes.has(id)) return id;
     const order = SOCKET_ORDER[kind] * 1000 + n;
-    const node: PbNode = { id, col: 0, group: "", order, label: "", name: "", origin: true };
+    const node: PbNode = { id, col: COL.in, group: "", order, label: "", name: "", origin: true };
     switch (kind) {
       case "local":
         Object.assign(node, { group: "Local inputs", label: `Local ${n}`, socket: `local input ${n}` });
@@ -219,7 +226,7 @@ class Builder {
   }
 
   monitor(): string {
-    return this.add({ id: "mon", col: 2, group: "Monitor", order: 300, label: "Monitor", name: "L/R", origin: true });
+    return this.add({ id: "mon", col: COL.mtx, group: "Monitor", order: 300, label: "Monitor", name: "L/R", origin: true });
   }
 
   /**
@@ -272,7 +279,7 @@ export function buildPatchbay(l: Lookup, opts: PatchbayOptions = {}): Patchbay {
   for (const s of STRIPS) {
     b.add({
       id: s.path,
-      col: 1,
+      col: COL.strip,
       group: s.group,
       order: s.order,
       label: s.label,
@@ -285,7 +292,7 @@ export function buildPatchbay(l: Lookup, opts: PatchbayOptions = {}): Patchbay {
   for (const m of MIXES) {
     b.add({
       id: m.path,
-      col: 2,
+      col: m.col,
       group: m.group,
       order: m.order,
       label: m.label,
@@ -363,7 +370,7 @@ export function buildPatchbay(l: Lookup, opts: PatchbayOptions = {}): Patchbay {
       const pos = txt(l, `${node}/pos`);
       const side = src === 1 ? "L · " : src === 2 ? "R · " : "";
       const name = from ? stripName(l, s.strip) || s.label : "";
-      b.add({ id: node, col: 3, group: o.group, order: o.order + n, label: o.label(n), name, detail: delay || undefined });
+      b.add({ id: node, col: COL.out, group: o.group, order: o.order + n, label: o.label(n), name, detail: delay || undefined });
       b.link(from, node, "patch", side + [pos, delay].filter(Boolean).join(" · "));
     }
   }
@@ -380,7 +387,7 @@ export function buildPatchbay(l: Lookup, opts: PatchbayOptions = {}): Patchbay {
       const dev = aes ? b.device(letter as "A" | "B") : "";
       b.add({
         id,
-        col: 4,
+        col: COL.port,
         group: aes ? `AES50 ${letter}${dev ? " · " + dev : ""}` : port.id === "CARD" ? "Card tracks" : "Local XLR outputs",
         order: pi * 1000 + n,
         label: aes ? `${letter} ${n}` : port.id === "CARD" ? `Track ${n}` : `XLR ${n}`,
@@ -406,7 +413,7 @@ function finish(b: Builder): Patchbay {
   const { nodes } = b;
   const feeds = new Set<string>();
   const out = outgoing(b.links);
-  const queue = [...nodes.values()].filter((n) => n.origin || n.col === 2).map((n) => n.id);
+  const queue = [...nodes.values()].filter((n) => n.origin || isMix(n)).map((n) => n.id);
   queue.forEach((id) => feeds.add(id));
   while (queue.length) {
     for (const k of out.get(queue.shift()!) ?? []) {
@@ -420,15 +427,15 @@ function finish(b: Builder): Patchbay {
   for (const k of links) if (nodes.get(k.from)!.muted) k.muted = true;
   const into = incoming(links);
   for (const n of nodes.values()) {
-    if (n.col === 2 && n.id !== "mon" && !into.get(n.id)?.length) n.idle = true;
-    if (n.col !== 4) continue;
+    if (isMix(n) && !into.get(n.id)?.length) n.idle = true;
+    if (n.col !== COL.port) continue;
     // what a port channel carries: the strip behind it
     const src = into.get(n.id)?.[0];
     const from = src && nodes.get(src.from);
     if (!from) continue;
-    const ch = from.col === 0 ? firstFed(from.id, links, nodes) : undefined;
+    const ch = from.col === COL.in ? firstFed(from.id, links, nodes) : undefined;
     n.name = ch ? ch.name || ch.label : from.name || from.label;
-    const via = ch ? [ch.label, ch.name].filter(Boolean).join(" ") : from.col === 0 ? "" : from.name;
+    const via = ch ? [ch.label, ch.name].filter(Boolean).join(" ") : from.col === COL.in ? "" : from.name;
     n.detail = [from.label, via].filter(Boolean).join(" · ");
   }
   return { nodes, links, warnings: check(b, links) };
@@ -438,7 +445,7 @@ function finish(b: Builder): Patchbay {
 function firstFed(socket: string, links: PbLink[], nodes: Map<string, PbNode>): PbNode | undefined {
   for (const k of links) {
     const to = nodes.get(k.to);
-    if (k.from === socket && to?.col === 1) return to;
+    if (k.from === socket && to?.col === COL.strip) return to;
   }
   return undefined;
 }
@@ -475,10 +482,10 @@ function check(b: Builder, links: PbLink[]): Warning[] {
     });
   }
   for (const n of nodes.values()) {
-    if (n.col === 0 && n.phantom && !out.get(n.id)?.length) {
+    if (n.col === COL.in && n.phantom && !out.get(n.id)?.length) {
       w.push({ node: n.id, text: `48 V is on for ${n.label}${n.socket ? ` (${n.socket})` : ""}, which feeds nothing.` });
     }
-    if (n.col === 2 && n.id !== "mon" && into.get(n.id)?.length && !out.get(n.id)?.length) {
+    if (isMix(n) && into.get(n.id)?.length && !out.get(n.id)?.length) {
       const name = n.name ? " " + n.name : "";
       w.push({ node: n.id, text: `${n.label}${name} gets a signal but goes nowhere (no output, matrix or effect).` });
     }
@@ -650,6 +657,8 @@ export interface Layout {
   y: Map<string, number>;
   /** group headings: column, title, top */
   heads: { col: Column; title: string; y: number }[];
+  /** the bottom of each column */
+  bottom: number[];
   height: number;
 }
 
@@ -657,8 +666,8 @@ export interface Layout {
 export function layout(nodes: PbNode[], row: number, head: number): Layout {
   const y = new Map<string, number>();
   const heads: Layout["heads"] = [];
-  const bottom = [0, 0, 0, 0, 0];
-  const last: (string | null)[] = [null, null, null, null, null];
+  const bottom = COLUMNS.map(() => 0);
+  const last: (string | null)[] = COLUMNS.map(() => null);
   for (const n of nodes) {
     if (last[n.col] !== n.group) {
       if (last[n.col] !== null) bottom[n.col] += head / 3;
@@ -669,5 +678,5 @@ export function layout(nodes: PbNode[], row: number, head: number): Layout {
     y.set(n.id, bottom[n.col]);
     bottom[n.col] += row;
   }
-  return { y, heads, height: Math.max(...bottom) };
+  return { y, heads, bottom, height: Math.max(...bottom) };
 }
