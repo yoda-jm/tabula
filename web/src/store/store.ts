@@ -175,7 +175,7 @@ export class Store {
     if (!this.status.connected) return false;
     const armed = !!this.status.console?.armed;
     if (addr === undefined) return this.access?.role === "engineer" && armed;
-    return mayWrite(this.access, armed, addr);
+    return mayWrite(this.access, armed, addr, (a) => this.values.get(a)?.value);
   }
 
   /** whyReadOnly explains a refused write. */

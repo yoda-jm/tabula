@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Whoami } from "./api";
-import { atLeast, mayWrite, musicianMay } from "./access";
+import { atLeast, busLinkAddr, mayWrite, mixBuses, musicianBuses, musicianMay } from "./access";
 
 describe("access", () => {
   it("lets a musician change the sends to their buses and their bus master only", () => {
@@ -23,5 +23,22 @@ describe("access", () => {
     expect(mayWrite({ ...engineer, role: "viewer" }, true, "/ch/01/mix/fader")).toBe(false);
     expect(atLeast("musician", "viewer")).toBe(true);
     expect(atLeast("viewer", "musician")).toBe(false);
+  });
+
+  it("computes a musician's buses from the link of their bus, as the server", () => {
+    expect(busLinkAddr(3)).toBe("/config/buslink/3-4");
+    expect(busLinkAddr(4)).toBe("/config/buslink/3-4");
+    expect(mixBuses(4, true)).toEqual([3, 4]);
+    expect(mixBuses(4, false)).toEqual([4]);
+    expect(mixBuses(17, true)).toEqual([]);
+    const who: Whoami = { role: "musician", bus: 4, buses: [4], local: false, link: true, musicians_can_write: true };
+    const links: Record<string, number> = {};
+    const value = (a: string) => links[a];
+    expect(musicianBuses(who, value)).toEqual([4]); // not known yet: what /api/whoami said
+    links["/config/buslink/3-4"] = 1; // linked after the page opened
+    expect(musicianBuses(who, value)).toEqual([3, 4]);
+    expect(mayWrite(who, false, "/bus/03/mix/fader", value)).toBe(true);
+    links["/config/buslink/3-4"] = 0;
+    expect(mayWrite({ ...who, buses: [3, 4] }, false, "/bus/03/mix/fader", value)).toBe(false);
   });
 });

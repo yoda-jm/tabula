@@ -35,6 +35,8 @@ const SCHEMA: SchemaResponse = {
     },
     { path: "/fx/1", scene: true, fields: [{ name: "type", type: 4 }] },
     { path: "/fx/1/par", scene: true, variant: "/fx/1/type", fields: [{ name: "01", type: 5 }] },
+    { path: "/bus/03/mix", scene: true, fields: [{ name: "fader", type: 1 }] },
+    { path: "/config/buslink", scene: true, fields: [{ name: "3-4", type: 0 }] },
   ],
 };
 
@@ -257,6 +259,18 @@ describe("store", () => {
     s.set("/ch/01/mix/03/on", 1);
     expect(sets).toHaveLength(1);
     expect(s.toasts.at(-1)?.text).toContain("has not let musicians");
+  });
+
+  it("follows the link of a musician's bus as it changes", async () => {
+    const { s } = await ready();
+    s.setAccess({ role: "musician", name: "Lou", bus: 4, buses: [4], local: false, link: true, musicians_can_write: true });
+    expect(s.canWrite("/bus/03/mix/fader")).toBe(false);
+    // the engineer links buses 3 and 4: the stereo mix is the musician's at once
+    s.applyChanges([{ addr: "/config/buslink/3-4", text: "ON", value: 1, origin: "console" }]);
+    expect(s.canWrite("/bus/03/mix/fader")).toBe(true);
+    expect(s.canWrite("/ch/01/mix/03/level")).toBe(true);
+    s.applyChanges([{ addr: "/config/buslink/3-4", text: "OFF", value: 0, origin: "console" }]);
+    expect(s.canWrite("/bus/03/mix/fader")).toBe(false);
   });
 
   it("buffers changes that arrive while the state loads", async () => {

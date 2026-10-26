@@ -12,13 +12,15 @@ import { Fader } from "../components/Fader";
 import { StripMeter } from "../components/Meter";
 import { Scribble } from "../components/Scribble";
 import { StreamBanner, Toasts } from "../components/shell";
+import { busLinkAddr, mixBuses } from "../lib/access";
 import { api } from "../lib/api";
 import type { MixSource } from "../lib/mix";
-import { mixSources } from "../lib/mix";
+import { masterBuses, mixSources } from "../lib/mix";
 import { go, usePersistent } from "../lib/route";
 import type { Strip } from "../lib/strips";
 import { ALL_STRIPS, colourOf, stripAddrs } from "../lib/strips";
 import { prettyText } from "../lib/values";
+import { keepAwake, wakeLockSupported } from "../lib/wakelock";
 import { useAccess, useCanWrite, useLeaf, useNodes, useSchema, useStatus, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
@@ -58,19 +60,43 @@ function Leave({ name }: { name?: string }) {
   );
 }
 
+/** The "Keep the screen on" setting, and whether the browser keeps it on. */
+interface Awake {
+  on: boolean;
+  set(on: boolean): void;
+  active: boolean;
+}
+
 export function MixPage({ bus }: { bus?: number }) {
   const schema = useSchema();
   const who = useAccess();
   const engineer = who?.role === "engineer";
   const n = bus && bus >= 1 && bus <= 16 ? bus : undefined;
+  // the screen stays on as long as the page shows, whether Options is open or not
+  const [awake, setAwake] = usePersistent("tabula.mix.awake", false);
+  const active = useWakeLock(awake);
   if (!schema) return <p className="banner">Loading…</p>;
   return (
     <div className="page mix">
       {engineer && <BusPicker bus={n} />}
       <NotConnected />
-      {n ? <BusMix bus={n} /> : engineer ? <p className="muted">Pick the bus of an in-ear mix to see it as its musician does.</p> : null}
+      {n ? (
+        <BusMix bus={n} awake={{ on: awake, set: setAwake, active }} />
+      ) : engineer ? (
+        <p className="muted">Pick the bus of an in-ear mix to see it as its musician does.</p>
+      ) : null}
     </div>
   );
+}
+
+/** useWakeLock keeps the phone's screen on while on, taking the lock again when the page shows; it tells whether it is held. */
+function useWakeLock(on: boolean): boolean {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    if (!on || !wakeLockSupported()) return;
+    return keepAwake(navigator.wakeLock, document, setActive);
+  }, [on]);
+  return active;
 }
 
 function BusPicker({ bus }: { bus?: number }) {
@@ -94,9 +120,8 @@ function BusOption({ strip, n }: { strip: Strip; n: number }) {
 
 /** The buses of the mix: the bus, or the linked pair it belongs to (stereo). */
 function useMixBuses(bus: number): number[] {
-  const odd = bus - ((bus + 1) % 2);
-  const link = useValue(`/config/buslink/${odd}-${odd + 1}`);
-  return Number(link?.value) === 1 ? [odd, odd + 1] : [bus];
+  const link = useValue(busLinkAddr(bus));
+  return mixBuses(bus, Number(link?.value) === 1);
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -111,7 +136,7 @@ function sourceInfo(strip: Strip) {
   };
 }
 
-function BusMix({ bus }: { bus: number }) {
+function BusMix({ bus, awake }: { bus: number; awake: Awake }) {
   const buses = useMixBuses(bus);
   const target = buses[0]; // writes go to the odd bus of a pair: the console mirrors them
   const stereo = buses.length === 2;
@@ -147,7 +172,7 @@ function BusMix({ bus }: { bus: number }) {
           <label className="check">
             <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show unnamed sources
           </label>
-          <WakeLockToggle />
+          <WakeLockToggle {...awake} />
           {who?.role === "musician" && <Leave name={who.name} />}
           <p className="muted">
             Drag a fader anywhere along it: it never jumps to your finger. Slide through the sources with the bar at the bottom. ★ keeps a source on the left.
@@ -162,7 +187,7 @@ function BusMix({ bus }: { bus: number }) {
           ))}
           {!sources.length && <p className="muted iem-empty">No named source sends to this mix: Options → Show unnamed sources.</p>}
         </div>
-        <MasterStrip bus={target} stereo={stereo} />
+        <MasterStrip buses={buses} />
       </div>
       <Overview sources={sources} bus={target} scroller={strips} />
     </div>
@@ -215,21 +240,33 @@ function SourceStrip(props: { source: MixSource; bus: number; stereo: boolean; p
   );
 }
 
-/** MasterStrip is the musician's own volume: their bus fader and mute. */
-function MasterStrip({ bus, stereo }: { bus: number; stereo: boolean }) {
+/**
+ * MasterStrip is the musician's own volume: their bus fader and mute. A
+ * stereo mix shows its odd bus; both are written unless the console links
+ * the faders and mutes of the pair (masterBuses).
+ */
+function MasterStrip({ buses }: { buses: number[] }) {
+  const bus = buses[0];
   const strip = BUSES[bus - 1];
-  const busPath = `/bus/${pad2(bus)}`;
+  const fdrmute = useValue("/config/linkcfg/fdrmute");
+  const paths = masterBuses(buses, Number(fdrmute?.value) === 1).map((b) => `/bus/${pad2(b)}/mix`);
+  const also = (name: string) => paths.slice(1).map((p) => `${p}/${name}`);
   return (
     <div className="iem-strip iem-master">
       <div className="iem-master-head">My volume</div>
-      <TallFader addr={`${busPath}/mix/fader`} label="My volume" meter={<StripMeter strip={strip} partner={stereo ? BUSES[bus] : undefined} />} />
-      <MuteButton addr={`${busPath}/mix/on`} label="my mix" />
+      <TallFader
+        addr={`${paths[0]}/fader`}
+        also={also("fader")}
+        label="My volume"
+        meter={<StripMeter strip={strip} partner={buses.length === 2 ? BUSES[bus] : undefined} />}
+      />
+      <MuteButton addr={`${paths[0]}/on`} also={also("on")} label="my mix" />
     </div>
   );
 }
 
-/** TallFader is a meter and a fader filling the strip's height, with the level below. */
-function TallFader({ addr, label, meter }: { addr: string; label: string; meter: ReactNode }) {
+/** TallFader is a meter and a fader filling the strip's height, with the level below; also are written the same value. */
+function TallFader({ addr, also = [], label, meter }: { addr: string; also?: string[]; label: string; meter: ReactNode }) {
   const val = useValue(addr);
   const leaf = useLeaf(addr);
   const can = useCanWrite(addr);
@@ -244,8 +281,8 @@ function TallFader({ addr, label, meter }: { addr: string; label: string; meter:
           disabled={!can || val === undefined}
           label={label}
           valueText={`${text} dB`}
-          onChange={(v) => store.set(addr, v)}
-          onRelease={() => store.flush(addr)}
+          onChange={(v) => [addr, ...also].forEach((a) => store.set(a, v))}
+          onRelease={() => [addr, ...also].forEach((a) => store.flush(a))}
         />
       </div>
       <output className={"db" + (val?.pending ? " pending" : "")}>{val ? text : "—"}</output>
@@ -279,7 +316,7 @@ function PanSlider({ addr, label }: { addr: string; label: string }) {
   );
 }
 
-function MuteButton({ addr, label }: { addr: string; label: string }) {
+function MuteButton({ addr, also = [], label }: { addr: string; also?: string[]; label: string }) {
   const val = useValue(addr);
   const can = useCanWrite(addr);
   const muted = val !== undefined && Number(val.value) === 0;
@@ -290,7 +327,7 @@ function MuteButton({ addr, label }: { addr: string; label: string }) {
       aria-pressed={muted}
       aria-label={`Mute ${label}`}
       disabled={!can || val === undefined}
-      onClick={() => store.set(addr, muted ? 1 : 0)}
+      onClick={() => [addr, ...also].forEach((a) => store.set(a, muted ? 1 : 0))}
     >
       MUTE
     </button>
@@ -360,43 +397,12 @@ function OverviewCell({ source, bus }: { source: MixSource; bus: number }) {
   );
 }
 
-/** WakeLockToggle keeps the phone's screen on while the mix page is open. */
-function WakeLockToggle() {
-  const supported = typeof navigator !== "undefined" && "wakeLock" in navigator;
-  const [on, setOn] = usePersistent("tabula.mix.awake", false);
-  const [active, setActive] = useState(false);
-  const lock = useRef<WakeLockSentinel | null>(null);
-  useEffect(() => {
-    if (!supported || !on) return;
-    let cancelled = false;
-    const request = () =>
-      navigator.wakeLock.request("screen").then(
-        (l) => {
-          if (cancelled) {
-            void l.release();
-            return;
-          }
-          lock.current = l;
-          setActive(true);
-          l.addEventListener("release", () => setActive(false));
-        },
-        () => setActive(false),
-      );
-    void request();
-    // the lock is released when the page is hidden: take it again on return
-    const onVisible = () => document.visibilityState === "visible" && void request();
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisible);
-      void lock.current?.release();
-      lock.current = null;
-    };
-  }, [supported, on]);
-  if (!supported) return null;
+/** WakeLockToggle is the setting that keeps the phone's screen on while the mix page is open (held by MixPage). */
+function WakeLockToggle({ on, set, active }: Awake) {
+  if (!wakeLockSupported()) return null;
   return (
     <label className="check" title={on && !active ? "The browser refused (the page may need HTTPS or a user gesture)" : undefined}>
-      <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} /> Keep the screen on
+      <input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} /> Keep the screen on
     </label>
   );
 }

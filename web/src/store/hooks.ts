@@ -1,6 +1,7 @@
 // React bindings of the store.
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { busLinkAddr } from "../lib/access";
 import type { Leaf } from "../lib/schema";
 import { parentOf } from "../lib/schema";
 import { store } from "./store";
@@ -58,7 +59,8 @@ export const useAccess = () => useKey("access", () => store.access);
  */
 export function useCanWrite(addr?: string): boolean {
   useStatus();
-  useAccess();
+  const who = useAccess();
+  useValue(who?.role === "musician" && who.bus ? busLinkAddr(who.bus) : undefined); // a musician's mix follows its bus link
   return store.canWrite(addr);
 }
 

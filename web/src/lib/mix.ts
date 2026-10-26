@@ -38,3 +38,13 @@ export function mixSources(
   const pinned = shown.filter((s) => opts.pins.includes(s.strip.path));
   return [...pinned, ...shown.filter((s) => !opts.pins.includes(s.strip.path))];
 }
+
+/**
+ * masterBuses are the buses a musician's own volume (fader and mute) writes:
+ * the odd bus of a stereo mix when the console follows faders and mutes in
+ * linked pairs (/config/linkcfg/fdrmute ON) and mirrors it to the even one,
+ * both otherwise.
+ */
+export function masterBuses(buses: number[], fdrmute: boolean): number[] {
+  return buses.length === 2 && !fdrmute ? buses : buses.slice(0, 1);
+}

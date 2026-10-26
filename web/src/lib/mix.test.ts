@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mixSources } from "./mix";
+import { masterBuses, mixSources } from "./mix";
 import { ALL_STRIPS } from "./strips";
 
 const SOURCES = ALL_STRIPS.filter((s) => s.kind === "ch").slice(0, 6);
@@ -27,5 +27,13 @@ describe("mixSources", () => {
   it("puts the pinned sources first, named or not", () => {
     const got = mixSources(SOURCES, none, info, { showAll: false, pins: ["/ch/06", "/ch/02"] });
     expect(got.map((s) => s.strip.path)).toEqual(["/ch/02", "/ch/06", "/ch/01", "/ch/03", "/ch/04"]);
+  });
+});
+
+describe("masterBuses", () => {
+  it("writes both buses of a stereo mix unless the console links their faders and mutes", () => {
+    expect(masterBuses([3, 4], true)).toEqual([3]);
+    expect(masterBuses([3, 4], false)).toEqual([3, 4]);
+    expect(masterBuses([5], false)).toEqual([5]);
   });
 });

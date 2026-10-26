@@ -50,19 +50,29 @@ export function go(r: Route) {
   if (window.location.hash !== h) window.location.hash = h;
 }
 
-/** usePersistent is useState kept in localStorage (when the browser allows it). */
+/** readPersistent reads a value kept by usePersistent, or initial. */
+export function readPersistent<T>(key: string, initial: T): T {
+  try {
+    const s = window.localStorage.getItem(key);
+    return s === null ? initial : (JSON.parse(s) as T);
+  } catch {
+    return initial;
+  }
+}
+
+/** followKey is usePersistent's state for key: the one held, or the value kept under a new key (pins per bus). */
+export function followKey<T>(held: { key: string; v: T }, key: string, initial: T): { key: string; v: T } {
+  return held.key === key ? held : { key, v: readPersistent(key, initial) };
+}
+
+/** usePersistent is useState kept in localStorage (when the browser allows it), under key: a new key reads its own value. */
 export function usePersistent<T>(key: string, initial: T): [T, (v: T) => void] {
-  const [v, setV] = useState<T>(() => {
-    try {
-      const s = window.localStorage.getItem(key);
-      return s === null ? initial : (JSON.parse(s) as T);
-    } catch {
-      return initial;
-    }
-  });
+  const [held, setHeld] = useState(() => ({ key, v: readPersistent(key, initial) }));
+  const cur = followKey(held, key, initial);
+  if (cur !== held) setHeld(cur); // during the render: the old key's value never shows under the new one
   const set = useCallback(
     (nv: T) => {
-      setV(nv);
+      setHeld({ key, v: nv });
       try {
         window.localStorage.setItem(key, JSON.stringify(nv));
       } catch {
@@ -71,5 +81,5 @@ export function usePersistent<T>(key: string, initial: T): [T, (v: T) => void] {
     },
     [key],
   );
-  return [v, set];
+  return [cur.v, set];
 }
