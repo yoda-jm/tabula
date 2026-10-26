@@ -26,8 +26,9 @@ with every recording*, choose the device (**Find devices** lists them; the
 console's card is marked ★), the tracks, and **Save**. **Test the input**
 listens for three seconds and shows the level of every track. From then
 on, **Start recording** records the audio too, and **Stop recording** stops
-both. A recording uses the saved settings: changes not saved yet are
-saved by **Start recording** first, as the page says.
+both. A recording uses the saved settings: when some were changed on the
+page and not saved, **Start recording** asks whether to save them or
+discard them, showing what changed.
 
 When the device chosen is not the console's card, or is not connected, the
 page says so above **Start recording**, with a button to record from the
@@ -131,7 +132,10 @@ records as such. The number of channels the computer sees follows the
 card's USB mode on the console (*Setup › Card*: 32/32, 16/16…): set
 **Channels of the device** (`-audio-channels`) to what the list shows, and
 the rate (`-audio-rate`) to the console's (48 kHz unless the console runs at
-44.1 kHz).
+44.1 kHz). Picking a device in **Find devices** sets its channels; for a card
+that `/proc` does not describe (the laptop's own HDA card), tabula asks
+`arecord --dump-hw-params`, which opens it for an instant and records
+nothing. **Save** refuses more channels than the card has.
 
 **arecord** (the default on Linux) needs the card for itself. With PipeWire
 or PulseAudio running, it may answer *Device or resource busy*. Either:
@@ -187,9 +191,15 @@ hard to miss.
   device other than the card on purpose (a test at home with the laptop's
   microphone)? Tick *Name the files “Track 01”…* and only a missing device
   is reported.
-- **Start recording** saves the audio settings changed on the page first: a
-  device picked in **Find devices** but not saved is the one recorded. It
-  answers once the audio runs or has failed (three seconds at most).
+- **Saving** refuses more channels than the card has: 32 channels from the
+  laptop's 2-input card is said at once, under *Channels of the device*,
+  with the console's card to choose instead when it is connected.
+- **Start recording** asks first when the audio settings were changed on the
+  page and not saved: **Save and start** (a device picked in **Find
+  devices** is then the one recorded), **Discard them and start** (the
+  saved ones), or **Cancel**; it lists what changed. It answers once the
+  audio runs or has failed (three seconds at most). *Start the audio* and
+  *Stop and record again* ask the same.
 - **When the audio fails**, the top bar says *REC ⚠ NO AUDIO*, a red bar
   under the pages says why on every page (*The audio is NOT recorded…
   The console still is.*), and the Record page shows the error with what
@@ -343,10 +353,19 @@ that machine chooses one (the flag, or the GUI opened on it): an
 [engineer link](access.md) can change the device, tracks and format, and
 keep the current command, but not set a new one.
 
-On macOS and Windows, ffmpeg records the card (it must be on the PATH).
-These two have not been tried with the console's card yet; on Windows, the
-card's ASIO driver is not usable by ffmpeg, and its WDM inputs may offer
-fewer channels.
+## On macOS and Windows
+
+ffmpeg records the card there; it is not in tabula's archives (see
+[Download](index.md#download) for where to get it). tabula finds it on the
+PATH, or next to its own program: on Windows, `ffmpeg.exe` in the folder of
+`tabula.exe` is enough. If it is missing, the audio fails at once and the
+red bar says how to install it.
+
+These two systems have not been tried with the console's card yet: on
+Windows, the card's ASIO driver is not usable by ffmpeg, and its WDM inputs
+may offer fewer channels. **Test the input** before a show. The checks of
+the device (the console's card, its channels) are made on Linux only; on
+these systems, only a failure of the recorder is told.
 
 ## API
 

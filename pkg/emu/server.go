@@ -66,6 +66,8 @@ type Server struct {
 
 	undoMu sync.Mutex
 	undo   []string // scene lines saved by /-action/undopt
+
+	usb usbStick
 }
 
 func New(cfg Config, st *state.Store) *Server {
@@ -92,6 +94,7 @@ func New(cfg Config, st *state.Store) *Server {
 		lib:       newLibrary(),
 	}
 	s.derived.kick = make(chan struct{}, 1)
+	s.usb.tick = time.Second
 	// The network name is a preference: /xinfo and /status report it.
 	st.Set("/-prefs/name", osc.String(cfg.Name), "config")
 	st.Subscribe(s.broadcast)
@@ -172,6 +175,7 @@ func (s *Server) Serve(ctx context.Context, conn *net.UDPConn) error {
 	s.deriveHeadamps()
 	go s.runSubscriptions(ctx)
 	go s.runDerived(ctx)
+	go s.runUSB(ctx)
 	buf := make([]byte, 65536)
 	for {
 		n, from, err := conn.ReadFromUDP(buf)
@@ -271,9 +275,9 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 		changes, err := s.store.ApplyText(text, origin)
 		if err != nil {
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
-		} else if path, _ := schema.SplitLine(strings.TrimLeft(text, " /")); strings.HasPrefix(path, "-action/") {
+		} else if path, _ := schema.SplitLine(strings.TrimLeft(text, " /")); isCommand("/" + path) {
 			if v, l, err := s.store.Get("/" + path); err == nil {
-				s.action(l.Addr, v, origin)
+				s.command(l.Addr, v, origin)
 			}
 		} else {
 			s.link(changes)
@@ -324,8 +328,8 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			switch {
 			case err != nil:
 				s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
-			case strings.HasPrefix(l.Addr, "/-action/"):
-				s.action(l.Addr, v, origin)
+			case isCommand(l.Addr):
+				s.command(l.Addr, v, origin)
 			case changed:
 				s.link([]state.Change{{Leaf: l, Value: v, Origin: origin}})
 			}

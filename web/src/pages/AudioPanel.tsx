@@ -2,9 +2,23 @@
 // tracks, format), a test of the input, the live state of the capture
 // while recording, and the exports of a session for audio editors.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { AudioConfig, AudioDevice, AudioStatus, AudioTrack, AudioView, ExportFormat, Recorder } from "../lib/audio";
-import { LOW_DISK_SECONDS, audioApi, byteRate, exportUrl, formatBytes, formatHours, formatTracks, parseTracks, trackLabel } from "../lib/audio";
+import {
+  LOW_DISK_SECONDS,
+  audioApi,
+  byteRate,
+  channelRange,
+  configChanges,
+  exportUrl,
+  formatBytes,
+  formatHours,
+  formatTracks,
+  parseTracks,
+  tooManyChannels,
+  trackLabel,
+} from "../lib/audio";
 import { meterFraction, toDbfs } from "../lib/meters";
 import type { Record as RecordStatus, SessionDetail } from "../lib/session";
 import { formatDuration } from "../lib/session";
@@ -26,12 +40,17 @@ export interface Audio {
   /** the settings changed on the page and not saved yet, or null */
   draft: AudioConfig | null;
   setDraft(c: AudioConfig | null): void;
+  /** discard puts the saved settings back on the page */
+  discard(): void;
+  /** counts the discards: the settings form starts again from the saved ones */
+  resets: number;
 }
 
 /** useAudio loads the audio settings, again when a recording starts or stops (free space, last capture). */
 export function useAudio(recording: boolean): Audio {
   const [view, setView] = useState<AudioView | null>(null);
   const [draft, setDraft] = useState<AudioConfig | null>(null);
+  const [resets, setResets] = useState(0);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     try {
@@ -44,18 +63,127 @@ export function useAudio(recording: boolean): Audio {
   useEffect(() => {
     void load();
   }, [load, recording]);
-  return { view, error, setView, draft, setDraft };
+  const discard = useCallback(() => {
+    setDraft(null);
+    setResets((n) => n + 1);
+  }, []);
+  return { view, error, setView, draft, setDraft, discard, resets };
 }
 
-/**
- * saveDraft saves the settings changed on the page, if any: a recording
- * uses the saved ones, so starting one (or its audio) saves them first.
- */
+/** saveDraft saves the settings changed on the page, if any. */
 export async function saveDraft(audio: Audio): Promise<void> {
   if (!audio.draft) return;
   const v = await audioApi.save(audio.draft);
   audio.setView(v);
   audio.setDraft(null);
+}
+
+/**
+ * useUnsaved asks, before something that records with the saved audio
+ * settings (Start recording), what to do with the changes of the page not
+ * saved yet: save them, discard them, or cancel. ask runs it at once when
+ * nothing changed; dialog is to render.
+ */
+export function useUnsaved(audio: Audio): { ask(verb: string, go: () => Promise<unknown>): void; dialog: ReactNode } {
+  const [pending, setPending] = useState<{ verb: string; go: () => Promise<unknown> } | null>(null);
+  const ask = (verb: string, go: () => Promise<unknown>) => {
+    if (audio.draft && audio.view) setPending({ verb, go });
+    else void go();
+  };
+  const dialog =
+    pending && audio.draft && audio.view ? (
+      <UnsavedDialog
+        verb={pending.verb}
+        saved={audio.view.config}
+        draft={audio.draft}
+        onSave={async () => {
+          await saveDraft(audio);
+          setPending(null);
+          void pending.go();
+        }}
+        onDiscard={() => {
+          audio.discard();
+          setPending(null);
+          void pending.go();
+        }}
+        onCancel={() => setPending(null)}
+      />
+    ) : null;
+  return { ask, dialog };
+}
+
+function UnsavedDialog(props: {
+  verb: string;
+  saved: AudioConfig;
+  draft: AudioConfig;
+  onSave(): Promise<void>;
+  onDiscard(): void;
+  onCancel(): void;
+}) {
+  const { verb, saved, draft, onDiscard, onCancel } = props;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const saveBtn = useRef<HTMLButtonElement>(null);
+  const cancel = useRef(onCancel);
+  cancel.current = onCancel;
+  useEffect(() => {
+    saveBtn.current?.focus();
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && cancel.current();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, []);
+  const save = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await props.onSave();
+    } catch (e) {
+      setError((e as Error).message); // e.g. more channels than the card has
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="overlay" onClick={onCancel}>
+      <div
+        className="dialog wide"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="unsaved-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="unsaved-title">Save the audio settings?</h2>
+        <div className="dialog-body">
+          <p>The audio settings were changed on this page and not saved; the recording uses the saved ones.</p>
+          <dl className="facts changes">
+            {configChanges(saved, draft).map((c) => (
+              <div key={c.label}>
+                <dt>{c.label}</dt>
+                <dd>
+                  <span className="muted">{c.from}</span> → <strong>{c.to}</strong>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          {error && (
+            <p className="error" role="alert">
+              Not saved: {error}
+            </p>
+          )}
+        </div>
+        <div className="dialog-actions">
+          <button type="button" className="btn" disabled={busy} onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="btn" disabled={busy} onClick={onDiscard}>
+            Discard them and {verb}
+          </button>
+          <button ref={saveBtn} type="button" className="btn primary" disabled={busy} onClick={() => void save()}>
+            {busy ? "Saving…" : `Save and ${verb}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** toConsoleCard switches the settings to the console's card, when the check found it connected, and saves them. */
@@ -89,7 +217,7 @@ export function AudioPanel({ rec, audio, onRetry }: { rec: RecordStatus | null; 
   // the audio of this recording can (re)start: it failed before recording anything, or was off
   const fixable = recording && (!live || (live.state === "failed" && !live.frames));
   const settings = (retry?: () => Promise<void>) => (
-    <AudioSettings key={JSON.stringify(view.config)} view={view} audio={audio} onSaved={setView} onRetry={retry} />
+    <AudioSettings key={JSON.stringify(view.config) + audio.resets} view={view} audio={audio} onSaved={setView} onRetry={retry} />
   );
   return (
     <section className="card audio">
@@ -305,6 +433,10 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
   useEffect(() => () => setDraft(null), [setDraft]);
 
   const tracks = parseTracks(cfg.tracks ?? "", cfg.channels);
+  // the server refuses more channels than the card has: say it before
+  const tooMany = tooManyChannels(cfg, devices);
+  const device = devices?.find((d) => d.recorder === cfg.recorder && d.id === cfg.device && d.channels);
+  const invalid = typeof tracks === "string" || !!tooMany;
   const rate = byteRate(cfg);
   const reserve = Math.max(256 * 2 ** 20, 60 * rate);
   const fits = view.free >= 0 && rate > 0 ? Math.max(0, (view.free - reserve) / rate) : -1;
@@ -402,13 +534,14 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
       )}
       <div className="row">
         <label>
-          <span className="field-label">Channels of the device</span>
+          <span className="field-label">Channels of the device{device ? ` (it has ${channelRange(device)})` : ""}</span>
           <input
             className="input num"
             type="number"
             min={1}
             max={128}
             value={cfg.channels}
+            aria-invalid={!!tooMany}
             onChange={(e) => set({ channels: Number(e.target.value) || 0 })}
           />
         </label>
@@ -444,6 +577,11 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
           </select>
         </label>
       </div>
+      {tooMany && (
+        <p className="error" role="alert">
+          ⚠ {tooMany}
+        </p>
+      )}
       <TrackPicker
         channels={cfg.channels}
         names={view.names}
@@ -496,7 +634,7 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
         </p>
       )}
       <div className="row">
-        <button type="submit" className="btn primary" disabled={!!busy || !dirty || typeof tracks === "string"}>
+        <button type="submit" className="btn primary" disabled={!!busy || !dirty || invalid}>
           {busy === "save" ? "Saving…" : dirty ? "Save" : "Saved"}
         </button>
         <button type="button" className="btn" disabled={!!busy || view.testing || typeof tracks === "string"} onClick={() => void probe()}>
@@ -506,7 +644,7 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
           <button
             type="button"
             className="btn primary"
-            disabled={!!busy || !cfg.enabled || typeof tracks === "string"}
+            disabled={!!busy || !cfg.enabled || invalid}
             onClick={() => void retry()}
           >
             {busy === "retry" ? "Starting…" : dirty ? "Save and start the audio" : "Start the audio"}
@@ -514,7 +652,7 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
         )}
       </div>
       {dirty && !onRetry && (
-        <p className="note">Not saved yet: Save, or Start recording saves these settings first (a recording uses the saved ones).</p>
+        <p className="note">Not saved yet: a recording uses the saved settings. Start recording asks whether to save these or discard them.</p>
       )}
       {(error || view.error) && (
         <p className="error" role="alert">

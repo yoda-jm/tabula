@@ -39,6 +39,7 @@ func main() {
 		save      = flag.String("save", "", "scene file to write the state to on exit")
 		libDir    = flag.String("library", "", "directory keeping the saved scenes, snippets and presets (/save, /copy…)")
 		presets   = flag.String("presets", "", "load factory presets from M32-Edit's library directory, e.g. ~/.config/.M32-Edit/Xlib")
+		usbDir    = flag.String("usb", "", "directory standing for a USB stick in the console (WAV files to play, scenes to load)")
 		httpAddr  = flag.String("http", "", "address of the read-only debug page, e.g. :8032 (disabled if empty)")
 		unhandled = flag.String("unhandled-log", "", "append every unhandled request to this JSON lines file")
 		verbose   = flag.Bool("v", false, "log every unhandled request, not only the first of each kind")
@@ -56,13 +57,13 @@ func main() {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 	log.Info("tabula-emu", "version", version)
-	if err := run(log, *listen, *model, *name, *firmware, *sceneFile, *save, *libDir, *presets, *httpAddr, *unhandled); err != nil {
+	if err := run(log, *listen, *model, *name, *firmware, *sceneFile, *save, *libDir, *presets, *usbDir, *httpAddr, *unhandled); err != nil {
 		log.Error("tabula-emu", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(log *slog.Logger, listen, model, name, firmware, sceneFile, save, libDir, presets, httpAddr, unhandled string) error {
+func run(log *slog.Logger, listen, model, name, firmware, sceneFile, save, libDir, presets, usbDir, httpAddr, unhandled string) error {
 	model = strings.ToUpper(model)
 	if !contains(models, model) {
 		return fmt.Errorf("unknown model %q (known: %s)", model, strings.Join(models, ", "))
@@ -103,6 +104,13 @@ func run(log *slog.Logger, listen, model, name, firmware, sceneFile, save, libDi
 			return err
 		}
 		log.Info("presets imported", "dir", presets, "presets", n)
+	}
+	if usbDir != "" {
+		n, err := srv.MountUSB(usbDir)
+		if err != nil {
+			return err
+		}
+		log.Info("usb stick mounted", "dir", usbDir, "entries", n)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

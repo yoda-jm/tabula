@@ -14,6 +14,7 @@ function useKey<T>(key: string, get: () => T): T {
 export const useStatus = () => useKey("status", () => store.status);
 export const useStream = () => useKey("stream", () => store.stream);
 export const useRecord = () => useKey("record", () => store.record);
+export const useSceneLoad = () => useKey("scenefile", () => store.sceneLoad);
 export const useToasts = () => useKey("toasts", () => store.toasts);
 export const useSchema = () => useKey("schema", () => store.schema); // loads notify every key
 export const useStateVersion = () => useKey("state", () => store.stateVersion);

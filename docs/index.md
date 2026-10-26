@@ -24,6 +24,22 @@ built in: unpack it and run them, nothing to install. Checksums:
 [SHA256SUMS](https://github.com/yoda-jm/tabula/releases/download/latest/SHA256SUMS). On macOS, the binaries are not signed: allow
 them once with `xattr -d com.apple.quarantine tabula tabula-emu`.
 
+**Recording the audio tracks** (optional) needs a recorder program that is
+not in the archives:
+
+- Linux: `arecord`, from alsa-utils, already there on most systems.
+- macOS: [ffmpeg](https://evermeet.cx/ffmpeg/), a static build: unzip
+  `ffmpeg` next to `tabula` (allow it with
+  `xattr -d com.apple.quarantine ffmpeg`), or `brew install ffmpeg`.
+- Windows: [ffmpeg](https://www.gyan.dev/ffmpeg/builds/), the *release
+  essentials* zip: put its `bin\ffmpeg.exe` next to `tabula.exe`, or
+  `winget install Gyan.FFmpeg`.
+
+Other builds are listed on [ffmpeg.org](https://ffmpeg.org/download.html).
+tabula finds the program on the PATH or next to itself. Recording the
+console's card through ffmpeg on macOS and Windows has not been tried yet:
+test it before a show ([recording](recording.md#on-macos-and-windows)).
+
 Versioned releases, with their notes, are on the
 [releases page](https://github.com/yoda-jm/tabula/releases).
 
@@ -48,6 +64,10 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   (`scene-07.scn`, `snippet-03.snp`…). A scene file copied there as
   `scene-NN.scn` fills slot NN, ready to recall from an editor or from
   tabula's Scenes page.
+- `-usb dir` puts a USB stick in the console: the folder stands for it, its
+  WAV files play (time running, previous/next, folder mode, no sound) and its
+  scenes load, as the console's USB recorder does
+  ([details](emulator.md#usb-stick)); try `-usb testdata/usb`.
 - `-model` picks what `/info` reports: X32, X32RACK, X32C, X32P, X32CORE, M32, M32R, M32C.
 
 ![The debug page: the connected clients and their meter subscriptions, the requests the emulator did not understand, and every parameter](img/emulator.png)
@@ -73,6 +93,7 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   shaped by the low cut, the EQ and the graphic EQ.
 - Linked channels, aux inputs, FX returns, buses and matrices kept in step
   as the console does, following the link options.
+- The USB stick's player and file browser, from a folder (`-usb`).
 
 **[How the emulator simulates the console](emulator.md)**: audio flow,
 meters, RTA, effects, and exactly what linking two strips does.
@@ -109,7 +130,11 @@ tabula -console 192.168.1.62 -http :8033
   behind a channel's EQ curve.
 - **Scenes**: the scenes, snippets and presets the console holds; recall
   (after a confirmation), save, rename, copy and delete them, load channel
-  presets onto a strip and effect presets into a slot.
+  presets onto a strip and effect presets into a slot. **Scene files**:
+  `.scn` files kept on the laptop (a show prepared in M32-Edit), loaded into
+  the console in one go, and the console saved as one.
+- **USB**: the console's USB stick and player: browse its folders, play a
+  WAV file (pause, stop, previous, next), load a scene from it.
 - **Browser**: every parameter of the console as a tree of its paths
   (`ch` → `01` → `eq` → `1`), searchable by path or value, each with an
   editor; values can also be typed as on the console (`-6`,

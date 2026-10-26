@@ -29,6 +29,8 @@ func TestCheckDevice(t *testing.T) {
 		{"console card", cfg("arecord", "hw:CARD=DN32USB,DEV=0", 32), withCard, "", false},
 		{"console card by number", cfg("arecord", "plughw:1,0", 32), withCard, "", false},
 		{"wrong channels", cfg("arecord", "hw:CARD=DN32USB,DEV=0", 16), withCard, "delivers 32 channels, but Channels of the device says 16", false},
+		{"in the range", cfg("arecord", "hw:CARD=DN32USB,DEV=0", 16), []Device{{Recorder: "arecord", ID: dn32.ID, Name: dn32.Name, Channels: 32, MinChannels: 8, Console: true, card: "1"}}, "", false},
+		{"out of the range", cfg("arecord", "hw:CARD=DN32USB,DEV=0", 4), []Device{{Recorder: "arecord", ID: dn32.ID, Name: dn32.Name, Channels: 32, MinChannels: 8, Console: true, card: "1"}}, "delivers 8 to 32 channels, but Channels of the device says 4", false},
 		{"unplugged", cfg("arecord", "hw:CARD=DN32USB,DEV=0", 32), without, "hw:CARD=DN32USB,DEV=0 is not connected. Neither is the console's card", false},
 		{"other card name", cfg("arecord", "hw:CARD=XUSB,DEV=0", 32), withCard, "hw:CARD=XUSB,DEV=0 is not connected. The console's card is DN32-USB", true},
 		{"default", cfg("arecord", "", 32), withCard, `Records from "default", the system's default input, not the console's card`, true},
@@ -69,6 +71,45 @@ func TestCheckDevice(t *testing.T) {
 	}
 }
 
+func TestCheckChannels(t *testing.T) {
+	pch := Device{Recorder: "arecord", ID: "hw:CARD=PCH,DEV=0", Name: "HDA Intel PCH, ALC294 Analog", Channels: 2, card: "0"}
+	dn32 := Device{Recorder: "arecord", ID: "hw:CARD=DN32USB,DEV=0", Name: "DN32-USB, USB Audio", Channels: 32, Console: true, card: "1"}
+	src := Device{Recorder: "parecord", ID: "alsa_input.pci-0000_00_1f.3.analog-stereo", Name: "alsa_input.pci-0000_00_1f.3.analog-stereo", Channels: 2}
+	devs := []Device{pch, dn32, src}
+	cfg := func(recorder, device string, channels int) Config {
+		c := DefaultConfig()
+		c.Recorder, c.Device, c.Channels = recorder, device, channels
+		return c
+	}
+	for _, tc := range []struct {
+		name string
+		cfg  Config
+		devs []Device
+		want string
+	}{
+		// the concert of 2026-10-25, refused when saving
+		{"laptop card", cfg("arecord", "hw:CARD=PCH,DEV=0", 32), devs, "HDA Intel PCH, ALC294 Analog (hw:CARD=PCH,DEV=0) has 2 input channels, not 32: set Channels of the device to 2, or record from the console's card, DN32-USB, USB Audio (hw:CARD=DN32USB,DEV=0)."},
+		{"laptop card by number", cfg("arecord", "plughw:0,0", 4), devs, "has 2 input channels, not 4"},
+		{"no console card", cfg("arecord", "hw:CARD=PCH,DEV=0", 32), []Device{pch}, "set Channels of the device to 2."},
+		{"fewer", cfg("arecord", "hw:CARD=PCH,DEV=0", 1), devs, ""},
+		{"console card", cfg("arecord", "hw:CARD=DN32USB,DEV=0", 32), devs, ""},
+		{"console card, too many", cfg("arecord", "hw:CARD=DN32USB,DEV=0", 64), devs, "DN32-USB, USB Audio (hw:CARD=DN32USB,DEV=0) has 32 input channels, not 64: set Channels of the device to 32."},
+		{"source", cfg("parecord", src.ID, 32), devs, "has 2 input channels, not 32"},
+		{"range", cfg("arecord", "hw:CARD=PCH,DEV=0", 8), []Device{{Recorder: "arecord", ID: "hw:CARD=PCH,DEV=0", Name: "PCH", Channels: 4, MinChannels: 2, card: "0"}}, "has 2 to 4 input channels, not 8: set Channels of the device to 4."},
+		{"channels unknown", cfg("arecord", "hw:CARD=PCH,DEV=0", 32), []Device{{Recorder: "arecord", ID: "hw:CARD=PCH,DEV=0", card: "0"}}, ""},
+		{"not connected", cfg("arecord", "hw:CARD=XUSB,DEV=0", 32), devs, ""},
+		{"default", cfg("arecord", "", 32), devs, ""},
+		{"custom", cfg("custom", "", 32), devs, ""},
+	} {
+		if got := CheckChannels(tc.cfg, tc.devs, "linux"); tc.want == "" && got != "" || !strings.Contains(got, tc.want) {
+			t.Errorf("%s: %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	if got := CheckChannels(cfg("arecord", "hw:CARD=PCH,DEV=0", 32), devs, "darwin"); got != "" {
+		t.Errorf("macOS: %q", got)
+	}
+}
+
 func TestHint(t *testing.T) {
 	for msg, want := range map[string]string{
 		"the recorder stopped (exit status 1): arecord: set_params:1398: Channels count non available": "no mode with this many channels",
@@ -76,6 +117,7 @@ func TestHint(t *testing.T) {
 		"ALSA lib confmisc.c:165:(snd_config_get_card) cannot find card 'DN32USB'":                     "is the console's USB cable plugged in?",
 		"arecord: set_params:1387: Sample format non available":                                        "plughw",
 		`arecord: exec: "arecord": executable file not found in $PATH`:                                 "alsa-utils",
+		`ffmpeg: exec: "ffmpeg": executable file not found in %PATH%`:                                  "winget install Gyan.FFmpeg",
 		"all fine": "",
 	} {
 		if got := Hint(msg); want == "" && got != "" || !strings.Contains(got, want) {

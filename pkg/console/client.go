@@ -257,17 +257,19 @@ func (c *Client) handle(m osc.Message) {
 	}
 }
 
-// Sync requests every node of the schema with /node and waits for the
-// replies, a window of requests at a time so the network is not flooded.
-// Variant nodes (effect parameters) are requested after the rest, once the
-// values selecting their fields (effect types) are known. progress, if set,
-// is called after each reply, never concurrently.
+// Sync requests every node of the schema but the lazy ones with /node and
+// waits for the replies, a window of requests at a time so the network is
+// not flooded. Variant nodes (effect parameters) are requested after the
+// rest, once the values selecting their fields (effect types) are known.
+// progress, if set, is called after each reply, never concurrently.
 func (c *Client) Sync(ctx context.Context, progress func(done, total int)) error {
 	var regular, variants []*schema.Node
 	for _, n := range c.mirror.Schema().Nodes {
-		if n.Variant != nil {
+		switch {
+		case n.Lazy:
+		case n.Variant != nil:
 			variants = append(variants, n)
-		} else {
+		default:
 			regular = append(regular, n)
 		}
 	}
@@ -333,6 +335,10 @@ func (c *Client) fetchNodes(ctx context.Context, nodes []*schema.Node, each func
 	return nil
 }
 
+// xremoteRenew is how often /xremote is sent again (the console's lease is
+// 10 s); with the 2 s tick, every 6 s.
+const xremoteRenew = 5 * time.Second
+
 // Run keeps the connection alive until ctx is done: /xremote renewal, and
 // a probe when the console has been silent for a while. When a lost
 // console answers again (rebooted, cable back), the mirror is synced again
@@ -353,7 +359,9 @@ func (c *Client) Run(ctx context.Context) {
 		connected := c.status.Connected
 		c.mu.Unlock()
 		if connected && silent < c.probeAfter {
-			if time.Since(lastRemote) > 8*time.Second {
+			// the console keeps sending changes 10 s after /xremote: renew
+			// well before, or changes made at the edge are lost
+			if time.Since(lastRemote) >= xremoteRenew {
 				c.send(osc.NewMessage("/xremote"))
 				lastRemote = time.Now()
 			}
@@ -439,6 +447,20 @@ func (c *Client) SetAs(addr string, v osc.Arg, origin string, unarmed bool) erro
 	}
 	_, err = c.mirror.Set(l.Addr, cv, origin)
 	return err
+}
+
+// Get asks the console for one parameter (its address alone, as Maillot's
+// X32USB reads the USB stick's listing) and returns the value, applied to
+// the mirror as well.
+func (c *Client) Get(ctx context.Context, addr string) (osc.Arg, error) {
+	r, err := c.ask(ctx, osc.NewMessage(addr), addr, 2)
+	if err != nil {
+		return osc.Arg{}, fmt.Errorf("%s: %w", addr, err)
+	}
+	if len(r.Args) != 1 {
+		return osc.Arg{}, fmt.Errorf("%s: unexpected answer %s", addr, r)
+	}
+	return r.Args[0], nil
 }
 
 // SetText writes one parameter given as node text, e.g. "-3.5" or "GATE".

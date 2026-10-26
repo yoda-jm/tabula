@@ -26,6 +26,9 @@ type Node struct {
 	InScene bool
 	// Variant, when set, makes the field types depend on another parameter.
 	Variant *Variant
+	// Lazy nodes are not read when connecting: clients read them when they
+	// need them (the entries of the USB stick's directory).
+	Lazy bool
 }
 
 // Variant makes a node's field types depend on the value of another

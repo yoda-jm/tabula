@@ -479,9 +479,13 @@ input[type="range"] {
 }
 .dialog-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
+}
+.dialog.wide {
+  width: min(560px, 100%);
 }
 .toasts {
   position: fixed;
@@ -569,6 +573,12 @@ input[type="range"] {
 }
 .facts dd {
   margin: 0;
+}
+.facts > div {
+  display: contents;
+}
+.changes dd {
+  overflow-wrap: anywhere;
 }
 .facts dd .btn {
   display: inline-flex;
@@ -2129,6 +2139,34 @@ div.scribble {
 .lib-note {
   margin: 10px 0 0;
   font-size: 0.85rem;
+}
+.slot-name.static {
+  cursor: default;
+}
+.scene-file .slot-head .btn {
+  flex: none;
+}
+.scene-progress {
+  margin: 4px 0 12px;
+}
+.scene-progress p {
+  margin: 0 0 6px;
+}
+.player-file {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+.transport {
+  align-items: center;
+}
+.transport .check {
+  margin-left: auto;
+}
+pre.skipped {
+  max-height: 12em;
+  overflow: auto;
+  margin: 6px 0 0;
+  font-size: 0.8rem;
 }
 
 /* ---------- audio tracks (Record page) ---------- */

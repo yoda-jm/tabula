@@ -18,6 +18,7 @@ import { NoAccess } from "./pages/NoAccess";
 import { RecordPage } from "./pages/RecordPage";
 import { RoutingPage } from "./pages/RoutingPage";
 import { ScenesPage } from "./pages/ScenesPage";
+import { UsbPage } from "./pages/UsbPage";
 import { useAccess, useSchema, useStatus, useValue } from "./store/hooks";
 import { store } from "./store/store";
 
@@ -28,6 +29,7 @@ const NAV: { page: Page; label: string; role: Role }[] = [
   { page: "routing", label: "Routing", role: "engineer" },
   { page: "fx", label: "FX", role: "engineer" },
   { page: "scenes", label: "Scenes", role: "engineer" },
+  { page: "usb", label: "USB", role: "engineer" },
   { page: "browser", label: "Browser", role: "viewer" },
   { page: "mix", label: "In-ears", role: "engineer" },
   { page: "record", label: "Record", role: "engineer" },
@@ -114,6 +116,8 @@ function ConsoleApp({ role }: { role: Role }) {
           <FxPage slot={route?.slot} />
         ) : page === "scenes" && engineer ? (
           <ScenesPage />
+        ) : page === "usb" && engineer ? (
+          <UsbPage />
         ) : page === "browser" ? (
           <BrowserPage />
         ) : page === "record" && engineer ? (

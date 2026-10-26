@@ -41,11 +41,12 @@ Both share the same library (`pkg/`).
 
 ### 2. Emulator — what X32-Edit / M32-Edit need *(in progress)*
 Driven by the unknown-request log while connecting the real editors:
-- [x] `/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-action`, `/-undo`, `/-usb`, `/-urec`, `/-insert`, `/-ha` (1126 nodes; formats checked against a real M32C's values cached by M32-Edit).
+- [x] `/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-action`, `/-undo`, `/-usb`, `/-urec`, `/-insert`, `/-ha` (2026 nodes, 999 of them the USB stick's directory entries, read by clients only when browsing; formats checked against a real M32C's values cached by M32-Edit).
 - [x] `/meters/0…16` with synthetic levels following the mix, `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
 - [x] Effect parameters (`/fx/N/par/NN`): fields follow the effect type (switching effect loads its defaults); all 61 effects modelled, with ranges, steps, formats and defaults matching M32-Edit's built-in tables; 57 of 61 real parameter lines round-trip byte for byte, the other 4 (older firmware spellings) load and are written in today's form.
 - [x] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/add` (cues), `/showdump`, with listings in `/-show` and `/-libs`, optionally kept in a directory (`-library`). Scene safes and snippet filters are not applied yet.
 - [x] Side effects of `/-action/*` (go scene/snippet/cue, clear solo, undo checkpoint and undo, init) and computed status (`/-insert`, `/-ha/NN/index` from sources and input routing, `/-stat/solo`).
+- [x] USB stick from a folder (`-usb`): directory listing, `/-action/recselect` (enter a directory, play a WAV file, load a scene or snippet), player state and time (`/-stat/tape`), previous/next (`/-action/playtrack`), folder mode, unmount; no sound, no recording to the stick (`docs/emulator.md`).
 - [x] Factory presets: `-presets` imports M32-Edit's library (channel, effect and routing presets).
 - [x] RTA of the source chosen with `/-action/setrtasrc` (channels, buses, graphic EQs, pre/post EQ), shaped by low cut, EQ and graphic EQ.
 - [x] Linked strips (channels, aux, FX returns, buses, matrices) kept in step, following `/config/linkcfg`, with the rules of M32-Edit's offline logic (see `docs/emulator.md`).
@@ -60,6 +61,8 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Routing: input routing and patch, outputs, AES50 A/B, card, P16, aux, AES/EBU, user routing, with names resolved.
 - [x] FX pages: overview of the 8 slots, per-slot editor, graphic EQ with the RTA (also behind the channel EQ curve).
 - [x] Scenes, snippets and presets: list, recall, save, rename, copy, delete (`POST /api/library`).
+- [x] Scene files kept on the laptop (`-scenes`): load into the console line by line, save the console as one, open from the browser (`/api/scenefiles`).
+- [x] The console's USB stick and player: browse, play WAV files, transport, load scenes from the stick (`/api/usb`). Not yet tried on the real M32.
 - [x] Linked pairs shown as stereo strips in the mixer.
 
 ### 4. Recording and replay *(in progress)*

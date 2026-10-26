@@ -147,6 +147,38 @@ card 2: XUSB [X-USB], device 0: USB Audio [USB Audio]
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("linux:\n got %+v\nwant %+v", got, want)
 	}
+
+	// The HDA card says its channels when arecord opens it; the USB card
+	// is known already, and a card in use stays unknown.
+	probed := map[string]string{
+		"hw:CARD=PCH,DEV=0":  "HW Params of device \"hw:CARD=PCH,DEV=0\":\n--------------------\nACCESS: MMAP_INTERLEAVED RW_INTERLEAVED\nCHANNELS: [2 4]\nRATE: [44100 192000]\n--------------------\narecord: set_params:1393: Sample format non available\n",
+		"hw:CARD=Busy,DEV=0": "arecord: main:850: audio open error: Device or resource busy\n",
+	}
+	var asked []string
+	probe := func(_ context.Context, name string, args ...string) (string, error) {
+		asked = append(asked, args[1])
+		if want := []string{"-D", args[1], "--dump-hw-params", "-c", "256", "-d", "1", "-t", "raw", os.DevNull}; name != "arecord" || !reflect.DeepEqual(args, want) {
+			t.Errorf("probe ran %s %q", name, args)
+		}
+		return probed[args[1]], errors.New("exit status 1")
+	}
+	devs := append(got, Device{Recorder: "arecord", ID: "hw:CARD=Busy,DEV=0"}, Device{Recorder: "arecord", ID: "plughw:CARD=PCH,DEV=0"})
+	probeChannels(context.Background(), devs, probe)
+	if !reflect.DeepEqual(asked, []string{"hw:CARD=PCH,DEV=0", "hw:CARD=Busy,DEV=0"}) {
+		t.Errorf("probed %q", asked)
+	}
+	if d := devs[0]; d.Channels != 4 || d.MinChannels != 2 || d.channelRange() != "2 to 4" {
+		t.Errorf("HDA card: %+v", d)
+	}
+	if d := devs[3]; d.Channels != 0 {
+		t.Errorf("busy card: %+v", d)
+	}
+	for text, want := range map[string][2]int{"CHANNELS: 2\n": {2, 2}, "x\nCHANNELS: (1 4]\n": {2, 4}, "CHANNELS: [1 10000]": {1, 10000}, "nothing": {0, 0}} {
+		if lo, hi, _ := parseHWChannels(text); lo != want[0] || hi != want[1] {
+			t.Errorf("%q: %d %d", text, lo, hi)
+		}
+	}
+
 	got = listDevices(context.Background(), "darwin", run, read)
 	if len(got) != 2 || got[1] != (Device{Recorder: "ffmpeg", ID: "1", Name: "DN32-USB", Console: true}) {
 		t.Errorf("macOS: %+v", got)

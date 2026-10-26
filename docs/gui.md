@@ -18,8 +18,8 @@ accident. Disarm to go back to read-only.
 every page (once signed in, when an engineer password is set). Other
 devices get a role from an access link: viewers see the
 Mixer, Channel and Browser pages read-only; musicians only get their in-ear
-mix. Routing, FX, Scenes, In-ears, Record, Access and Connect are engineer
-pages. See [access](access.md).
+mix. Routing, FX, Scenes, USB, In-ears, Record, Access and Connect are
+engineer pages. See [access](access.md).
 
 ## Mixer
 
@@ -138,7 +138,8 @@ has, and names it. The dB window follows the console's RTA settings
 ## Scenes
 
 The console's library, in six tabs: scenes, snippets, channel presets,
-effect presets, routing presets and AES50/DP48 presets. Each tab lists the
+effect presets, routing presets and AES50/DP48 presets; a seventh, **Scene
+files**, holds the scene files of the machine running tabula (below). Each tab lists the
 slots in use (tick *Empty slots* to see all 100), with their name and, for
 scenes, their note; the scene or snippet the console's scenes page
 highlights is marked *current* (when the console shows scenes or snippets
@@ -160,6 +161,44 @@ there).
 Every command changes the console, so the page needs armed writes. Recalls
 apply the scene safes and snippet filters on a console; the emulator does
 not apply them yet.
+
+### Scene files
+
+The `.scn` files kept in a folder of the machine running tabula
+(`-scenes`, default `scenes` where tabula starts): a show prepared with
+M32-Edit, saved by the console on a USB stick, or a backup of the console.
+
+- **Open a file…** takes a scene file of the computer the browser runs on
+  and keeps it in the folder (asking before replacing one of the same name).
+- **Load** sends a file to the console, after a confirmation: every
+  parameter it holds changes at once, as M32-Edit's PC → Mixer does, and the
+  console's scene safes do not apply. A bar follows it (about 2,100 lines,
+  a few seconds over Wi-Fi); lines the console does not know (a file from
+  another model or firmware) are skipped and listed. It needs armed writes.
+  To keep the scene in the console's memory too, save it in a slot from the
+  Scenes tab afterwards.
+- **Save the console's settings as a file** writes the current settings as
+  `<name>.scn`, which M32-Edit opens (reading needs no armed writes).
+- ⤓ downloads a file, ✕ deletes it.
+
+![Scene files kept on the machine running tabula](img/gui-scene-files.png)
+
+## USB
+
+The USB stick in the console, as on its USB recorder screen. The **USB
+player** shows the file loaded, whether it plays, its elapsed and remaining
+time, with |◀ (previous file), ▶ Play / ❚❚ Pause, ■ Stop, ▶| (next file),
+and *Then the next file of the folder* (the console's folder mode). Below,
+the current folder of the stick: **Open** a folder (or the parent folder),
+**▶ Play** a WAV file, **Load…** a scene, snippet or preset file into the
+console (after a confirmation: the console loads it from the stick). The
+file in the player is marked. Every command needs armed writes; the sound
+goes where the console's routing sends its USB player.
+
+![The console's USB stick and player](img/gui-usb.png)
+
+The emulator has a stick too, with `-usb dir` ([emulator](emulator.md#usb-stick)):
+its WAV files play silently, time running.
 
 ## Browser
 
@@ -195,8 +234,13 @@ Record a show as a session, which keeps two things, as the page says above
   the tracks to record in the list, named after what the console sends to
   each track of its card ([recording](recording.md#quick-start)); the page
   says how long the free space lasts with them. It warns when the device
-  is not the console's card or not connected, and **Start recording**
-  saves the audio settings not saved yet.
+  is not the console's card or not connected, and refuses to save more
+  channels than the card has (32 channels from the laptop's 2-input card).
+  When the audio settings were changed on the page and not saved, **Start
+  recording** asks first: save them, discard them, or cancel, with what
+  changed.
+
+![Start recording asks about the audio settings not saved](img/audio-unsaved.png)
 
 When the audio of a recording fails, the top bar says *REC ⚠ NO AUDIO* and
 a red bar under the pages says why, on every page; the Record page tells

@@ -1,6 +1,8 @@
 // Scenes, snippets and presets: what the console's library holds, with
 // recall (after a confirmation), save, rename, copy and delete. Every
-// command changes the console, so they all need armed writes.
+// command changes the console, so they all need armed writes. The Scene
+// files tab holds the .scn files of the machine running tabula
+// (SceneFiles.tsx).
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -15,6 +17,7 @@ import { useCanWrite, useNodes, useValue } from "../store/hooks";
 import { lookup } from "../store/lookup";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
+import { SceneFiles } from "./SceneFiles";
 
 /** The strips a channel preset is saved from or loaded to, by index 0-71 (DCAs excluded). */
 const PRESET_STRIPS = INDEXED_STRIPS;
@@ -27,7 +30,7 @@ interface Ask {
 }
 
 export function ScenesPage() {
-  const [kind, setKind] = usePersistent<LibKind>("tabula.library", "scene");
+  const [kind, setKind] = usePersistent<LibKind | "files">("tabula.library", "scene");
   const k = KINDS.find((i) => i.kind === kind) ?? KINDS[0];
   const [showEmpty, setShowEmpty] = usePersistent("tabula.library.empty", false);
   const paths = useMemo(() => Array.from({ length: 100 }, (_, i) => slotPath(k, i)), [k]);
@@ -66,40 +69,58 @@ export function ScenesPage() {
             key={i.kind}
             type="button"
             role="tab"
-            aria-selected={i.kind === k.kind}
-            className={"bank" + (i.kind === k.kind ? " active" : "")}
+            aria-selected={i.kind === kind}
+            className={"bank" + (i.kind === kind ? " active" : "")}
             onClick={() => setKind(i.kind)}
           >
             {i.label}
           </button>
         ))}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={kind === "files"}
+          className={"bank" + (kind === "files" ? " active" : "")}
+          onClick={() => setKind("files")}
+        >
+          Scene files
+        </button>
       </div>
       <NotConnected />
-      {!can && (
-        <p className="warn-box">
-          Recalling, saving or changing the library changes the console: it needs armed writes (top right).
-        </p>
+      {kind === "files" ? (
+        <SceneFiles />
+      ) : (
+        <>
+          {!can && (
+            <p className="warn-box">
+              Recalling, saving or changing the library changes the console: it needs armed writes (top right).
+            </p>
+          )}
+          <SaveForm k={k} slots={slots} actions={actions} />
+          <section className="card">
+            <header className="section-head">
+              <h3>
+                {k.label} <span className="muted">({used.length} of 100)</span>
+              </h3>
+              <label className="check">
+                <input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} /> Empty slots
+              </label>
+            </header>
+            {!shown.length && <p className="muted">The console holds no {k.one}.</p>}
+            <div className="slots">
+              {shown.map((s) => (
+                <SlotRow key={s.slot} k={k} s={s} slots={slots} current={s.slot === current} actions={actions} />
+              ))}
+            </div>
+            {k.kind === "scene" && (
+              <p className="muted lib-note">
+                A recall loads the whole scene; the console applies its scene safes. A .scn file of this computer (saved
+                by M32-Edit, or on a USB stick): the Scene files tab.
+              </p>
+            )}
+          </section>
+        </>
       )}
-      <SaveForm k={k} slots={slots} actions={actions} />
-      <section className="card">
-        <header className="section-head">
-          <h3>
-            {k.label} <span className="muted">({used.length} of 100)</span>
-          </h3>
-          <label className="check">
-            <input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} /> Empty slots
-          </label>
-        </header>
-        {!shown.length && <p className="muted">The console holds no {k.one}.</p>}
-        <div className="slots">
-          {shown.map((s) => (
-            <SlotRow key={s.slot} k={k} s={s} slots={slots} current={s.slot === current} actions={actions} />
-          ))}
-        </div>
-        {k.kind === "scene" && (
-          <p className="muted lib-note">A recall loads the whole scene; the console applies its scene safes.</p>
-        )}
-      </section>
       {ask && (
         <ConfirmDialog
           title={describe(ask.req, ask.name) + "?"}

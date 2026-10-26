@@ -30,6 +30,8 @@ This page says what is simulated, how, and what is not.
 - Library: scenes, snippets and presets (`/save`, `/load`, `/copy`,
   `/delete`, `/rename`, `/add`, `/showdump`). A recall applies the stored
   values as they are; scene safes and snippet filters are not applied yet.
+- A USB stick (`-usb dir`): browsing its folders, playing its WAV files,
+  loading its scenes, as described [below](#usb-stick).
 
 ## Audio flow (meters)
 
@@ -139,6 +141,40 @@ name, icon, source, pans and insert selection.
 
 Recalling a scene or a snippet applies the stored values without linking
 them.
+
+## USB stick
+
+`-usb dir` plugs a USB stick into the emulator: the folder `dir` stands for
+it (`testdata/usb` is a small one to try). The console's USB recorder is
+driven as Patrick-Gilles Maillot's `X32USB` tool drives it:
+
+```sh
+tabula-emu -scene testdata/scenes/demo.scn -usb testdata/usb
+```
+
+| Parameter | What the emulator does |
+|---|---|
+| `/-stat/usbmounted` | 1 while the stick is in. A client setting it to 0 unmounts it (the player stops, the listing empties); 1 mounts it again. |
+| `/-usb/path` | the name of the current directory, `""` at the root of the stick |
+| `/-usb/dir/maxpos` | the number of entries of the current directory (up to 999) |
+| `/-usb/dir/001…/name` | the entries, numbered from 1: `[..]` first in a subdirectory, then the directories as `[name]`, then the files with their extension, each group in alphabetical order (case ignored); hidden files (starting with a dot) are left out. Entries past `maxpos` are empty. |
+| `/-usb/dir/dirpos` | the entry last selected, 0 after entering a directory |
+| `/-usb/title` | the file selected, without its extension (`02 Opening`) |
+| `/-action/recselect n` | entry `n` of the current directory: `[..]` goes up, a directory is entered, a `.wav` file plays from its start, a `.scn` or `.snp` file is applied to the console as a scene load. Then it reads 0 again. |
+| `/-stat/tape/state` | 0 stop, 1 pause, 2 play (as the console's `STOP`, `PPAUSE`, `PLAY`). Setting 0 stops and goes back to the start of the file, 1 pauses a playing file, 2 resumes, or plays the stopped file again from its start. |
+| `/-stat/tape/file` | the file in the player, from the root of the stick: `/Breaks/Interval music.wav`; it stays after the end or a stop |
+| `/-stat/tape/etime`, `rtime` | the seconds played and left, pushed to the `/xremote` clients every second while playing; the length comes from the WAV header |
+| `/-action/playtrack -1`, `1` | the previous or next WAV file of the player's directory, played from its start. Nothing changes at either end; with no file in the player, `1` plays the first WAV file of the current directory. |
+| `/config/tape/autoplay` | `ON` (folder mode): at the end of a file the next WAV file of its directory plays, the player stops after the last; `OFF`: it stops at the end of each file |
+
+Not emulated: no sound comes out (the WAV files are only read for their
+length); recording to the stick (`/-stat/tape/state` 3 and 4), fast forward
+and rewind (5, 6) are logged as unhandled and the player stays as it was;
+loading show, channel, effect, routing and preference files (`.shw`,
+`.chn`, `.efx`, `.rou`, `.prf`) from the stick is logged as unhandled;
+`/-usb/dir/NNN/type` stays empty (what the console writes there is not
+documented). The WAV files of `testdata/usb` are silent and sampled at
+100 Hz, so a 3-minute file weighs 20 kB.
 
 ## Verified with M32-Edit
 

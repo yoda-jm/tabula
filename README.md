@@ -53,6 +53,9 @@ Latest build of `main` (both programs, GUI included):
 [macOS Intel](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-darwin-amd64.tar.gz) ·
 [Windows](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-windows-amd64.zip).
 Versioned releases: [releases page](https://github.com/yoda-jm/tabula/releases).
+Recording the audio tracks on macOS or Windows also needs
+[ffmpeg](https://ffmpeg.org/download.html), next to `tabula` or on the PATH
+(see [Download](https://yoda-jm.github.io/tabula/#download)).
 
 ## Quick start
 
@@ -65,7 +68,8 @@ Then point X32-Edit / M32-Edit at this machine's IP and open
 emulator did not handle. `testdata/scenes/demo.scn` is a real show with
 made-up names. To have your own scenes in the console's scene slots, copy
 them into `var/library` (git ignores `var/`) as `scene-00.scn`,
-`scene-01.scn`… and add `-library var/library`.
+`scene-01.scn`… and add `-library var/library`. `-usb testdata/usb` puts a
+USB stick in it, whose WAV files the console's player plays (silently).
 
 To drive it (or a real console) from a browser:
 

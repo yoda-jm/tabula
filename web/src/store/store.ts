@@ -18,6 +18,7 @@ import type { Field, Leaf, Schema } from "../lib/schema";
 import { KeyedThrottle } from "../lib/throttle";
 import { formatValue, isFloatKind, quantize, sameValue } from "../lib/values";
 import type { Record as RecordStatus } from "../lib/session";
+import type { SceneProgress } from "../lib/scenefiles";
 
 export interface Val {
   value: RawValue;
@@ -65,6 +66,8 @@ export class Store {
   stream: StreamState = "connecting";
   record: RecordStatus | null = null;
   private recordAt = 0;
+  /** the scene file being sent to the console, or the last one sent */
+  sceneLoad: SceneProgress | null = null;
   toasts: Toast[] = [];
   /** bumped when the whole state is (re)loaded or cleared */
   stateVersion = 0;
@@ -314,6 +317,11 @@ export class Store {
     this.record = r;
     this.recordAt = this.now();
     this.notify(["record"]);
+  }
+
+  setSceneLoad(p: SceneProgress | null) {
+    this.sceneLoad = p;
+    this.notify(["scenefile"]);
   }
 
   /** recordElapsed is the recording's elapsed time: the server's duration plus the time since it was sent. */

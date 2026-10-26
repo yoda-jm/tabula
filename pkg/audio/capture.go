@@ -233,7 +233,7 @@ func (c *Capture) startCommand() error {
 		return err
 	}
 	c.command = QuoteArgs(args)
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command(program(args[0]), args[1:]...)
 	cmd.SysProcAttr = procAttr() // its own process group: Ctrl-C in a terminal is ours to handle
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

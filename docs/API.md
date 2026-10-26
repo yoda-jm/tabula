@@ -109,6 +109,46 @@ the command changed: the listing before answering, or, for a recall, every
 value it may have changed, in the background — the changes come on the
 event stream.
 
+## Scene files
+
+The `.scn` files kept in a folder of the machine running tabula
+(`-scenes`, default `scenes`), as the console, M32-Edit and X32-Edit
+write them. Engineer only.
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/api/scenefiles` | | `{"dir", "files": [{"file", "name", "note"?, "size", "modified"}], "loading"?}`: `name` and `note` from the file's first line (`#4.0# "name" "note" …`); `loading` while one is being sent |
+| GET | `/api/scenefiles/{file}` | | the file, as a download; 404 |
+| PUT | `/api/scenefiles/{file}` | the file's text | 204: kept in the folder (`?replace=1` to replace one of the same name, else 409); 400 for a name that is not `something.scn` or a text without parameter lines; 413 above 2 MB |
+| DELETE | `/api/scenefiles/{file}` | | 204; 404 |
+| POST | `/api/scenefiles` | `{"name", "note"?, "file"?, "replace"?}` | `{"file"}`: the console's current settings written as a scene file, named `<name>.scn` unless `file` says; 409 when the name is taken (without `replace`) or when not connected |
+| POST | `/api/scenefiles/{file}/load` | | `SceneProgress`, once sent: the file sent to the console, line by line with the `/` command (each echoed before the next goes, as the editors' PC → Mixer). Every parameter it holds changes at once, without the console's scene safes. Lines this console's schema does not know are skipped and listed. 403 unless writes are armed; 409 when not connected, while a replay runs or another file loads; 404 |
+
+`SceneProgress`: `{"file", "sent", "total", "done", "skipped"?: [line],
+"error"?}`, also sent as `scenefile` events while a file loads (every 50
+lines) and when it is done. A load goes on if the browser leaves.
+
+## USB stick
+
+The USB stick in the console, as on its USB recorder screen (the commands
+of Maillot's X32USB). Engineer only.
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/api/usb` | | `UsbView`, read from the console (it does not push its listing); 409 when not connected, 504 when it does not answer |
+| POST | `/api/usb` | `{"op": "open", "index"}` | `UsbView` after it: `/-action/recselect index` enters a directory (the listing is read again once the console changed `/-usb/path`, 1.5 s at most), plays a WAV file, or loads a scene, snippet or preset file (the console's values it may have changed are then read again, as after a recall); 400 for an entry not in the directory, 409 without a stick |
+| POST | `/api/usb` | `{"op": "play"}`, or `pause`, `stop`, `prev`, `next` | 204: `/-stat/tape/state` 2, 1, 0, or `/-action/playtrack` -1, 1 |
+
+Commands need armed writes (403). `UsbView`: `{"mounted", "path" (the
+current directory's name, "" at the root), "title" (the file selected),
+"pos", "entries": [{"index", "name", "kind"}]}`, `index` as `recselect`
+numbers it (from 1), `name` without the brackets of directories, `kind`
+`parent`, `dir`, `wav`, `scene`, `snippet`, `show`, `effect`, `routing`,
+`channel`, `prefs`, `volume` or `file`. The player's state is in the
+mirror, pushed by the console: `/-stat/tape` (`state`, `file`, `etime`,
+`rtime` in seconds), `/config/tape/autoplay` (play the folder). The
+entries `/-usb/dir/001`…`999` are lazy nodes: not read when connecting.
+
 ## Events
 
 `GET /api/events` — Server-Sent Events:
@@ -119,6 +159,8 @@ event stream.
   this server from its machine) or `web <name>` (through an access link);
 - `access`: the musicians' permission changed — read `/api/whoami` again;
 - `resync`: the initial sync finished — reload `/api/state`;
+- `record`: a `Record` (recording, replay, audio);
+- `scenefile`: a `SceneProgress` while a scene file is sent to the console;
 - `meters`: `{"id": "1", "values": [...]}` for the meter groups named when
   opening the stream, e.g. `/api/events?meters=1,2,6:12` (`N` is
   `/meters/N`, `N:a:b` adds its parameters: `5:0:0` channels 1-16 + DCAs,
@@ -230,8 +272,8 @@ starts it again once fixed. Engineer only.
 | Method | Path | Body | Answer |
 |---|---|---|---|
 | GET | `/api/audio` | | `AudioView` |
-| POST | `/api/audio/config` | `AudioConfig` | `AudioView`; 400 if not valid. Used from the next recording, saved in `<sessions>/audio.json` |
-| GET | `/api/audio/devices` | | `[{"recorder", "id", "name", "channels"?, "format"?, "rates"?, "console"?}]`: what the recorders can record from (`id` is the device to use); `console` marks what looks like the console's card. Lists only, opens nothing |
+| POST | `/api/audio/config` | `AudioConfig` | `AudioView`; 400 if not valid, or when the device is connected and has fewer input channels than `channels` (32 channels from a card with 2 inputs: the message says what to set, and names the console's card if connected). Used from the next recording, saved in `<sessions>/audio.json` |
+| GET | `/api/audio/devices` | | `[{"recorder", "id", "name", "channels"?, "min_channels"?, "format"?, "rates"?, "console"?}]`: what the recorders can record from (`id` is the device to use); `console` marks what looks like the console's card. `channels` is the most the device records (`min_channels` the fewest, when it takes a range): from `/proc/asound` for USB cards, PipeWire for sources, and for the other ALSA cards (an HDA card) from `arecord --dump-hw-params`, which opens the card for an instant and records nothing; not while the input is recording or being tested. Saving the settings asks the same way |
 | POST | `/api/audio/test` | `AudioConfig` (optional: default the saved one) | `AudioStatus` after 3 s of capture, nothing written: the stream format, `peaks`, or `error`; 409 while the audio is being recorded (allowed once it failed) |
 | POST | `/api/audio/restart` | | `Record`, once the audio delivers samples or has failed (3 s at most): starts the audio of the recording again with the saved settings, in the same session (its empty files replaced, the first sample timed from the session start). Only before any audio was recorded: 409 when the audio runs, when the session already has audio (stop and start a new recording), when not recording or while testing; 400 when audio is off |
 | GET | `/api/sessions/{name}/export?format=` | | a download: `reaper` (`<name>.rpp`), `audacity` (`<name> labels.txt`: `start⇥end⇥label` per marker, in seconds of the audio files), `csv` (`<name>.csv`: `time,audio_time,clock,type,address,text,value,origin,label`), `scene` (`<name>.scn`: `start.scn`, the console at the start, for M32-Edit; 404 without it) |

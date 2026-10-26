@@ -156,6 +156,21 @@ func headampOf(block string, offset int) int32 {
 	return int32(base + n - 1 + offset)
 }
 
+// isCommand tells the parameters whose sets do something: /-action/…, and
+// the USB stick and player.
+func isCommand(addr string) bool {
+	return strings.HasPrefix(addr, "/-action/") || addr == "/-stat/tape/state" || addr == "/-stat/usbmounted"
+}
+
+// command runs the side effect of a client's set of a command parameter.
+func (s *Server) command(addr string, v osc.Arg, origin string) {
+	if strings.HasPrefix(addr, "/-action/") {
+		s.action(addr, v, origin)
+	} else {
+		s.usbControl(addr, v, origin)
+	}
+}
+
 // action runs the side effect of a /-action/… set.
 func (s *Server) action(addr string, v osc.Arg, origin string) {
 	n := int(v.Int)
@@ -178,6 +193,12 @@ func (s *Server) action(addr string, v osc.Arg, origin string) {
 		s.store.Set("/-show/prepos/current", osc.Int(int32(n)), origin)
 	case "setrtasrc":
 		s.setInt("/-stat/rtasource", int32(n))
+	case "recselect":
+		if n != 0 {
+			s.recselect(n, origin)
+		}
+	case "playtrack":
+		s.playtrack(n)
 	case "clearsolo":
 		if n == 1 {
 			for i := 1; i <= 80; i++ {

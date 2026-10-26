@@ -114,7 +114,7 @@ func (r *Recorder) snapshot() error {
 	}
 	var b strings.Builder
 	for _, n := range r.store.Schema().Nodes {
-		if !n.InScene {
+		if !n.InScene && !n.Lazy {
 			b.WriteString(r.store.NodeLine(n))
 			b.WriteByte('\n')
 		}

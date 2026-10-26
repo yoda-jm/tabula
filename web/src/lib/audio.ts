@@ -90,10 +90,54 @@ export interface AudioDevice {
   recorder: Recorder;
   id: string;
   name: string;
+  /** capture channels, when known: the most */
   channels?: number;
+  /** the fewest, when the card takes a range (2 to 4) */
+  min_channels?: number;
   format?: string;
   rates?: string;
   console?: boolean;
+}
+
+/** channelRange is how many channels a device records: "32", "2 to 4". */
+export const channelRange = (d: AudioDevice) =>
+  d.min_channels && d.min_channels < (d.channels ?? 0) ? `${d.min_channels} to ${d.channels}` : String(d.channels ?? "");
+
+/**
+ * tooManyChannels says why the settings ask more channels than the device
+ * has, when it is among the devices found and tells its channels (the
+ * server refuses to save them); otherwise "".
+ */
+export function tooManyChannels(c: AudioConfig, devices: AudioDevice[] | null): string {
+  const d = devices?.find((x) => x.recorder === c.recorder && x.id === c.device);
+  if (!d?.channels || c.channels <= d.channels) return "";
+  const card = devices?.find((x) => x.console && x.recorder === d.recorder && x !== d);
+  return (
+    `${d.name} has ${channelRange(d)} input channels, not ${c.channels}: set Channels of the device to ${d.channels}` +
+    (card ? `, or choose the console's card (★ ${card.name}).` : ".")
+  );
+}
+
+const FIELDS: { key: keyof AudioConfig; label: string; show?(c: AudioConfig): string }[] = [
+  { key: "enabled", label: "Audio tracks", show: (c) => (c.enabled ? "recorded" : "off") },
+  { key: "recorder", label: "Recorder" },
+  { key: "device", label: "Device", show: (c) => c.device || "default" },
+  { key: "channels", label: "Channels of the device" },
+  { key: "tracks", label: "Tracks", show: (c) => c.tracks || "all" },
+  { key: "bits", label: "Bits", show: (c) => `${c.bits}-bit` },
+  { key: "rate", label: "Rate", show: (c) => `${c.rate / 1000} kHz` },
+  { key: "command", label: "Command" },
+  { key: "input", label: "Raw samples" },
+  { key: "plain_names", label: "File names", show: (c) => (c.plain_names ? "Track 01…" : "from the routing") },
+];
+
+/** configChanges lists what differs between the saved settings and the page's: "Device: hw:… → hw:…". */
+export function configChanges(saved: AudioConfig, draft: AudioConfig): { label: string; from: string; to: string }[] {
+  return FIELDS.flatMap((f) => {
+    const show = f.show ?? ((c: AudioConfig) => String(c[f.key] ?? ""));
+    const [from, to] = [show(saved), show(draft)];
+    return from === to ? [] : [{ label: f.label, from: from || "—", to: to || "—" }];
+  });
 }
 
 export type ExportFormat = "reaper" | "audacity" | "csv" | "scene";

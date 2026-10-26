@@ -58,10 +58,14 @@ type Server struct {
 
 	lib   libraryState // library.go
 	audio audioState   // audio.go
+
+	scenesDir string         // scenefiles.go
+	scenes    sceneLoadState // scenefiles.go
+	usb       usbState       // usb.go
 }
 
 func New(log *slog.Logger) *Server {
-	s := &Server{log: log, model: "M32C", schema: schema.Build("M32C"), sessionsDir: "sessions"}
+	s := &Server{log: log, model: "M32C", schema: schema.Build("M32C"), sessionsDir: "sessions", scenesDir: "scenes"}
 	s.hub.init()
 	s.acc.init()
 	return s
@@ -92,6 +96,8 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("POST /api/replay/stop", s.replayStop)
 	s.accessRoutes(mux)
 	s.libraryRoutes(mux)
+	s.sceneFileRoutes(mux)
+	s.usbRoutes(mux)
 	s.audioRoutes(mux)
 	mux.Handle("/", ui)
 	return s.protect(gzipJSON(s.guard(mux)))

@@ -104,6 +104,9 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
     src.addEventListener("record", (e) => {
       if (live()) store.setRecord(JSON.parse((e as MessageEvent).data));
     });
+    src.addEventListener("scenefile", (e) => {
+      if (live()) store.setSceneLoad(JSON.parse((e as MessageEvent).data));
+    });
     src.addEventListener("access", () => {
       if (live()) void store.loadAccess();
     });

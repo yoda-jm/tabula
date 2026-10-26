@@ -391,7 +391,7 @@ func TestAudioDeviceCheck(t *testing.T) {
 	api.audio.source = liveSource(0)
 	api.audio.devices = func(context.Context) []audio.Device {
 		return []audio.Device{
-			{Recorder: "arecord", ID: "hw:CARD=PCH,DEV=0", Name: "HDA Intel PCH"},
+			{Recorder: "arecord", ID: "hw:CARD=PCH,DEV=0", Name: "HDA Intel PCH", Channels: 2},
 			{Recorder: "arecord", ID: "hw:CARD=DN32USB,DEV=0", Name: "DN32-USB", Channels: 32, Console: true},
 		}
 	}
@@ -414,6 +414,20 @@ func TestAudioDeviceCheck(t *testing.T) {
 	}
 	post(t, ts.URL+"/api/record/stop", ``)
 
+	// Saving 32 channels of the laptop's card is refused: it has 2.
+	resp, err := http.Post(ts.URL+"/api/audio/config", "application/json",
+		strings.NewReader(`{"enabled":true,"recorder":"arecord","device":"hw:CARD=PCH,DEV=0","channels":32}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest || !strings.Contains(string(body), "has 2 input channels, not 32: set Channels of the device to 2, or record from the console's card, DN32-USB") {
+		t.Errorf("too many channels: %d %s", resp.StatusCode, body)
+	}
+	if code := post(t, ts.URL+"/api/audio/config", `{"enabled":true,"recorder":"arecord","device":"hw:CARD=PCH,DEV=0","channels":2}`); code != http.StatusOK {
+		t.Errorf("2 channels: %d", code)
+	}
 	if code := post(t, ts.URL+"/api/audio/config", `{"enabled":true,"recorder":"arecord","device":"hw:CARD=DN32USB,DEV=0","channels":32}`); code != http.StatusOK {
 		t.Fatalf("config: %d", code)
 	}

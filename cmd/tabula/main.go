@@ -29,6 +29,7 @@ func main() {
 		consoleA = flag.String("console", "", "console (or tabula-emu) to connect to at start, e.g. 192.168.1.62")
 		webDir   = flag.String("web-dir", "", "serve the GUI from this directory instead of the embedded build")
 		sessions = flag.String("sessions", "sessions", "directory where recorded sessions are kept")
+		scenes   = flag.String("scenes", "scenes", "directory of the scene files (.scn) to load into the console, or to save it as")
 		record   = flag.Bool("record", false, "start recording as soon as the console is connected and synced (stops on exit)")
 		accessF  = flag.String("access", "access.json", "file keeping the access links made on the Access page")
 		guest    = flag.String("guest", "none", "role of other devices without an access link: none, viewer or engineer")
@@ -88,6 +89,7 @@ func main() {
 		os.Exit(2)
 	}
 	api.SetSessionsDir(*sessions)
+	api.SetScenesDir(*scenes)
 	audioCfg, audioFile, err := audioF.load(*sessions)
 	if err != nil {
 		log.Error("audio", "err", err)

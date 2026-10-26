@@ -22,9 +22,15 @@
 - Audio that fails can no longer go unnoticed (it did at a show: the
   device saved during tests was the laptop's own card, and the show was
   recorded without its audio):
-  - **Start recording** saves the audio settings changed on the page first
-    (a device picked in Find devices but not saved was ignored), and answers
-    once the audio runs or has failed;
+  - **Start recording** asks what to do with the audio settings changed on
+    the page and not saved (a device picked in Find devices but not saved
+    was ignored): save them, discard them or cancel, listing what changed;
+    it answers once the audio runs or has failed;
+  - saving refuses more channels than the card has (`POST
+    /api/audio/config` → 400), said at once under *Channels of the device*;
+    Find devices tells the channels of the laptop's own card too (`arecord
+    --dump-hw-params`, an instant, nothing recorded), `min_channels` for a
+    range;
   - when the audio fails, *REC ⚠ NO AUDIO* in the top bar, a red bar on
     every page (amber for warnings), and on the Record page the error with
     a hint for the usual recorder errors (*Channels count non available*,
@@ -39,9 +45,34 @@
     (`POST /api/audio/restart`); **Test the input** works meanwhile;
   - the session list says *audio failed* for a session whose audio
     recorded nothing.
+- Scene files: a **Scene files** tab on the Scenes page keeps `.scn` files
+  in a folder of the machine running tabula (`-scenes`, default `scenes`):
+  open one from the browser's computer, **Load** it into the console (every
+  parameter, line by line as M32-Edit's PC → Mixer, with a progress bar and
+  the lines the console does not know skipped and listed), save the
+  console's settings as one, download, delete (`/api/scenefiles`, event
+  `scenefile`).
+- A **USB** page: the console's USB stick and player, as on its USB recorder
+  screen: browse the folders, play a WAV file, pause, stop, previous and
+  next, folder mode, load a scene from the stick (`/api/usb`). The stick's
+  entries (up to 999) are only read when browsed.
+- tabula renews its `/xremote` registration every 6 s instead of every 10 s,
+  right when the console's lease ends: changes made at that moment were
+  lost.
+- ffmpeg is found next to tabula's own program too (`ffmpeg.exe` next to
+  `tabula.exe`), and a missing recorder says how to install it; the download
+  page says where to get ffmpeg for macOS and Windows.
 
 ### tabula-emu
 - The debug page says when a subscription expires (`in 8s`), not `-8s ago`.
+- A USB stick in the console: `-usb dir` makes a folder stand for it,
+  browsed and played as with Maillot's `X32USB`: the `/-usb/dir` listing
+  (entries 001… with `[..]` and `[folders]`), `/-action/recselect` enters
+  folders, plays WAV files and loads `.scn`/`.snp` files, `/-stat/tape`
+  state, file and elapsed/remaining time pushed every second, pause, resume
+  and stop, `/-action/playtrack` previous/next, folder mode
+  (`/config/tape/autoplay`) and unmounting. No sound, and no recording to
+  the stick (logged as unhandled). `testdata/usb` is a small demo stick.
 
 ### Docs
 - Screenshots of tabula (mixer, channel, phone) and of the emulator's

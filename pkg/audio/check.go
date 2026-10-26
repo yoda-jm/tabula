@@ -37,87 +37,122 @@ func alsaCardOf(dev string) (card, num string, ok bool) {
 	return m[1], m[2], true
 }
 
-// CheckDevice compares the device of cfg with the devices connected
+// lookup finds the device of cfg among the devices connected
 // (ListDevices). It knows ALSA devices (arecord, and ffmpeg on Linux) and
-// PulseAudio/PipeWire sources (parecord); other configurations, and a
-// machine where nothing is listed, pass. With PlainNames (a device that is
-// not the console's card, on purpose) only a missing device is a problem.
-func CheckDevice(cfg Config, devs []Device, goos string) Check {
+// PulseAudio/PipeWire sources (parecord): kind is "arecord" or "parecord",
+// or "" for the other configurations, which are not looked for. known tells
+// whether dev names a card or a source to look for ("default" does not);
+// console is the console's card, when connected.
+type lookup struct {
+	kind, dev      string
+	known          bool
+	found, console *Device
+}
+
+func findDevice(cfg Config, devs []Device, goos string) lookup {
 	cfg = cfg.Normalized()
-	kind := cfg.Recorder
-	if kind == "ffmpeg" && goos == "linux" {
-		kind = "arecord" // ffmpeg -f alsa takes the ALSA names
+	var l lookup
+	l.kind = cfg.Recorder
+	if l.kind == "ffmpeg" && goos == "linux" {
+		l.kind = "arecord" // ffmpeg -f alsa takes the ALSA names
 	}
-	if !cfg.Enabled || goos != "linux" || len(devs) == 0 || kind != "arecord" && kind != "parecord" {
-		return Check{}
+	if goos != "linux" || l.kind != "arecord" && l.kind != "parecord" {
+		l.kind = ""
+		return l
 	}
-	var console *Device
 	for i := range devs {
-		if devs[i].Console && devs[i].Recorder == kind {
-			console = &devs[i]
+		if devs[i].Console && devs[i].Recorder == l.kind {
+			l.console = &devs[i]
 			break
 		}
 	}
-	dev := cfg.Device
-	if dev == "" {
-		dev = defaultDevice(cfg.Recorder, goos)
+	l.dev = cfg.Device
+	if l.dev == "" {
+		l.dev = defaultDevice(cfg.Recorder, goos)
 	}
-
-	var found *Device
-	known := false // whether dev names a card (or source) we can look for
-	if kind == "arecord" {
-		if card, num, ok := alsaCardOf(dev); ok {
-			known = true
+	if l.kind == "arecord" {
+		if card, num, ok := alsaCardOf(l.dev); ok {
+			l.known = true
 			for i := range devs {
 				d := &devs[i]
 				dc, dn, _ := alsaCardOf(d.ID)
 				if d.Recorder == "arecord" && (dc == card || d.card == card) && dn == num {
-					found = d
+					l.found = d
 					break
 				}
 			}
 		}
-	} else if dev != "@DEFAULT_SOURCE@" {
-		known = true
+	} else if l.dev != "@DEFAULT_SOURCE@" {
+		l.known = true
 		for i := range devs {
-			if devs[i].Recorder == "parecord" && devs[i].ID == dev {
-				found = &devs[i]
+			if devs[i].Recorder == "parecord" && devs[i].ID == l.dev {
+				l.found = &devs[i]
 				break
 			}
 		}
 	}
+	return l
+}
 
+// CheckDevice compares the device of cfg with the devices connected
+// (ListDevices), for ALSA devices and PulseAudio/PipeWire sources; other
+// configurations, and a machine where nothing is listed, pass. With
+// PlainNames (a device that is not the console's card, on purpose) only a
+// missing device is a problem.
+func CheckDevice(cfg Config, devs []Device, goos string) Check {
+	cfg = cfg.Normalized()
+	l := findDevice(cfg, devs, goos)
+	if !cfg.Enabled || len(devs) == 0 || l.kind == "" {
+		return Check{}
+	}
 	var c Check
 	notConsole := func(what string) {
 		if cfg.PlainNames {
 			return
 		}
-		if console != nil {
-			c.Problems = append(c.Problems, fmt.Sprintf("%s, not the console's card: %s (%s) is connected.", what, console.Name, console.ID))
-			c.Console = console
+		if l.console != nil {
+			c.Problems = append(c.Problems, fmt.Sprintf("%s, not the console's card: %s (%s) is connected.", what, l.console.Name, l.console.ID))
+			c.Console = l.console
 		} else {
 			c.Problems = append(c.Problems, what+", not the console's card, which is not connected: plug its USB cable in, then Find devices.")
 		}
 	}
-	switch {
-	case known && found == nil:
-		msg := fmt.Sprintf("%s is not connected.", dev)
-		if console != nil {
-			msg += fmt.Sprintf(" The console's card is %s (%s).", console.Name, console.ID)
-			c.Console = console
+	switch found := l.found; {
+	case l.known && found == nil:
+		msg := fmt.Sprintf("%s is not connected.", l.dev)
+		if l.console != nil {
+			msg += fmt.Sprintf(" The console's card is %s (%s).", l.console.Name, l.console.ID)
+			c.Console = l.console
 		} else if !cfg.PlainNames {
 			msg += " Neither is the console's card: plug its USB cable in, then Find devices."
 		}
 		c.Problems = append(c.Problems, msg)
-	case !known:
+	case !l.known:
 		// "default", "pipewire"…: wherever the system sends it
-		notConsole(fmt.Sprintf("Records from %q, the system's default input", dev))
+		notConsole(fmt.Sprintf("Records from %q, the system's default input", l.dev))
 	case !found.Console:
-		notConsole(fmt.Sprintf("%s is %s", dev, found.Name))
-	case found.Channels > 0 && found.Channels != cfg.Channels:
-		c.Problems = append(c.Problems, fmt.Sprintf("%s delivers %d channels, but Channels of the device says %d.", found.Name, found.Channels, cfg.Channels))
+		notConsole(fmt.Sprintf("%s is %s", l.dev, found.Name))
+	case found.Channels > 0 && (cfg.Channels > found.Channels || cfg.Channels < found.minChannels()):
+		c.Problems = append(c.Problems, fmt.Sprintf("%s delivers %s channels, but Channels of the device says %d.", found.Name, found.channelRange(), cfg.Channels))
 	}
 	return c
+}
+
+// CheckChannels says why cfg asks more channels than its device has, or
+// "": a device connected whose number of channels is known (ListDevices,
+// then ProbeChannels).
+func CheckChannels(cfg Config, devs []Device, goos string) string {
+	cfg = cfg.Normalized()
+	l := findDevice(cfg, devs, goos)
+	d := l.found
+	if d == nil || d.Channels == 0 || cfg.Channels <= d.Channels {
+		return ""
+	}
+	msg := fmt.Sprintf("%s (%s) has %s input channels, not %d: set Channels of the device to %d", d.Name, d.ID, d.channelRange(), cfg.Channels, d.Channels)
+	if c := l.console; c != nil && c != d {
+		msg += fmt.Sprintf(", or record from the console's card, %s (%s)", c.Name, c.ID)
+	}
+	return msg + "."
 }
 
 // hints explain the recorder errors people meet most.
@@ -136,7 +171,7 @@ var hints = []struct {
 	{regexp.MustCompile(`(?i)rate (non|not) available|rate doesn't match`),
 		"The device does not run at this rate: set Rate to the console's sample rate."},
 	{regexp.MustCompile(`(?i)executable file not found`),
-		"The recorder program is not installed (arecord comes with alsa-utils)."},
+		"The recorder program is not installed: arecord comes with alsa-utils; ffmpeg (ffmpeg.exe) can be put next to tabula, or installed with brew install ffmpeg (macOS), winget install Gyan.FFmpeg (Windows) or the system's packages."},
 }
 
 // Hint says in plain words what to do about a recorder error, or "".

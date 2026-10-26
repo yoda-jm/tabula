@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { AudioConfig, AudioInfo, AudioStatus } from "./audio";
+import type { AudioConfig, AudioDevice, AudioInfo, AudioStatus } from "./audio";
 import {
   audioPlan,
   audioSummary,
   audioTrouble,
   byteRate,
+  configChanges,
   exportUrl,
   formatBytes,
   formatHours,
   formatTracks,
   parseTracks,
   plural,
+  tooManyChannels,
   trackLabel,
 } from "./audio";
 
@@ -108,5 +110,49 @@ describe("audio trouble", () => {
     expect(audioSummary(info)).toBe("audio: 2 tracks");
     expect(audioSummary({ ...info, error: "the recorder stopped" })).toBe("audio failed");
     expect(audioSummary({ ...info, frames: 48000, error: "the recorder stopped" })).toBe("audio: 2 tracks, cut short");
+  });
+});
+
+describe("saving the audio settings", () => {
+  const saved: AudioConfig = {
+    enabled: true,
+    recorder: "arecord",
+    device: "hw:CARD=PCH,DEV=0",
+    channels: 32,
+    rate: 48000,
+    bits: 24,
+    tracks: "1-16,23-24",
+  };
+  const pch: AudioDevice = { recorder: "arecord", id: "hw:CARD=PCH,DEV=0", name: "HDA Intel PCH, ALC294 Analog", channels: 2 };
+  const dn32: AudioDevice = { recorder: "arecord", id: "hw:CARD=DN32USB,DEV=0", name: "DN32-USB, USB Audio", channels: 32, console: true };
+
+  it("refuses more channels than the device has", () => {
+    // the concert of 2026-10-25: 32 channels from the laptop's card
+    expect(tooManyChannels(saved, [pch, dn32])).toBe(
+      "HDA Intel PCH, ALC294 Analog has 2 input channels, not 32: set Channels of the device to 2, or choose the console's card (★ DN32-USB, USB Audio).",
+    );
+    expect(tooManyChannels({ ...saved, channels: 2 }, [pch, dn32])).toBe("");
+    expect(tooManyChannels({ ...saved, device: dn32.id }, [pch, dn32])).toBe("");
+    expect(tooManyChannels({ ...saved, channels: 8 }, [{ ...pch, channels: 4, min_channels: 2 }])).toBe(
+      "HDA Intel PCH, ALC294 Analog has 2 to 4 input channels, not 8: set Channels of the device to 4.",
+    );
+    // unknown channels, a device not found, or no list yet
+    expect(tooManyChannels(saved, [{ ...pch, channels: undefined }])).toBe("");
+    expect(tooManyChannels({ ...saved, device: "hw:CARD=XUSB,DEV=0" }, [pch])).toBe("");
+    expect(tooManyChannels({ ...saved, recorder: "parecord" }, [pch])).toBe("");
+    expect(tooManyChannels(saved, null)).toBe("");
+  });
+
+  it("lists what changed", () => {
+    expect(configChanges(saved, saved)).toEqual([]);
+    expect(configChanges(saved, { ...saved, device: dn32.id, tracks: "" })).toEqual([
+      { label: "Device", from: "hw:CARD=PCH,DEV=0", to: "hw:CARD=DN32USB,DEV=0" },
+      { label: "Tracks", from: "1-16,23-24", to: "all" },
+    ]);
+    expect(configChanges(saved, { ...saved, enabled: false, rate: 44100, plain_names: true })).toEqual([
+      { label: "Audio tracks", from: "recorded", to: "off" },
+      { label: "Rate", from: "48 kHz", to: "44.1 kHz" },
+      { label: "File names", from: "from the routing", to: "Track 01…" },
+    ]);
   });
 });

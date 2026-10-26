@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yoda-jm/tabula/pkg/audio"
 	"github.com/yoda-jm/tabula/pkg/emu"
 	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/scene"
@@ -22,6 +23,11 @@ import (
 )
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
+
+func TestMain(m *testing.M) {
+	probeCards = func(context.Context, []audio.Device) {} // never open this machine's cards
+	os.Exit(m.Run())
+}
 
 func startEmu(t *testing.T) (*emu.Server, string) {
 	t.Helper()

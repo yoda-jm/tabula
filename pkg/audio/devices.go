@@ -18,14 +18,32 @@ type Device struct {
 	Recorder string `json:"recorder"` // arecord, parecord or ffmpeg
 	ID       string `json:"id"`       // what to give as the device
 	Name     string `json:"name"`
-	Channels int    `json:"channels,omitempty"` // capture channels, when known
-	Format   string `json:"format,omitempty"`   // e.g. "S32_LE, 24 bits"
-	Rates    string `json:"rates,omitempty"`    // e.g. "44100, 48000"
+	Channels int    `json:"channels,omitempty"` // capture channels, when known (the most)
+	// MinChannels is the fewest channels the device records, when it takes
+	// a range (an HDA card: 2 to 4); 0 when it is Channels.
+	MinChannels int    `json:"min_channels,omitempty"`
+	Format      string `json:"format,omitempty"` // e.g. "S32_LE, 24 bits"
+	Rates       string `json:"rates,omitempty"`  // e.g. "44100, 48000"
 	// Console is true for what looks like the console's USB card (X-USB,
 	// DN32-USB).
 	Console bool `json:"console,omitempty"`
 
 	card string // ALSA card number of an arecord device ("1")
+}
+
+func (d Device) minChannels() int {
+	if d.MinChannels > 0 {
+		return d.MinChannels
+	}
+	return d.Channels
+}
+
+// channelRange is how many channels the device records: "32", "2 to 4".
+func (d Device) channelRange() string {
+	if lo := d.minChannels(); lo < d.Channels {
+		return fmt.Sprintf("%d to %d", lo, d.Channels)
+	}
+	return strconv.Itoa(d.Channels)
 }
 
 var consoleCard = regexp.MustCompile(`(?i)x-?usb|dn32|m32|x32|midas|behringer`)
@@ -34,6 +52,7 @@ var consoleCard = regexp.MustCompile(`(?i)x-?usb|dn32|m32|x32|midas|behringer`)
 type runner func(ctx context.Context, name string, args ...string) (string, error)
 
 func run(ctx context.Context, name string, args ...string) (string, error) {
+	name = program(name)
 	if _, err := exec.LookPath(name); err != nil {
 		return "", err
 	}
@@ -72,6 +91,57 @@ func listDevices(ctx context.Context, goos string, run runner, read func(string)
 		out[i].Console = consoleCard.MatchString(out[i].Name + " " + out[i].ID)
 	}
 	return out
+}
+
+// ProbeChannels fills in the channels of the ALSA cards ListDevices could
+// not tell (an HDA card has no /proc stream file): arecord opens each for
+// an instant to say what it takes, and records nothing (256 channels are
+// asked, which no card takes). A card in use stays unknown. Not while a
+// capture starts: its card could be busy for an instant.
+func ProbeChannels(ctx context.Context, devs []Device) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	probeChannels(ctx, devs, run)
+}
+
+func probeChannels(ctx context.Context, devs []Device, run runner) {
+	for i := range devs {
+		d := &devs[i]
+		if d.Recorder != "arecord" || d.Channels > 0 || !strings.HasPrefix(d.ID, "hw:") {
+			continue
+		}
+		out, _ := run(ctx, "arecord", "-D", d.ID, "--dump-hw-params", "-c", "256", "-d", "1", "-t", "raw", os.DevNull)
+		if lo, hi, ok := parseHWChannels(out); ok {
+			d.Channels = hi
+			if lo < hi {
+				d.MinChannels = lo
+			}
+		}
+	}
+}
+
+// "CHANNELS: 2", "CHANNELS: [2 4]" in arecord --dump-hw-params
+var hwChannels = regexp.MustCompile(`(?m)^CHANNELS: (?:(\d+)|([\[(])(\d+) (\d+)([\])]))\s*$`)
+
+// parseHWChannels reads the channels a card takes, from the first dump.
+func parseHWChannels(text string) (lo, hi int, ok bool) {
+	m := hwChannels.FindStringSubmatch(text)
+	switch {
+	case m == nil:
+		return 0, 0, false
+	case m[1] != "":
+		n, _ := strconv.Atoi(m[1])
+		return n, n, n > 0
+	}
+	lo, _ = strconv.Atoi(m[3])
+	hi, _ = strconv.Atoi(m[4])
+	if m[2] == "(" {
+		lo++
+	}
+	if m[5] == ")" {
+		hi--
+	}
+	return lo, hi, lo > 0 && lo <= hi
 }
 
 // "card 1: XUSB [X-USB], device 0: USB Audio [USB Audio]"

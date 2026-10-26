@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yoda-jm/tabula/pkg/audio"
@@ -37,6 +38,10 @@ type audioState struct {
 	// shown as warnings of its status
 	problems []string
 	devices  func(context.Context) []audio.Device // tests: replaces audio.ListDevices
+	// probeMu is held while the cards are probed (audio.ProbeChannels),
+	// taken before Server.mu: a capture or a test starting meanwhile could
+	// find its card busy, so they wait for the probe to end.
+	probeMu sync.Mutex
 }
 
 func (s *Server) audioRoutes(mux *http.ServeMux) {
@@ -91,7 +96,7 @@ func (s *Server) startAudioLocked(rec *session.Recorder) {
 	info := c.Info()
 	rec.SetAudio(&info)
 	go func() { // a device that is not the console's card records, but not the show
-		problems := audio.CheckDevice(cfg, s.listDevices(context.Background()), runtime.GOOS).Problems
+		problems := audio.CheckDevice(cfg, s.listDevices(context.Background(), false), runtime.GOOS).Problems
 		for _, p := range problems {
 			s.log.Warn("audio device", "problem", p)
 		}
@@ -103,16 +108,30 @@ func (s *Server) startAudioLocked(rec *session.Recorder) {
 	}()
 }
 
-// listDevices lists the capture devices (audio.ListDevices).
-func (s *Server) listDevices(ctx context.Context) []audio.Device {
+// listDevices lists the capture devices (audio.ListDevices). probe asks
+// their channels to the cards that do not tell them (audio.ProbeChannels),
+// unless the audio input is in use: recording or testing.
+func (s *Server) listDevices(ctx context.Context, probe bool) []audio.Device {
+	if probe {
+		s.audio.probeMu.Lock()
+		defer s.audio.probeMu.Unlock()
+	}
 	s.mu.Lock()
 	list := s.audio.devices
+	busy := s.audio.testing || s.audio.cap != nil && s.audio.cap.Status().State != audio.Failed
 	s.mu.Unlock()
-	if list == nil {
-		list = audio.ListDevices
+	if list != nil {
+		return list(ctx)
 	}
-	return list(ctx)
+	devs := audio.ListDevices(ctx)
+	if probe && !busy {
+		probeCards(ctx, devs)
+	}
+	return devs
 }
+
+// probeCards opens the cards; the tests leave this machine's alone.
+var probeCards = audio.ProbeChannels
 
 // audioStartWait is how long starting a recording waits for its audio to
 // deliver samples or fail, so that the answer says whether it runs.
@@ -166,9 +185,11 @@ func (s *Server) restartAudio(w http.ResponseWriter, r *http.Request) {
 	if old != nil {
 		old.Stop() // over already: waits for its files to be finished
 	}
+	s.audio.probeMu.Lock()
 	s.mu.Lock()
 	defer func() {
 		s.mu.Unlock()
+		s.audio.probeMu.Unlock()
 		s.waitAudioStart()
 		s.publishRecord()
 		writeJSON(w, http.StatusOK, s.recordStatus())
@@ -321,7 +342,7 @@ func (s *Server) audioView() audioView {
 		v.Names = audio.TrackNames(mirror)
 	}
 	if cfg.Enabled {
-		if c := audio.CheckDevice(cfg, s.listDevices(context.Background()), runtime.GOOS); len(c.Problems) > 0 {
+		if c := audio.CheckDevice(cfg, s.listDevices(context.Background(), false), runtime.GOOS); len(c.Problems) > 0 {
 			v.Check = &c
 		}
 	}
@@ -383,6 +404,11 @@ func (s *Server) setAudioConfig(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusForbidden, err)
 		return
 	}
+	// 32 channels from a card with 2 inputs: the mistake of a test
+	if msg := audio.CheckChannels(cfg, s.listDevices(r.Context(), true), runtime.GOOS); msg != "" {
+		httpError(w, http.StatusBadRequest, errors.New(msg))
+		return
+	}
 	s.mu.Lock()
 	s.audio.cfg = cfg
 	file := s.audio.file
@@ -397,7 +423,7 @@ func (s *Server) setAudioConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) audioDevices(w http.ResponseWriter, r *http.Request) {
-	devs := s.listDevices(r.Context())
+	devs := s.listDevices(r.Context(), true)
 	if devs == nil {
 		devs = []audio.Device{}
 	}
@@ -408,6 +434,7 @@ func (s *Server) audioDevices(w http.ResponseWriter, r *http.Request) {
 // format, the levels of the tracks, or why it does not work. The body may
 // carry a configuration to try (default: the current one).
 func (s *Server) audioTest(w http.ResponseWriter, r *http.Request) {
+	s.audio.probeMu.Lock()
 	s.mu.Lock()
 	cfg := s.audio.cfg
 	// a capture that failed holds no device: test the fix before restarting it
@@ -417,6 +444,7 @@ func (s *Server) audioTest(w http.ResponseWriter, r *http.Request) {
 		s.audio.testing = true
 	}
 	s.mu.Unlock()
+	s.audio.probeMu.Unlock()
 	if busy {
 		httpError(w, http.StatusConflict, errors.New("the audio input is in use (recording or testing)"))
 		return

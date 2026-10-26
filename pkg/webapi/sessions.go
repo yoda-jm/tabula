@@ -51,6 +51,8 @@ func (s *Server) publishRecord() { s.hub.publish("record", s.recordStatus()) }
 
 // StartRecording records the connected console into a new session.
 func (s *Server) StartRecording(note string) error {
+	s.audio.probeMu.Lock() // see audioState.probeMu
+	defer s.audio.probeMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.mirror == nil || s.connecting {

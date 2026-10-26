@@ -225,13 +225,14 @@ func (b builder) prefs() {
 		fields(100, from0(two), Str{Max: 12})...)...)
 }
 
-// usb adds the USB stick browser, maintained by the console. The document
-// numbers directory entries up to 999; 99 are modelled.
+// usb adds the USB stick browser, maintained by the console: the current
+// directory and its entries 001 to maxpos (up to 999), "[..]" and "[name]"
+// for directories. The entries are lazy: read when the stick is browsed.
 func (b builder) usb() {
 	b.status("/-usb", f("path", Str{}), f("title", Str{}))
 	b.status("/-usb/dir", f("dirpos", Int{0, 999, 0}), f("maxpos", Int{0, 999, 0}))
-	for i := 1; i <= 99; i++ {
-		b.status(fmt.Sprintf("/-usb/dir/%03d", i), f("type", Str{}), f("name", Str{}))
+	for i := 1; i <= 999; i++ {
+		b.s.add(&Node{Path: fmt.Sprintf("/-usb/dir/%03d", i), Fields: []Field{f("type", Str{}), f("name", Str{})}, Lazy: true})
 	}
 }
 
