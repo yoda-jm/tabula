@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SchemaResponse, StateNode, Status } from "../lib/api";
-import { SWAP_DELAY, startEvents } from "./events";
+import { QUIET, SWAP_DELAY, startEvents } from "./events";
 import { Store } from "./store";
 import type { Api } from "./store";
 
@@ -93,7 +93,7 @@ describe("event stream", () => {
     expect(first.url).toBe("/api/events?meters=0,2");
     first.open();
     first.fire("status", CONNECTED);
-    await vi.runOnlyPendingTimersAsync();
+    await vi.advanceTimersByTimeAsync(1); // the reload settles
     expect(loads).toBe(1);
 
     const release = store.wantMeters("15");
@@ -115,7 +115,7 @@ describe("event stream", () => {
     expect(store.getValue("/ch/01/mix/fader")?.value).toBe(0.5); // closed: ignored
     second.fire("meters", { id: "15", values: [-30, -40] });
     expect(store.getMeters("15")).toEqual([-30, -40]);
-    await vi.runOnlyPendingTimersAsync();
+    await vi.advanceTimersByTimeAsync(1000);
     expect(loads).toBe(1); // nothing was missed: no reload
 
     release();
@@ -139,7 +139,7 @@ describe("event stream", () => {
     const second = FakeSource.all[1];
     second.open(); // not the stream in use yet: ignored
     second.fire("status", CONNECTED);
-    await vi.runOnlyPendingTimersAsync();
+    await vi.advanceTimersByTimeAsync(1);
     expect(loads).toBe(2);
     expect(store.stream).toBe("open");
   });
@@ -174,7 +174,7 @@ describe("event stream", () => {
     first.onerror?.();
     second.open();
     second.fire("status", CONNECTED); // the replacement wins, the reopen is cancelled
-    await vi.advanceTimersByTimeAsync(20000);
+    await vi.advanceTimersByTimeAsync(10000); // the reopen was due after 1 s
     expect(FakeSource.all).toHaveLength(2);
     expect(FakeSource.all.filter((s) => s.readyState !== FakeSource.CLOSED)).toEqual([second]);
     // values of a group given back are dropped until the stream is replaced
@@ -182,5 +182,57 @@ describe("event stream", () => {
     second.fire("meters", { id: "15", values: [-30] });
     expect(store.getMeters("15")).toBeUndefined();
     stop();
+  });
+
+  it("reopens a stream that went silent, through the backoff", async () => {
+    const store = new Store(fakeApi);
+    await store.loadSchema();
+    const stop = startEvents(store);
+    const first = FakeSource.all[0];
+    first.open();
+    first.fire("status", CONNECTED);
+    first.fire("meters", { id: "0", values: [0.5] });
+    // the server's pings keep it alive
+    for (let i = 0; i < 4; i++) {
+      await vi.advanceTimersByTimeAsync(5000);
+      first.fire("ping", {});
+    }
+    expect(FakeSource.all).toHaveLength(1);
+    expect(store.stream).toBe("open");
+
+    // a half-open connection: no error, no event
+    await vi.advanceTimersByTimeAsync(QUIET);
+    expect(first.readyState).toBe(FakeSource.CLOSED);
+    expect(store.stream).toBe("down");
+    expect(store.getMeters("0")).toBeUndefined(); // no frozen meters
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(FakeSource.all).toHaveLength(2);
+    expect(store.stream).toBe("down"); // until the new stream opens
+    FakeSource.all[1].open();
+    FakeSource.all[1].fire("status", CONNECTED);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(store.stream).toBe("open");
+    expect(loads).toBe(2); // changes may have been missed: reloaded
+    stop();
+  });
+
+  it("gives up a replacement that never starts", async () => {
+    const store = new Store(fakeApi);
+    await store.loadSchema();
+    startEvents(store);
+    const first = FakeSource.all[0];
+    first.open();
+    first.fire("status", CONNECTED);
+    store.wantMeters("15");
+    await vi.advanceTimersByTimeAsync(SWAP_DELAY);
+    const silent = FakeSource.all[1];
+    for (let i = 0; i < 3; i++) {
+      await vi.advanceTimersByTimeAsync(5000);
+      first.fire("ping", {});
+    }
+    expect(silent.readyState).toBe(FakeSource.CLOSED);
+    expect(first.readyState).toBe(FakeSource.OPEN); // the stream in use stays
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(FakeSource.all[2].url).toBe("/api/events?meters=0,2,15");
   });
 });

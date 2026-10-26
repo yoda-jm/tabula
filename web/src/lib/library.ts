@@ -3,7 +3,7 @@
 // (/-show/showfile/scene/000…099, /-libs/ch/001…100…) and managed with
 // POST /api/library (docs/API.md, "Library").
 
-import { call } from "./api";
+import { LONG, call } from "./api";
 import type { Lookup } from "./routing";
 import { three } from "./num";
 
@@ -79,7 +79,7 @@ export interface LibraryRequest {
 }
 
 export const libraryApi = {
-  run: (req: LibraryRequest) => call<void>("POST", "/api/library", req),
+  run: (req: LibraryRequest) => call<void>("POST", "/api/library", req, LONG), // waits for the console, then reads back
 };
 
 /** describe says in words what a request does, for confirmations and toasts. */

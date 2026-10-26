@@ -8,7 +8,8 @@
 // Writes are optimistic: the control shows its new value at once, and
 // echoes of older writes (the event stream lags behind a fast fader drag)
 // are held back until the console confirms the last value sent, or a hold
-// time passes.
+// time passes once tabula has answered the write: a write answered late
+// still reverts when it fails.
 
 import { mayWrite } from "../lib/access";
 import { ApiError, api as realApi } from "../lib/api";
@@ -81,6 +82,9 @@ export class Store {
   private loading = false;
   private reloadAgain = false;
   private buffered: Change[] = [];
+  private reloadTimer: ReturnType<typeof setTimeout> | null = null;
+  private reloadWait = 0; // ms before trying a failed reload again
+  private inflight = new Map<string, number>(); // writes sent to tabula and not answered yet, per address
   private refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private sweepTimer: ReturnType<typeof setTimeout> | null = null;
   private toastId = 0;
@@ -219,26 +223,49 @@ export class Store {
     }
     this.loading = true;
     this.buffered = [];
+    if (this.reloadTimer) {
+      clearTimeout(this.reloadTimer);
+      this.reloadTimer = null;
+    }
     try {
       const nodes = await this.api.state();
-      this.values.clear();
+      // a write not confirmed yet keeps its value: what was read may be older (loadNodes keeps it as latest)
+      for (const addr of [...this.values.keys()]) if (!this.pending.has(addr)) this.values.delete(addr);
       this.nodes.clear();
       this.loadNodes(nodes);
       this.stateLoaded = true;
       this.stateVersion++;
+      this.reloadWait = 0;
       const buffered = this.buffered;
       this.buffered = [];
       this.loading = false;
       if (buffered.length) this.applyChanges(buffered, false);
       this.notifyAll();
     } catch (e) {
+      // the changes that came meanwhile still apply, over the values held
+      const buffered = this.buffered;
+      this.buffered = [];
       this.loading = false;
-      if (!(e instanceof ApiError && e.status === 409)) this.toast(`Could not load the console state: ${(e as Error).message}`, "error");
+      if (buffered.length) this.applyChanges(buffered);
+      if (!(e instanceof ApiError && e.status === 409)) {
+        this.toast(`Could not load the console state: ${(e as Error).message}`, "error");
+        this.retryReload();
+      } // 409: not connected or still syncing; a resync event follows the sync
     }
     if (this.reloadAgain) {
       this.reloadAgain = false;
       void this.reloadState();
     }
+  }
+
+  /** retryReload tries a failed reload again, later each time, while the event stream is open (a reopen reloads anyway). */
+  private retryReload() {
+    if (this.reloadTimer) return;
+    this.reloadWait = Math.min(this.reloadWait ? this.reloadWait * 2 : 1000, 10000);
+    this.reloadTimer = setTimeout(() => {
+      this.reloadTimer = null;
+      if (this.stream === "open") void this.reloadState();
+    }, this.reloadWait);
   }
 
   /** refresh reloads the nodes under a prefix (variant nodes after their selector changed). */
@@ -290,6 +317,7 @@ export class Store {
     this.nodes.clear();
     this.pending.clear();
     this.throttle.cancelAll();
+    this.meterValues.clear();
     this.stateLoaded = false;
     this.stateVersion++;
     this.notifyAll();
@@ -310,6 +338,12 @@ export class Store {
   setStream(s: StreamState) {
     if (this.stream === s) return;
     this.stream = s;
+    if (s === "down") {
+      // meters frozen at their last values would look live
+      const keys = [...this.meterValues.keys()].map((id) => "m:" + id);
+      this.meterValues.clear();
+      this.notify(keys);
+    }
     this.notify(["stream"]);
   }
 
@@ -350,7 +384,7 @@ export class Store {
       }
       const val: Val = { value: c.value, text: c.text };
       const p = this.pending.get(c.addr);
-      if (p && now < p.until) {
+      if (p && this.holds(c.addr, p, now)) {
         const t = this.leaf(c.addr)?.field.type;
         if (sameValue(t, c.value, p.value)) {
           this.pending.delete(c.addr);
@@ -458,10 +492,31 @@ export class Store {
   private send(addr: string, value: RawValue) {
     const p = this.pending.get(addr);
     if (p) p.until = this.now() + HOLD;
-    this.api.set({ addr, value }).catch((e: Error) => {
-      this.revert(addr);
-      this.toast(`${addr}: ${e.message}`, "error");
-    });
+    this.inflight.set(addr, (this.inflight.get(addr) ?? 0) + 1);
+    this.api.set({ addr, value }).then(
+      () => {
+        this.answered(addr);
+        // the echo follows the answer: the hold counts from it
+        const q = this.pending.get(addr);
+        if (q) q.until = Math.max(q.until, this.now() + HOLD);
+      },
+      (e: Error) => {
+        this.answered(addr);
+        this.revert(addr);
+        this.toast(`${addr}: ${e.message}`, "error");
+      },
+    );
+  }
+
+  private answered(addr: string) {
+    const n = (this.inflight.get(addr) ?? 1) - 1;
+    if (n > 0) this.inflight.set(addr, n);
+    else this.inflight.delete(addr);
+  }
+
+  /** holds tells whether a write still wins over what the server reports: within its hold time, or not answered yet. */
+  private holds(addr: string, p: Pending, now: number): boolean {
+    return now < p.until || this.inflight.has(addr);
   }
 
   private revert(addr: string) {
@@ -481,7 +536,7 @@ export class Store {
     const keys: string[] = [];
     const unconfirmed = new Set<string>();
     for (const [addr, p] of this.pending) {
-      if (now < p.until) continue;
+      if (this.holds(addr, p, now)) continue; // a write tabula has not answered yet can still fail and revert
       this.pending.delete(addr);
       const path = parentOf(addr);
       if (p.latest) {

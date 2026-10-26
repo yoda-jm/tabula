@@ -1,6 +1,6 @@
 // Recording and replay (docs/API.md, "Recording and replay").
 
-import { call } from "./api";
+import { LONG, SLOW, call } from "./api";
 import type { AudioInfo, AudioStatus } from "./audio";
 
 export interface SessionMeta {
@@ -52,14 +52,16 @@ export interface SessionDetail extends SessionSummary {
 
 export const sessionApi = {
   record: () => call<Record>("GET", "/api/record"),
-  start: (note: string) => call<Record>("POST", "/api/record/start", { note }),
+  // starting waits for the audio to run (3 s at most), stopping for its files to be finished; a session's
+  // details, a replay and a deletion read or remove all of a show's files
+  start: (note: string) => call<Record>("POST", "/api/record/start", { note }, LONG),
   mark: (label: string) => call<Record>("POST", "/api/record/mark", { label }),
-  stop: () => call<Record>("POST", "/api/record/stop", {}),
-  sessions: () => call<SessionSummary[]>("GET", "/api/sessions"),
-  session: (name: string) => call<SessionDetail>("GET", "/api/sessions/" + encodeURIComponent(name)),
-  remove: (name: string) => call<void>("DELETE", "/api/sessions/" + encodeURIComponent(name)),
+  stop: () => call<Record>("POST", "/api/record/stop", {}, LONG),
+  sessions: () => call<SessionSummary[]>("GET", "/api/sessions", undefined, SLOW),
+  session: (name: string) => call<SessionDetail>("GET", "/api/sessions/" + encodeURIComponent(name), undefined, LONG),
+  remove: (name: string) => call<void>("DELETE", "/api/sessions/" + encodeURIComponent(name), undefined, LONG),
   replay: (session: string, from: number, speed: number) =>
-    call<Record>("POST", "/api/replay/start", { session, from, speed }),
+    call<Record>("POST", "/api/replay/start", { session, from, speed }, LONG),
   stopReplay: () => call<Record>("POST", "/api/replay/stop", {}),
 };
 

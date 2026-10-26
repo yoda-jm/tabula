@@ -219,6 +219,16 @@ h4 {
 .rec-warn {
   letter-spacing: 0.02em;
 }
+/* the event stream to tabula is down: nothing shown is live, on every page */
+.stream-banner {
+  padding: 8px 16px;
+  font-weight: 600;
+  background: var(--danger);
+  color: #fff;
+}
+.iem-app .stream-banner {
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+}
 /* the audio of a recording is not recorded (red) or in trouble (amber), on every page */
 .audio-banner {
   display: flex;

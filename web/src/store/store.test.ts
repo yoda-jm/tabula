@@ -69,16 +69,31 @@ const CONNECTED: Status = {
 function fakeApi() {
   const sets: SetBody[] = [];
   let fail: Error | null = null;
+  let stateFail: Error | null = null;
+  let gate: Promise<void> | null = null;
   const states: Record<string, StateNode[]> = {};
   const api = {
     schema: async () => SCHEMA,
-    state: async (prefix?: string) => (prefix ? (states[prefix] ?? []) : STATE),
+    state: async (prefix?: string) => {
+      if (stateFail) throw stateFail;
+      return prefix ? (states[prefix] ?? []) : STATE;
+    },
     set: async (b: SetBody) => {
       sets.push(b);
+      if (gate) await gate;
       if (fail) throw fail;
     },
   } as unknown as Api;
-  return { api, sets, states, failWith: (e: Error | null) => (fail = e) };
+  /** hang holds the answers to the writes until the function it returns is called */
+  const hang = () => {
+    let answer = () => {};
+    gate = new Promise((r) => (answer = r));
+    return () => {
+      gate = null;
+      answer();
+    };
+  };
+  return { api, sets, states, hang, failWith: (e: Error | null) => (fail = e), failStateWith: (e: Error | null) => (stateFail = e) };
 }
 
 let now = 0;
@@ -164,6 +179,7 @@ describe("store", () => {
   it("applies the last held-back value when the hold time passes", async () => {
     const { s } = await ready();
     s.set("/ch/01/mix/on", 0);
+    await vi.advanceTimersByTimeAsync(1); // tabula answers the write
     s.applyChanges([{ addr: "/ch/01/mix/on", text: "ON", value: 1, origin: "console" }]);
     expect(s.getValue("/ch/01/mix/on")?.value).toBe(0);
     now += HOLD + 1;
@@ -179,6 +195,45 @@ describe("store", () => {
     await vi.advanceTimersByTimeAsync(1); // let the refused request settle
     expect(s.getValue("/ch/01/mix/on")).toEqual({ value: 1, text: "ON" });
     expect(s.toasts.at(-1)?.text).toContain("writes are not armed");
+  });
+
+  it("reverts a write that fails after the hold time", async () => {
+    const { s, hang, failWith } = await ready();
+    const answer = hang(); // tabula does not answer yet
+    s.set("/ch/01/mix/on", 0);
+    now += HOLD + 1;
+    await vi.advanceTimersByTimeAsync(HOLD + 1); // the sweeps go by
+    expect(s.getValue("/ch/01/mix/on")).toEqual({ value: 0, text: "OFF", pending: true }); // sent, not confirmed
+    s.applyChanges([{ addr: "/ch/01/mix/on", text: "ON", value: 1, origin: "console" }]); // the console still says ON
+    expect(s.getValue("/ch/01/mix/on")?.value).toBe(0);
+    failWith(new Error("tabula did not answer within 10 s"));
+    answer();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(s.getValue("/ch/01/mix/on")).toEqual({ value: 1, text: "ON" });
+    expect(s.toasts.at(-1)?.text).toContain("did not answer");
+  });
+
+  it("settles a write answered late once its hold time passes after the answer", async () => {
+    const { s, hang } = await ready();
+    const answer = hang();
+    s.set("/ch/01/mix/on", 0);
+    now += 3 * HOLD;
+    await vi.advanceTimersByTimeAsync(3 * HOLD);
+    expect(s.getValue("/ch/01/mix/on")?.pending).toBe(true);
+    answer();
+    await vi.advanceTimersByTimeAsync(1);
+    s.applyChanges([{ addr: "/ch/01/mix/on", text: "OFF", value: 0, origin: "local" }]); // its echo
+    expect(s.getValue("/ch/01/mix/on")).toEqual({ value: 0, text: "OFF" });
+  });
+
+  it("keeps a write not confirmed yet through a reload", async () => {
+    const { s } = await ready();
+    s.set("/ch/01/mix/on", 0);
+    await s.reloadState(); // read before the console had the write
+    expect(s.getValue("/ch/01/mix/on")).toEqual({ value: 0, text: "OFF", pending: true });
+    expect(s.getValue("/ch/01/mix/fader")).toEqual({ value: 0, text: "  -oo" });
+    s.applyChanges([{ addr: "/ch/01/mix/on", text: "OFF", value: 0, origin: "local" }]);
+    expect(s.getValue("/ch/01/mix/on")).toEqual({ value: 0, text: "OFF" });
   });
 
   it("refuses to write when not armed", async () => {
@@ -213,6 +268,49 @@ describe("store", () => {
     s.applyChanges([{ addr: "/ch/01/mix/fader", text: "-10.0", value: 0.5, origin: "console" }]);
     await loading;
     expect(s.getValue("/ch/01/mix/fader")?.text).toBe("-10.0");
+  });
+
+  it("keeps the changes that came during a failed reload, and tries again", async () => {
+    const { s, failStateWith } = await ready();
+    s.setStream("open");
+    failStateWith(new Error("tabula did not answer within 30 s"));
+    const loading = s.reloadState();
+    s.applyChanges([{ addr: "/ch/01/mix/fader", text: "-10.0", value: 0.5, origin: "console" }]);
+    await loading;
+    expect(s.getValue("/ch/01/mix/fader")?.text).toBe("-10.0");
+    expect(s.toasts.at(-1)?.text).toContain("Could not load");
+    const version = s.stateVersion;
+    await vi.advanceTimersByTimeAsync(1000); // failing again
+    expect(s.stateVersion).toBe(version);
+    failStateWith(null);
+    await vi.advanceTimersByTimeAsync(2000); // later each time
+    expect(s.stateVersion).toBe(version + 1);
+    expect(s.getValue("/ch/01/mix/fader")?.text).toBe("  -oo");
+  });
+
+  it("does not retry a failed reload while the stream is down (its reopen reloads)", async () => {
+    const { s, failStateWith } = await ready();
+    s.setStream("down");
+    failStateWith(new Error("Failed to fetch"));
+    await s.reloadState();
+    const version = s.stateVersion;
+    failStateWith(null);
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(s.stateVersion).toBe(version);
+  });
+
+  it("drops the meters when the stream goes down or the state is cleared", async () => {
+    const { s } = await ready();
+    const onMeters = vi.fn();
+    s.subscribe("m:0", onMeters);
+    s.setMeters("0", [0.5, 0.25]);
+    s.setStream("down");
+    expect(s.getMeters("0")).toBeUndefined();
+    expect(onMeters).toHaveBeenCalledTimes(2);
+    s.setStream("open");
+    s.setMeters("0", [0.5]);
+    s.clearState();
+    expect(s.getMeters("0")).toBeUndefined();
   });
 
   it("reloads a variant node after its selector changed", async () => {

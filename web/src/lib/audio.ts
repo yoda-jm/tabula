@@ -1,7 +1,7 @@
 // Audio tracks recorded with the sessions (docs/API.md, "Audio";
 // docs/recording.md).
 
-import { call } from "./api";
+import { LONG, call } from "./api";
 import type { Record as RecordStatus } from "./session";
 
 export type Recorder = "arecord" | "parecord" | "ffmpeg" | "custom";
@@ -144,11 +144,12 @@ export type ExportFormat = "reaper" | "audacity" | "csv" | "scene";
 
 export const audioApi = {
   get: () => call<AudioView>("GET", "/api/audio"),
-  save: (c: AudioConfig) => call<AudioView>("POST", "/api/audio/config", c),
-  devices: () => call<AudioDevice[]>("GET", "/api/audio/devices"),
-  test: (c: AudioConfig) => call<AudioStatus>("POST", "/api/audio/test", c),
+  // saving and listing the devices probe the cards, a test records 3 s, a restart waits for the audio to start
+  save: (c: AudioConfig) => call<AudioView>("POST", "/api/audio/config", c, LONG),
+  devices: () => call<AudioDevice[]>("GET", "/api/audio/devices", undefined, LONG),
+  test: (c: AudioConfig) => call<AudioStatus>("POST", "/api/audio/test", c, LONG),
   /** starts the audio of the recording again, after it failed before recording anything */
-  restart: () => call<RecordStatus>("POST", "/api/audio/restart", {}),
+  restart: () => call<RecordStatus>("POST", "/api/audio/restart", {}, LONG),
 };
 
 /** audioTrouble says what is wrong with the audio of a recording: failed (nothing recorded), a warning, or null. */

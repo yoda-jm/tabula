@@ -1,5 +1,5 @@
 // App shell pieces: confirmation dialog, toasts, connection pill, writes
-// armed toggle, recording indicator.
+// armed toggle, recording indicator, banners.
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -130,6 +130,20 @@ export function ArmControl() {
         </ConfirmDialog>
       )}
     </>
+  );
+}
+
+/**
+ * StreamBanner is a bar on every page while the event stream to tabula is
+ * down: the values and meters shown are not live (the meters are cleared).
+ */
+export function StreamBanner() {
+  const stream = useStream();
+  if (stream !== "down") return null;
+  return (
+    <div className="stream-banner" role="alert">
+      Connection lost — reconnecting…
+    </div>
   );
 }
 

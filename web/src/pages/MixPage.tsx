@@ -11,7 +11,7 @@ import type { ReactNode, RefObject } from "react";
 import { Fader } from "../components/Fader";
 import { StripMeter } from "../components/Meter";
 import { Scribble } from "../components/Scribble";
-import { Toasts } from "../components/shell";
+import { StreamBanner, Toasts } from "../components/shell";
 import { api } from "../lib/api";
 import type { MixSource } from "../lib/mix";
 import { mixSources } from "../lib/mix";
@@ -33,6 +33,7 @@ export function MusicianApp() {
   const who = useAccess();
   return (
     <div className="app iem-app">
+      <StreamBanner />
       <main className="main">
         <MixPage bus={who?.bus} />
       </main>

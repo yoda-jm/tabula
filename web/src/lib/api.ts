@@ -144,24 +144,42 @@ export class ApiError extends Error {
   }
 }
 
-export async function call<T>(method: "GET" | "POST" | "DELETE", url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method,
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`;
-    try {
-      const j = await res.json();
-      if (j && typeof j.error === "string") msg = j.error;
-    } catch {
-      // not JSON: keep the status line
+/** TIMEOUT is how long a request waits for its answer: on a connection gone silent it fails instead of hanging. */
+export const TIMEOUT = 10_000;
+/** LONG is for the calls that wait on purpose: an audio test, a recording that starts or ends, the USB stick… */
+export const LONG = 60_000;
+/** SLOW is for the big answers (the schema, the whole state) over a weak Wi-Fi. */
+export const SLOW = 30_000;
+
+/** call sends a request; it fails after timeout ms without an answer (0: it waits as long as it takes). */
+export async function call<T>(method: "GET" | "POST" | "DELETE", url: string, body?: unknown, timeout = TIMEOUT): Promise<T> {
+  const ctl = timeout > 0 ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), timeout) : undefined;
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: ctl?.signal,
+    });
+    if (!res.ok) {
+      let msg = `${res.status} ${res.statusText}`;
+      try {
+        const j = await res.json();
+        if (j && typeof j.error === "string") msg = j.error;
+      } catch {
+        // not JSON: keep the status line
+      }
+      throw new ApiError(res.status, msg);
     }
-    throw new ApiError(res.status, msg);
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
+  } catch (e) {
+    if (ctl?.signal.aborted) throw new Error(`tabula did not answer within ${timeout / 1000} s`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
 }
 
 export const api = {
@@ -170,9 +188,9 @@ export const api = {
   connect: (addr: string) => call<Status>("POST", "/api/connect", { addr }),
   disconnect: () => call<Status>("POST", "/api/disconnect", {}),
   arm: (armed: boolean) => call<Status>("POST", "/api/arm", { armed }),
-  schema: () => call<SchemaResponse>("GET", "/api/schema"),
+  schema: () => call<SchemaResponse>("GET", "/api/schema", undefined, SLOW),
   state: (prefix?: string) =>
-    call<StateNode[]>("GET", "/api/state" + (prefix ? "?prefix=" + encodeURIComponent(prefix) : "")),
+    call<StateNode[]>("GET", "/api/state" + (prefix ? "?prefix=" + encodeURIComponent(prefix) : ""), undefined, SLOW),
   set: (body: SetBody) => call<void>("POST", "/api/set", body),
   whoami: () => call<Whoami>("GET", "/api/whoami"),
   logout: () => call<Whoami>("POST", "/api/logout", {}),

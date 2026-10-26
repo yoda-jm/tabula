@@ -1,8 +1,10 @@
 // The Server-Sent Events stream (/api/events): status, change, resync,
-// record, access and meters. The stream is reopened with a backoff if it
-// drops, and the whole state is reloaded after each (re)open, as changes may
-// have been missed in between. A stream that drops because the access was
-// deleted is not reopened.
+// record, access, meters and ping. The stream is reopened with a backoff if
+// it drops, and the whole state is reloaded after each (re)open, as changes
+// may have been missed in between. A stream that drops because the access
+// was deleted is not reopened. The server pings every 5 s: a stream silent
+// for longer than QUIET is taken for dead (a half-open connection never
+// fails by itself) and reopened.
 //
 // The meter groups are named when the stream opens. When a view wants
 // another group (store.wantMeters, e.g. the RTA), a second stream is opened
@@ -19,6 +21,12 @@ export const METER_GROUPS = "0,2";
 
 /** SWAP_DELAY lets a burst of wantMeters calls (a page opening) settle into one new stream. */
 export const SWAP_DELAY = 150;
+
+/** QUIET is how long a stream may go without any event (the server pings every 5 s) before it is reopened. */
+export const QUIET = 15000;
+
+/** The events of the stream: any of them shows it is alive. */
+const EVENTS = ["status", "change", "resync", "record", "scenefile", "access", "meters", "ping"];
 
 export function startEvents(store: Store, meters = METER_GROUPS): () => void {
   let es: EventSource | null = null; // the stream in use
@@ -47,12 +55,12 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
       next?.close();
       nextGroups = g;
     } else {
-      // a fresh start replaces both streams
+      // a fresh start replaces both streams; after a drop, the stream is down until it opens
       es?.close();
       next?.close();
       next = null;
       groups = g;
-      store.setStream("connecting");
+      if (store.stream !== "down") store.setStream("connecting");
     }
     const src = new EventSource("/api/events" + (g ? "?meters=" + g : ""));
     if (swap) next = src;
@@ -60,7 +68,20 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
     const live = () => src === es || src === next;
     let fresh = true; // the first status after each (re)open triggers a reload
 
+    // the watchdog: a stream without any event for QUIET is dead
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
+    const alive = () => {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        watchdog = null;
+        if (!stopped && live()) fail(true);
+      }, QUIET);
+    };
+    alive();
+    for (const type of EVENTS) src.addEventListener(type, alive);
+
     src.onopen = () => {
+      alive();
       if (src !== es) return;
       fresh = true;
       retry = 1000;
@@ -116,7 +137,8 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
       // a group given back keeps coming until the stream is replaced: drop it
       if (wantedList().includes(String(m.id))) store.setMeters(String(m.id), m.values);
     });
-    src.onerror = () => {
+    /** fail handles a stream that failed; dead when the watchdog found it silent (the browser would keep it). */
+    const fail = (dead: boolean) => {
       if (src === next) {
         // the replacement failed: keep the stream in use, try again later
         src.close();
@@ -126,19 +148,23 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
       }
       if (src !== es) return;
       store.setStream("down");
-      if (src.readyState === EventSource.CLOSED) {
+      if (dead || src.readyState === EventSource.CLOSED) {
         src.close();
+        if (watchdog) clearTimeout(watchdog);
+        watchdog = null;
         void store.loadAccess().then((who) => {
           if (who?.role === "none") stopped = true;
         });
+        if (timer) clearTimeout(timer);
         timer = setTimeout(() => {
           timer = null;
           open();
         }, retry);
         retry = Math.min(retry * 2, 10000);
       }
-      // otherwise the browser reconnects by itself
+      // otherwise the browser reconnects by itself (the watchdog still runs)
     };
+    src.onerror = () => fail(false);
   };
 
   /** scheduleSwap reopens the stream if the wanted meter groups changed. */

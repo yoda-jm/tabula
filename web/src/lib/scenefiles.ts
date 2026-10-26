@@ -38,7 +38,8 @@ export const sceneFilesApi = {
   /** save writes the console's settings as a file; it answers the file name */
   save: (name: string, note: string, replace = false) =>
     call<{ file: string }>("POST", "/api/scenefiles", { name, note, replace }),
-  load: (file: string) => call<SceneProgress>("POST", fileUrl(file) + "/load", {}),
+  /** load answers once every line is sent: no time limit (the progress comes as "scenefile" events) */
+  load: (file: string) => call<SceneProgress>("POST", fileUrl(file) + "/load", {}, 0),
   remove: (file: string) => call<void>("DELETE", fileUrl(file)),
   downloadUrl: fileUrl,
   /** keep sends a file opened in the browser; a 409 ApiError when the name is taken */

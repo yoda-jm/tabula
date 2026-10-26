@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { ArmControl, AudioBanner, ConnectionPill, RecIndicator, Toasts } from "./components/shell";
+import { ArmControl, AudioBanner, ConnectionPill, RecIndicator, StreamBanner, Toasts } from "./components/shell";
 import { atLeast } from "./lib/access";
 import type { Role } from "./lib/api";
 import { api } from "./lib/api";
@@ -101,6 +101,7 @@ function ConsoleApp({ role }: { role: Role }) {
             </a>
           ))}
         </nav>
+        <StreamBanner />
         {engineer && <AudioBanner onOpen={page !== "record" ? () => go({ page: "record" }) : undefined} />}
       </div>
       <main className="main">

@@ -2,7 +2,7 @@
 // GET /api/usb, and its player (/-stat/tape), driven with POST /api/usb
 // (docs/API.md, "USB stick").
 
-import { call } from "./api";
+import { LONG, call } from "./api";
 
 export type UsbKind =
   | "parent"
@@ -39,10 +39,11 @@ export interface UsbView {
 export type UsbOp = "play" | "pause" | "stop" | "prev" | "next";
 
 export const usbApi = {
-  get: () => call<UsbView>("GET", "/api/usb"),
+  // the console reads its stick slowly: tabula gives it 10 to 15 s
+  get: () => call<UsbView>("GET", "/api/usb", undefined, LONG),
   /** open enters a directory, plays a WAV file or loads a file; it answers the listing after */
-  open: (index: number) => call<UsbView>("POST", "/api/usb", { op: "open", index }),
-  op: (op: UsbOp) => call<void>("POST", "/api/usb", { op }),
+  open: (index: number) => call<UsbView>("POST", "/api/usb", { op: "open", index }, LONG),
+  op: (op: UsbOp) => call<void>("POST", "/api/usb", { op }, LONG),
 };
 
 /** What opening an entry does: the button's label, and whether it changes the mix (asked first). */
