@@ -407,13 +407,14 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 
 // accessView is what /api/access returns.
 type accessView struct {
-	Grants            []Grant  `json:"grants"` // links and sessions (without their token)
-	MusiciansCanWrite bool     `json:"musicians_can_write"`
-	Password          bool     `json:"password"`          // an engineer password is set
-	Current           string   `json:"current,omitempty"` // the caller's access
-	Guest             Role     `json:"guest"`
-	URLs              []string `json:"urls"`      // where other devices reach this tabula
-	Reachable         bool     `json:"reachable"` // false when listening on this machine only
+	Grants            []Grant    `json:"grants"` // links and sessions (without their token)
+	MusiciansCanWrite bool       `json:"musicians_can_write"`
+	Password          bool       `json:"password"`          // an engineer password is set
+	Current           string     `json:"current,omitempty"` // the caller's access
+	Guest             Role       `json:"guest"`
+	URLs              []string   `json:"urls"`      // where other devices reach this tabula
+	Reachable         bool       `json:"reachable"` // false when listening on this machine only
+	Online            onlineView `json:"online"`    // which devices have a page open
 }
 
 func (s *Server) accessStatus(r *http.Request) accessView {
@@ -435,7 +436,7 @@ func (s *Server) accessStatus(r *http.Request) accessView {
 	s.mu.Unlock()
 	urls, reachable := baseURLs(listen)
 	return accessView{Grants: d.Grants, MusiciansCanWrite: d.MusiciansCanWrite, Password: d.Password != nil, Current: current,
-		Guest: guest, URLs: urls, Reachable: reachable}
+		Guest: guest, URLs: urls, Reachable: reachable, Online: s.hub.online()}
 }
 
 // baseURLs lists the URLs other devices can use to reach a server listening

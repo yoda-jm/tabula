@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -101,7 +100,7 @@ func main() {
 	if *consoleA != "" {
 		api.Connect(*consoleA)
 	}
-	ln, err := net.Listen("tcp", *httpAddr)
+	ln, err := webapi.Listen(*httpAddr)
 	if err != nil {
 		log.Error("listen", "err", err)
 		os.Exit(1)

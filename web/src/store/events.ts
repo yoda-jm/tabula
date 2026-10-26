@@ -1,5 +1,5 @@
 // The Server-Sent Events stream (/api/events): status, change, resync,
-// record, access, meters and ping. The stream is reopened with a backoff if
+// record, scenefile, access, online, meters and ping. The stream is reopened with a backoff if
 // it drops, and the whole state is reloaded after each (re)open, as changes
 // may have been missed in between. A stream that drops because the access
 // was deleted is not reopened. The server pings every 5 s: a stream silent
@@ -26,7 +26,7 @@ export const SWAP_DELAY = 150;
 export const QUIET = 15000;
 
 /** The events of the stream: any of them shows it is alive. */
-const EVENTS = ["status", "change", "resync", "record", "scenefile", "access", "meters", "ping"];
+const EVENTS = ["status", "change", "resync", "record", "scenefile", "access", "online", "meters", "ping"];
 
 export function startEvents(store: Store, meters = METER_GROUPS): () => void {
   let es: EventSource | null = null; // the stream in use
@@ -130,6 +130,9 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
     });
     src.addEventListener("access", () => {
       if (live()) void store.loadAccess();
+    });
+    src.addEventListener("online", (e) => {
+      if (live()) store.setOnline(JSON.parse((e as MessageEvent).data));
     });
     src.addEventListener("meters", (e) => {
       if (!live()) return;

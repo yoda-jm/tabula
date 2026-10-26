@@ -197,7 +197,7 @@ func TestRecordWaitsForTheInputTest(t *testing.T) {
 func TestSlowBrowserResyncs(t *testing.T) {
 	var h hub
 	h.init()
-	ch, _ := h.add(nil, "")
+	ch, _ := h.add(nil, caller{}, "192.0.2.1")
 	for i := 0; i < cap(ch)+10; i++ {
 		h.publish("change", i)
 	}

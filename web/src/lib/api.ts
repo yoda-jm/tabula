@@ -111,6 +111,24 @@ export interface Grant {
   created: string;
 }
 
+/** Presence tells whether an access is in use: a page open with it keeps an event stream open. */
+export interface Presence {
+  /** event streams open now; 0 is offline */
+  streams: number;
+  /** the IP address of its last stream */
+  addr?: string;
+  /** when it last opened or closed one */
+  seen: string;
+}
+
+/** Online tells which devices have a page open (also the "online" event, sent to engineers). */
+export interface Online {
+  /** by access; one not opened since tabula started is left out */
+  grants: Record<string, Presence>;
+  /** the addresses of devices open without an access */
+  guests: string[];
+}
+
 export interface AccessStatus {
   /** access links and signed-in devices */
   grants: Grant[];
@@ -124,6 +142,8 @@ export interface AccessStatus {
   urls: string[];
   /** false when tabula listens on this machine only */
   reachable: boolean;
+  /** which devices have a page open */
+  online: Online;
 }
 
 export interface Discovered {

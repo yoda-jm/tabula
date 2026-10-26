@@ -1839,6 +1839,28 @@ div.scribble {
   align-items: baseline;
   gap: 4px 12px;
 }
+.presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.presence::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--muted);
+}
+.presence.on {
+  color: var(--ok);
+}
+.presence.on::before {
+  background: var(--ok);
+  border-color: var(--ok);
+  box-shadow: 0 0 6px var(--ok);
+}
 .grant-link code {
   display: block;
   margin: 6px 0;

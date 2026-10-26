@@ -1,6 +1,8 @@
 package webapi
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -206,5 +208,84 @@ func TestDeletedAccessEndsStream(t *testing.T) {
 	case <-ended:
 	case <-time.After(2 * time.Second):
 		t.Error("the stream is still open")
+	}
+}
+
+// TestOnline tells the engineer which accesses have a page open, as pages
+// open and close.
+func TestOnline(t *testing.T) {
+	api := New(quiet)
+	g, _ := api.acc.add("Theo", RoleMusician, 1)
+	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
+	defer ts.Close()
+
+	// the engineer's page (this machine, no password)
+	resp, err := http.Get(ts.URL + "/api/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	events := make(chan onlineView, 16)
+	go func() {
+		sc := bufio.NewScanner(resp.Body)
+		online := false
+		for sc.Scan() {
+			line := sc.Text()
+			if online && strings.HasPrefix(line, "data: ") {
+				var v onlineView
+				json.Unmarshal([]byte(line[6:]), &v)
+				events <- v
+			}
+			online = line == "event: online"
+		}
+	}()
+	wait := func(what string, ok func(onlineView) bool) {
+		t.Helper()
+		for deadline := time.After(3 * time.Second); ; {
+			select {
+			case v := <-events:
+				if ok(v) {
+					return
+				}
+			case <-deadline:
+				t.Fatalf("no online event where %s", what)
+			}
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req, _ := http.NewRequestWithContext(ctx, "GET", ts.URL+"/api/events", nil)
+	req.AddCookie(&http.Cookie{Name: accessCookie, Value: g.Token})
+	phone, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer phone.Body.Close()
+	wait("Theo is online", func(v onlineView) bool { return v.Grants[g.ID].Streams == 1 })
+
+	var st accessView
+	getJSON(t, ts.URL+"/api/access", &st)
+	if p := st.Online.Grants[g.ID]; p.Streams != 1 || p.Addr != "127.0.0.1" || time.Since(p.Seen) > time.Minute {
+		t.Errorf("/api/access: %+v", st.Online)
+	}
+	if len(st.Online.Guests) != 0 {
+		t.Errorf("this machine counted as a guest: %v", st.Online.Guests)
+	}
+
+	cancel() // the phone goes
+	wait("Theo is offline", func(v onlineView) bool {
+		p, ok := v.Grants[g.ID]
+		return ok && p.Streams == 0 && time.Since(p.Seen) < time.Minute
+	})
+
+	// devices without an access, by address
+	ch, _ := api.hub.add(nil, caller{Role: RoleViewer}, "192.0.2.7")
+	if v := api.hub.online(); !slices.Equal(v.Guests, []string{"192.0.2.7"}) {
+		t.Errorf("guests %v", v.Guests)
+	}
+	api.hub.remove(ch)
+	api.hub.kick(g.ID)
+	if v := api.hub.online(); len(v.Guests) != 0 || len(v.Grants) != 0 {
+		t.Errorf("after the guest left and Theo's access was deleted: %+v", v)
 	}
 }

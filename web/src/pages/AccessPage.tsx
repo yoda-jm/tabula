@@ -2,17 +2,18 @@
 // mix, and viewers or another engineer device a link of their role. A link
 // opened on a phone (or its QR code scanned) signs that phone in. The
 // engineer password, when set, signs browsers in as the engineer (this
-// machine included); they are listed as signed-in devices.
+// machine included); they are listed as signed-in devices. Each access says
+// whether a page is open with it now, or when it was last seen.
 
 import { useCallback, useEffect, useState } from "react";
 import qrcode from "qrcode-generator";
 import { ConfirmDialog } from "../components/shell";
 import { ROLE_LABELS } from "../lib/access";
-import type { AccessStatus, Grant, Role } from "../lib/api";
+import type { AccessStatus, Grant, Online, Presence, Role } from "../lib/api";
 import { accessApi, api } from "../lib/api";
 import { ALL_STRIPS } from "../lib/strips";
 import { prettyText } from "../lib/values";
-import { useValue } from "../store/hooks";
+import { useOnline, useValue } from "../store/hooks";
 import { store } from "../store/store";
 
 const BUSES = ALL_STRIPS.filter((s) => s.kind === "bus");
@@ -23,6 +24,8 @@ export function AccessPage() {
   const [base, setBase] = useState("");
   const [shown, setShown] = useState<string | null>(null); // grant whose QR code is open
   const [removing, setRemoving] = useState<Grant | null>(null);
+  const live = useOnline();
+  const online = live ?? st?.online;
 
   const refresh = useCallback(() => {
     accessApi.list().then(
@@ -41,6 +44,7 @@ export function AccessPage() {
   const link = (g: Grant) => `${base}/a/${g.token}`;
   const links = st?.grants.filter((g) => !g.session) ?? [];
   const sessions = st?.grants.filter((g) => g.session) ?? [];
+  const linksOnline = links.filter((g) => (online?.grants[g.id]?.streams ?? 0) > 0).length;
   const setWrite = (on: boolean) =>
     accessApi.settings(on).then(setSt, (e: Error) => store.toast(e.message, "error"));
   const remove = (g: Grant) =>
@@ -73,6 +77,7 @@ export function AccessPage() {
           </label>
           <p className="muted">
             Devices without a link: {ROLE_LABELS[st.guest].toLowerCase()} (set with <code>-guest</code>).
+            {online && online.guests.length > 0 && <> Open now without a link: {online.guests.join(", ")}.</>}
           </p>
           {st.urls.length > 1 && (
             <label className="form-field">
@@ -89,12 +94,15 @@ export function AccessPage() {
         </section>
       )}
       {st && <PasswordCard st={st} onChange={setSt} />}
-      {st && (st.password || sessions.length > 0) && <Sessions sessions={sessions} current={st.current} onChange={refresh} />}
+      {st && (st.password || sessions.length > 0) && (
+        <Sessions sessions={sessions} current={st.current} online={online} onChange={refresh} />
+      )}
       <NewAccess onAdded={refresh} />
       {st && (
         <section className="card section">
           <header className="section-head">
             <h3>Links</h3>
+            {links.length > 0 && <span className="muted">{linksOnline} online</span>}
           </header>
           {links.length === 0 && <p className="muted">No access link yet.</p>}
           <ul className="grants">
@@ -106,6 +114,7 @@ export function AccessPage() {
                     {ROLE_LABELS[g.role]}
                     {g.role === "musician" && g.bus ? <BusName n={g.bus} /> : null}
                   </span>
+                  <OnlineTag p={online?.grants[g.id]} />
                 </div>
                 <div className="grant-link">
                   <code className="mono">{link(g)}</code>
@@ -278,7 +287,8 @@ function PasswordCard({ st, onChange }: { st: AccessStatus; onChange(s: AccessSt
 }
 
 /** Sessions lists the browsers signed in with the engineer password. */
-function Sessions({ sessions, current, onChange }: { sessions: Grant[]; current?: string; onChange(): void }) {
+function Sessions(props: { sessions: Grant[]; current?: string; online?: Online; onChange(): void }) {
+  const { sessions, current, online, onChange } = props;
   const signOut = async (g: Grant) => {
     try {
       if (g.id === current) {
@@ -307,6 +317,7 @@ function Sessions({ sessions, current, onChange }: { sessions: Grant[]; current?
                 since {new Date(g.created).toLocaleString()}
                 {g.id === current ? ", this browser" : ""}
               </span>
+              <OnlineTag p={online?.grants[g.id]} />
             </div>
             <div className="grant-actions">
               <button type="button" className="btn danger-text" onClick={() => void signOut(g)}>
@@ -318,6 +329,16 @@ function Sessions({ sessions, current, onChange }: { sessions: Grant[]; current?
       </ul>
     </section>
   );
+}
+
+/** OnlineTag says whether a page is open with an access now, or when it was last seen. */
+function OnlineTag({ p }: { p?: Presence }) {
+  if (p && p.streams > 0) return <span className="presence on">Online{p.addr ? ` · ${p.addr}` : ""}</span>;
+  if (!p) return <span className="presence">Not opened since tabula started</span>;
+  const seen = new Date(p.seen);
+  const time = seen.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const today = seen.toDateString() === new Date().toDateString();
+  return <span className="presence">Last seen {today ? time : `${seen.toLocaleDateString()} ${time}`}</span>;
 }
 
 function BusName({ n }: { n: number }) {

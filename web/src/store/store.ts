@@ -13,7 +13,7 @@
 
 import { mayWrite } from "../lib/access";
 import { ApiError, api as realApi } from "../lib/api";
-import type { Change, RawValue, StateNode, Status, Whoami } from "../lib/api";
+import type { Change, Online, RawValue, StateNode, Status, Whoami } from "../lib/api";
 import { indexSchema, parentOf, resolveFields } from "../lib/schema";
 import type { Field, Leaf, Schema } from "../lib/schema";
 import { KeyedThrottle } from "../lib/throttle";
@@ -69,6 +69,8 @@ export class Store {
   private recordAt = 0;
   /** the scene file being sent to the console, or the last one sent */
   sceneLoad: SceneProgress | null = null;
+  /** which devices have a page open ("online" events, engineers only); null until one comes */
+  online: Online | null = null;
   toasts: Toast[] = [];
   /** bumped when the whole state is (re)loaded or cleared */
   stateVersion = 0;
@@ -356,6 +358,11 @@ export class Store {
   setSceneLoad(p: SceneProgress | null) {
     this.sceneLoad = p;
     this.notify(["scenefile"]);
+  }
+
+  setOnline(o: Online) {
+    this.online = o;
+    this.notify(["online"]);
   }
 
   /** recordElapsed is the recording's elapsed time: the server's duration plus the time since it was sent. */
