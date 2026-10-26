@@ -504,8 +504,9 @@ func TestIdleClientsForgotten(t *testing.T) {
 	idle, sub, remote := s.client(addr(1)), s.client(addr(2)), s.client(addr(3))
 	s.subscribe(osc.NewMessage("/subscribe", osc.String("/ch/01/mix/on")), sub)
 	s.mu.Lock()
-	for _, c := range []*Client{idle, sub, remote} {
-		c.LastSeen = c.LastSeen.Add(-2 * clientIdle)
+	// seen in this order, long ago (set apart: Windows' clock may give the three the same time)
+	for i, c := range []*Client{idle, sub, remote} {
+		c.LastSeen = time.Now().Add(-2*clientIdle + time.Duration(i)*time.Second)
 	}
 	remote.XremoteUntil = time.Now().Add(xremoteLease)
 	s.swept = time.Time{}

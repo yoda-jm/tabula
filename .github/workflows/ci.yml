@@ -30,7 +30,7 @@ jobs:
           go test -race -count=1 ./... 2>&1 | tee go-test.log
       - name: failed tests as annotations # readable without signing in to GitHub
         if: failure()
-        run: echo "::error::$(grep -E -e '--- FAIL|^FAIL|panic:|_test\.go:[0-9]+:|DATA RACE' go-test.log | head -60 | sed 's/%/%25/g' | awk 'BEGIN { ORS = "%0A" } { print }')"
+        run: echo "::error::$(grep -E -A2 -e '--- FAIL|^FAIL|panic:|\.go:[0-9]+:|DATA RACE' go-test.log | head -60 | sed 's/%/%25/g' | awk 'BEGIN { ORS = "%0A" } { print }')"
 
   # tabula is released for macOS and Windows too: their tests run there
   test-os:
@@ -53,7 +53,7 @@ jobs:
       - name: failed tests as annotations # readable without signing in to GitHub
         if: failure()
         shell: bash
-        run: echo "::error::$(grep -E -e '--- FAIL|^FAIL|panic:|_test\.go:[0-9]+:' go-test.log | head -60 | sed 's/%/%25/g' | awk 'BEGIN { ORS = "%0A" } { print }')"
+        run: echo "::error::$(grep -E -A2 -e '--- FAIL|^FAIL|panic:|\.go:[0-9]+:' go-test.log | head -60 | sed 's/%/%25/g' | awk 'BEGIN { ORS = "%0A" } { print }')"
 
   web:
     runs-on: ubuntu-latest

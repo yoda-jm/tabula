@@ -136,11 +136,20 @@ func (s *Server) Clients() []Client {
 		out = append(out, *c)
 	}
 	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j].LastSeen.After(out[j-1].LastSeen); j-- {
+		for j := i; j > 0 && newer(out[j], out[j-1]); j-- {
 			out[j], out[j-1] = out[j-1], out[j]
 		}
 	}
 	return out
+}
+
+// newer orders the clients for Clients: the last seen first, then by
+// address (a coarse clock gives several clients the same time).
+func newer(a, b Client) bool {
+	if !a.LastSeen.Equal(b.LastSeen) {
+		return a.LastSeen.After(b.LastSeen)
+	}
+	return a.Addr < b.Addr
 }
 
 // ListenAndServe serves on addr (e.g. ":10023") until ctx is done.

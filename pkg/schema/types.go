@@ -216,7 +216,10 @@ type Scale interface {
 // Linf is a linear scale.
 type Linf struct{ Min, Max float64 }
 
-func (l Linf) Value(n float64) float64 { return l.Min + n*(l.Max-l.Min) }
+// Value converts the product explicitly: without it, Go may fuse the
+// multiply and the add (on arm64), whose single rounding moves values lying
+// on a tie: -0.25 dB printed -0.2 where the console prints -0.3. Level too.
+func (l Linf) Value(n float64) float64 { return l.Min + float64(n*(l.Max-l.Min)) }
 func (l Linf) Norm(v float64) float64  { return (v - l.Min) / (l.Max - l.Min) }
 func (l Linf) Describe(steps int) string {
 	if steps == 0 {
@@ -246,13 +249,13 @@ func (Level) Value(n float64) float64 {
 	case n <= 0:
 		return math.Inf(-1)
 	case n < 0.0625:
-		return 480*n - 90
+		return float64(480*n) - 90
 	case n < 0.25:
-		return 160*n - 70
+		return float64(160*n) - 70
 	case n < 0.5:
-		return 80*n - 50
+		return float64(80*n) - 50
 	}
-	return 40*n - 30
+	return float64(40*n) - 30
 }
 
 func (Level) Norm(db float64) float64 {

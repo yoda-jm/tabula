@@ -166,12 +166,20 @@
   start-up is tested too (its flags, the log file, `-reset-password`, and
   `-console -record` against an emulator, stopped as by Ctrl-C), and the Go
   tests run on macOS and Windows as well as Linux.
+- On ARM (Apple silicon Macs, a Raspberry Pi, linux/arm64), levels lying
+  exactly between two tenths of a dB were written one tenth off in scene
+  files and node text (`-0.2` where the console writes `-0.3`): Go may fuse
+  a multiply and an add there, which rounds differently. The tests on
+  macOS found it; the arithmetic now rounds as on the console everywhere.
 - Stopping a recording and starting another within the same second failed
   (*already holds a session*): the second one is named `…-2`. A console
   change arriving while a recording starts no longer races with the
   writing of its `meta.json`.
 
 ### tabula-emu
+- On ARM, levels on a tie between two tenths of a dB no longer read one
+  tenth off (`-0.2` for `-0.3`) in node text and saved scenes. The list of
+  clients on the debug page keeps a stable order.
 - Recording to the USB stick: `/-stat/tape/state` 4 records and 3 pauses
   the recording; the file is named after the time
   (`/R_20261026-203512.wav`) and its time counts, but nothing is written.

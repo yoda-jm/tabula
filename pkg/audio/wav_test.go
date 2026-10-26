@@ -88,6 +88,7 @@ func TestRF64(t *testing.T) {
 func TestReadWAVStale(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "cut.wav")
 	w, _ := createWAV(createFile, path, 48000, 24, 0)
+	t.Cleanup(func() { w.f.Close() }) // before the temporary directory goes: Windows keeps an open file
 	writeSamples(t, w, 100)
 	w.refresh()
 	writeSamples(t, w, 50)
