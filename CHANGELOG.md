@@ -92,6 +92,30 @@
 - The event stream sends a `ping` event every 5 s, so the GUI can tell a
   stream that went silent; a browser too slow to take the events is told to
   load the state again once it catches up (it stayed out of date).
+- On a weak network (a code review found these): a red *Connection lost —
+  reconnecting…* bar on every page, the phones' included, with the meters
+  blanked instead of frozen; a stream gone silent without breaking is
+  reopened after 15 s; requests give up after 10 s (longer for those that
+  wait on purpose); a change refused late goes back to the console's value
+  (it stayed on screen as if the console had it); a reload that fails is
+  tried again, and no longer drops the changes received meanwhile nor
+  blanks a fader being moved.
+- Phones: **Keep the screen on** held only while Options was open; a
+  musician whose bus got linked was locked out until a reload; a stereo
+  in-ear mix's **My volume** and mute moved one ear when the console does
+  not link bus faders; the ★ pins could move to another bus.
+- **Stop recording** asks first, as do **Disconnect** and every connect
+  button while a recording runs; holding M adds one marker; the USB
+  page's ■ Stop asks while the console records to its stick; the Connect
+  buttons stay usable while a console is being asked again.
+- Phantom power asks on the Browser page too, and its dialog does what it
+  says even if phantom changed meanwhile; an open graphic EQ no longer
+  keeps taking the console's RTA source back; **Start recording** no
+  longer asks to save audio settings that did not change; a library form
+  no longer carries over from scenes to snippets; the session details say
+  how many console changes are missing when lines of its log are damaged;
+  mute and pan buttons are named for screen readers; the Channel page no
+  longer redraws its EQ editors with every RTA frame.
 
 ### tabula-emu
 - The debug page says when a subscription expires (`in 8s`), not `-8s ago`.

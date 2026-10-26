@@ -69,10 +69,18 @@ The page is a small desk filling the phone's screen:
   sources** shows them).
 - A stereo in-ear mix (two linked buses) has a pan slider per source; the
   musician changes the odd bus and the console moves the other one. A
-  stereo source keeps the pans set on the console.
-- **Options → Keep the screen on** works when the browser allows it, which
-  needs HTTPS: over plain HTTP on the local network, set the phone's screen
-  timeout instead.
+  stereo source keeps the pans set on the console. **My volume** and its
+  mute move both buses, also when the console does not link their faders
+  (*Config → link fader and mute* off).
+- Linking or unlinking the musician's bus on the console is followed at
+  once: the page shows the pair (or the one bus) and stays usable, without
+  a reload.
+- **Options → Keep the screen on** holds as long as the page is open (and
+  comes back when the phone shows the page again), when the browser allows
+  it, which needs HTTPS: over plain HTTP on the local network, set the
+  phone's screen timeout instead.
+- When the phone loses `tabula`, a red bar says *Connection lost —
+  reconnecting…* and the meters go blank; the page comes back by itself.
 - **Options → Leave** forgets the access on that phone.
 
 Musicians change their mix **even when writes are not armed** on the

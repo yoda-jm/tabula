@@ -14,6 +14,15 @@ made in one shows in the others.
 (top right), after a confirmation. On a real console nothing moves by
 accident. Disarm to go back to read-only.
 
+**On a weak network.** When the page loses `tabula` (Wi-Fi gone, laptop
+asleep), a red bar says *Connection lost — reconnecting…* on every page and
+the meters go blank rather than freeze; the page reconnects by itself and
+loads the console again. A connection that went silent without breaking
+(a phone changing access point) is noticed within 15 s. A change that
+`tabula` refuses or does not answer within a few seconds goes back to the
+console's value, with a message: what a control shows is what the console
+has.
+
 **Who sees what.** The machine running `tabula` is the engineer and sees
 every page (once signed in, when an engineer password is set). Other
 devices get a role from an access link: viewers see the
@@ -67,7 +76,8 @@ of the stage box on AES50 A), its gain and its +48 V phantom power. The
 console tells which headamp feeds each channel (`/-ha/NN/index`), following
 the channel's source and the input routing; the gain and phantom are
 `/headamp/NNN/gain` and `phantom`. Switching phantom power asks for a
-confirmation, as it pops through the PA. When the input has no preamp
+confirmation, as it pops through the PA (on the Browser page too); the
+dialog does what it says even if phantom changed meanwhile elsewhere. When the input has no preamp
 (card, user input, a bus…), the section says where it comes from instead.
 The Source row of the Config section also shows the physical input
 (`In 12 · AES50 A 12`).
@@ -249,7 +259,8 @@ the current folder of the stick: **Open** a folder (or the parent folder),
 **▶ Play** a WAV file, **Load…** a scene, snippet or preset file into the
 console (after a confirmation: the console loads it from the stick). The
 file in the player is marked. Every command needs armed writes; the sound
-goes where the console's routing sends its USB player.
+goes where the console's routing sends its USB player. While the console
+records to its stick (from its own screen), ■ Stop asks first.
 
 ![The console's USB stick and player](img/gui-usb.png)
 
@@ -284,7 +295,7 @@ Record a show as a session, which keeps two things, as the page says above
 - **Console**, always: the console's settings, not its sound. A snapshot of
   every setting when you start (a scene file that opens in M32-Edit), then
   every change, made on the console or here, with its time, and the markers
-  you add (press M).
+  you add (press M; holding it adds one).
 - **Audio**, when **Audio tracks** is on: the sound of the console's USB
   card, one WAV file per track, in step with the console changes. Click
   the tracks to record in the list, named after what the console sends to
@@ -297,6 +308,10 @@ Record a show as a session, which keeps two things, as the page says above
   changed.
 
 ![Start recording asks about the audio settings not saved](img/audio-unsaved.png)
+
+**Stop recording** asks first: the session and its audio end there.
+Disconnecting, or connecting to another console, asks too while a recording
+runs (see [Connect](#connect)).
 
 When the audio of a recording fails, the top bar says *REC ⚠ NO AUDIO* and
 a red bar under the pages says why, on every page; the Record page tells
@@ -311,7 +326,9 @@ change at its recorded time, and plays no sound. Export it for
 Reaper or Audacity to listen to the audio with the markers. The details of
 a session also show what it keeps of the console at the start, with
 **⤓ Scene (.scn)** to open it in M32-Edit, and **Delete this session…**
-removes it, audio included, after asking. See [recording](recording.md#replaying-a-session) and the
+removes it, audio included, after asking. When lines of its change log could
+not be read (a recording cut short by a power cut), the details say how many
+changes are missing, and where. See [recording](recording.md#replaying-a-session) and the
 [API](API.md#recording-and-replay) for the session format.
 
 ## Access
@@ -326,4 +343,6 @@ engineer password, and sign out the devices signed in with it. See
 Find the consoles on the network (a broadcast that X32/M32 consoles and
 `tabula-emu` answer) or type an address, connect and follow the sync. A
 console that does not answer is asked again every few seconds (the page
-says why) until it does; connecting to another address replaces it.
+says why) until it does; connecting to another address replaces it, so the
+buttons stay usable meanwhile. While a recording runs, **Disconnect** and
+every connect button ask first: they end the recording, with its audio.
