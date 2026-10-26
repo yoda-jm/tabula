@@ -143,6 +143,11 @@ func Parse(b []byte) (Message, error) {
 				m.Args = append(m.Args, Float(math.Float32frombits(v)))
 			}
 		case 's':
+			// readString would give an empty string past the end: a run of
+			// "s" tags with no data is not a run of empty strings.
+			if n >= len(b) {
+				return m, fmt.Errorf("%w: missing s argument", ErrMalformed)
+			}
 			var s string
 			s, n = readString(b, n)
 			m.Args = append(m.Args, String(s))
@@ -152,7 +157,9 @@ func Parse(b []byte) (Message, error) {
 			}
 			size := int(binary.BigEndian.Uint32(b[n:]))
 			n += 4
-			if size < 0 || n+size > len(b) {
+			// size > len(b)-n rather than n+size > len(b): the sum overflows
+			// on 32-bit platforms for sizes near 2^31.
+			if size < 0 || size > len(b)-n {
 				return m, fmt.Errorf("%w: truncated blob", ErrMalformed)
 			}
 			m.Args = append(m.Args, Blob(append([]byte(nil), b[n:n+size]...)))

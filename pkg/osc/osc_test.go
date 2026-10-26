@@ -1,7 +1,10 @@
 package osc
 
 import (
+	"encoding/binary"
 	"encoding/hex"
+	"errors"
+	"strings"
 	"testing"
 )
 
@@ -56,5 +59,32 @@ func TestLenientParsing(t *testing.T) {
 	}
 	if _, err := Parse([]byte("/x\x00\x00,i\x00\x00\x00\x01")); err == nil {
 		t.Fatal("truncated int accepted")
+	}
+}
+
+// Arguments past the end of a packet are refused: blob sizes near 2^31 (the
+// bounds check overflowed on 32-bit platforms, GOARCH=386 or arm, and the
+// slice panicked) and "s" tags with no data left (each gave an empty string).
+func TestArgumentsPastTheEnd(t *testing.T) {
+	for _, size := range []uint32{0x7ffffffc, 0x7fffffff, 0x80000000, 0xfffffffc} {
+		b := binary.BigEndian.AppendUint32([]byte("/a\x00\x00,b\x00\x00"), size)
+		b = append(b, 1, 2, 3, 4)
+		if _, err := Parse(b); !errors.Is(err, ErrMalformed) {
+			t.Errorf("blob size %#x: got %v", size, err)
+		}
+	}
+	for _, tags := range []string{",s", ",ss", ",s" + strings.Repeat("s", 4000)} {
+		b := appendString([]byte("/a\x00\x00"), tags)
+		if tags == ",ss" {
+			b = appendString(b, "x") // the first string only
+		}
+		if m, err := Parse(b); !errors.Is(err, ErrMalformed) {
+			t.Errorf("%d s tags: got %d arguments, %v", len(tags)-1, len(m.Args), err)
+		}
+	}
+	// An empty string is four NUL bytes.
+	m, err := Parse(appendString([]byte("/a\x00\x00,s\x00\x00"), ""))
+	if err != nil || len(m.Args) != 1 || m.Args[0].Str != "" {
+		t.Errorf("empty string: got %v, %v", m, err)
 	}
 }
