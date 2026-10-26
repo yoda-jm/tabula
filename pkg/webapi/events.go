@@ -20,7 +20,14 @@ type sub struct {
 	want  map[meterKey]bool // meter groups it asked for
 	grant string            // the access it was opened with, if any
 	quit  chan struct{}     // closed when that access is deleted
+	lost  bool              // events were dropped: it is sent "resync" first
 }
+
+// pingEvery is how often a stream gets a "ping" event, so a browser can tell
+// a stream that went silent (a half-open connection) and open it again.
+const pingEvery = 5 * time.Second
+
+var resyncMsg = []byte("event: resync\ndata: {}\n\n")
 
 func (h *hub) init() {
 	h.subs = map[chan []byte]*sub{}
@@ -67,10 +74,21 @@ func (h *hub) publish(event string, v any) {
 	msg := []byte(fmt.Sprintf("event: %s\ndata: %s\n\n", event, data))
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for ch := range h.subs {
+	for ch, sb := range h.subs {
+		// a slow browser drops events: once there is room again, it is told
+		// to load the state again before it gets the next ones
+		if sb.lost {
+			select {
+			case ch <- resyncMsg:
+				sb.lost = false
+			default:
+				continue
+			}
+		}
 		select {
 		case ch <- msg:
-		default: // a slow browser drops events; it resyncs on "resync"
+		default:
+			sb.lost = true
 		}
 	}
 }
@@ -113,8 +131,8 @@ func (h *hub) remove(ch chan []byte) {
 
 // events streams Server-Sent Events: "status" (connection state), "change"
 // (an array of changed parameters), "resync" (reload the state), "record",
-// "access" (the musicians' write permission changed), and "meters" for the
-// groups named in ?meters=.
+// "access" (the musicians' write permission changed), "meters" for the
+// groups named in ?meters=, and "ping" every 5 s.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -134,7 +152,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	first, _ := json.Marshal(s.status())
 	fmt.Fprintf(w, "event: status\ndata: %s\n\n", first)
 	flusher.Flush()
-	ping := time.NewTicker(15 * time.Second)
+	ping := time.NewTicker(pingEvery)
 	defer ping.Stop()
 	for {
 		select {
@@ -146,7 +164,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			w.Write(msg)
 			flusher.Flush()
 		case <-ping.C:
-			fmt.Fprint(w, ": ping\n\n")
+			fmt.Fprint(w, "event: ping\ndata: {}\n\n")
 			flusher.Flush()
 		}
 	}

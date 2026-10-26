@@ -49,8 +49,13 @@ func (s *Server) recordStatus() recordView {
 
 func (s *Server) publishRecord() { s.hub.publish("record", s.recordStatus()) }
 
-// StartRecording records the connected console into a new session.
+// StartRecording records the connected console into a new session. It
+// waits for the card to be free first: a recording started during an
+// input test would find it busy, and be recorded without its audio.
 func (s *Server) StartRecording(note string) error {
+	if err := s.waitAudioFree(); err != nil {
+		return err
+	}
 	s.audio.probeMu.Lock() // see audioState.probeMu
 	defer s.audio.probeMu.Unlock()
 	s.mu.Lock()
@@ -60,6 +65,9 @@ func (s *Server) StartRecording(note string) error {
 	}
 	if s.rec != nil {
 		return errors.New("already recording")
+	}
+	if s.audio.testing { // started again since waitAudioFree
+		return errors.New("the audio input is being tested: try again in a few seconds")
 	}
 	name := time.Now().Format("2006-01-02_150405")
 	st := s.client.Status()
@@ -76,9 +84,17 @@ func (s *Server) StartRecording(note string) error {
 
 // tickRecord publishes the recording status every second.
 func (s *Server) tickRecord(rec *session.Recorder) {
-	for range time.Tick(time.Second) {
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+	var failed error
+	for range t.C {
 		s.mu.Lock()
 		current := s.rec == rec
+		if err := rec.Err(); current && err != nil && failed == nil {
+			failed = err
+			s.recordErr = "the console's changes cannot be written (" + err.Error() + "): those after it are lost"
+			s.log.Error("recording: the changes cannot be written", "session", rec.Dir(), "err", err)
+		}
 		s.mu.Unlock()
 		if !current {
 			return
@@ -88,12 +104,17 @@ func (s *Server) tickRecord(rec *session.Recorder) {
 	}
 }
 
-// StopRecording ends the current recording, if any, and its audio.
+// StopRecording ends the current recording, if any, and its audio; it
+// also waits for a recording ended on a disconnect to be finished (tabula
+// stopping).
 func (s *Server) StopRecording() error {
 	s.mu.Lock()
-	rec, c := s.rec, s.audio.cap
+	rec, c, ending := s.rec, s.audio.cap, s.audio.ending
 	s.rec, s.audio.cap = nil, nil
 	s.mu.Unlock()
+	if ending != nil {
+		<-ending
+	}
 	if rec == nil {
 		return nil
 	}
@@ -162,6 +183,20 @@ type sessionView struct {
 	// (start.scn and start.nodes); Scene whether start.scn is there.
 	Snapshot int  `json:"snapshot,omitempty"`
 	Scene    bool `json:"scene,omitempty"`
+	// Damaged lists the lines of the change log that could not be read:
+	// their changes are missing from the session.
+	Damaged []int `json:"damaged,omitempty"`
+}
+
+// openSession opens a session, logging the lines of its change log that
+// could not be read (their changes are skipped).
+func (s *Server) openSession(dir string) (*session.Session, error) {
+	ses, err := session.Open(dir)
+	if err == nil && len(ses.Damaged) > 0 {
+		s.log.Error("session: lines of events.jsonl could not be read, their changes are skipped",
+			"session", filepath.Base(dir), "lines", audio.FormatTracks(ses.Damaged))
+	}
+	return ses, err
 }
 
 func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
@@ -200,14 +235,14 @@ func (s *Server) getSession(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusNotFound, err)
 		return
 	}
-	ses, err := session.Open(dir)
+	ses, err := s.openSession(dir)
 	if err != nil {
 		httpError(w, http.StatusInternalServerError, err)
 		return
 	}
 	_, err = os.Stat(filepath.Join(dir, "start.scn"))
 	writeJSON(w, http.StatusOK, sessionView{Name: filepath.Base(dir), Meta: ses.Meta, Markers: ses.Markers(),
-		Snapshot: len(ses.Start), Scene: err == nil})
+		Snapshot: len(ses.Start), Scene: err == nil, Damaged: ses.Damaged})
 }
 
 // deleteSession removes a session and its audio files, unless it is being
@@ -251,7 +286,7 @@ func (s *Server) replayStart(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusNotFound, err)
 		return
 	}
-	ses, err := session.Open(dir)
+	ses, err := s.openSession(dir)
 	if err != nil {
 		httpError(w, http.StatusInternalServerError, err)
 		return

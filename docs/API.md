@@ -11,8 +11,8 @@ client accepts it.
 |---|---|---|---|
 | GET | `/api/status` | | `Status` |
 | GET | `/api/discover` | | consoles answering a broadcast `/xinfo` within 1.5 s: `[{ip, name, model, firmware}]` |
-| POST | `/api/connect` | `{"addr": "192.168.1.62"}` (port 10023 by default) | 202 + `Status`; connection and sync go on in the background, follow `status` events |
-| POST | `/api/disconnect` | | `Status` |
+| POST | `/api/connect` | `{"addr": "192.168.1.62"}` (port 10023 by default) | 202 + `Status`; connection and sync go on in the background, follow `status` events. A console that does not answer is asked again (every 1 s, then up to every 10 s) until it does or another address is chosen: `connecting` stays true, `error` says why. A recording running ends (its files are finished in the background) |
+| POST | `/api/disconnect` | | `Status`; a recording running ends |
 | POST | `/api/arm` | `{"armed": true}` | `Status`; writes are refused (403) until armed |
 
 `Status`:
@@ -158,7 +158,8 @@ entries `/-usb/dir/001`…`999` are lazy nodes: not read when connecting.
   (made on the console or by another remote app), `local` (made through
   this server from its machine) or `web <name>` (through an access link);
 - `access`: the musicians' permission changed — read `/api/whoami` again;
-- `resync`: the initial sync finished — reload `/api/state`;
+- `resync`: the initial sync finished, or this stream dropped events (a
+  browser too slow to take them) — reload `/api/state`;
 - `record`: a `Record` (recording, replay, audio);
 - `scenefile`: a `SceneProgress` while a scene file is sent to the console;
 - `meters`: `{"id": "1", "values": [...]}` for the meter groups named when
@@ -172,6 +173,9 @@ entries `/-usb/dir/001`…`999` are lazy nodes: not read when connecting.
   see the protocol document for what each group holds (e.g. 1: 32 inputs,
   32 gate and 32 compressor gains; 2: 16 buses, 6 matrices, main L/R, mono,
   then their compressor gains).
+- `ping`: `{}` every 5 s, so a browser can tell a stream gone silent (a
+  connection cut without a word, as when a phone changes Wi-Fi) and open
+  it again; the GUI does so after 15 s without any event.
 
 ## Access
 
@@ -246,6 +250,8 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | POST | `/api/replay/stop` | | `Record` |
 
 `Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", "audio"?, …}, "replaying", "replay_of"?, "replay_at"?, "error"?, "audio"?}`.
+A session's `damaged`: the lines of its `events.jsonl` that do not read (their
+changes are skipped, and logged as an error).
 `audio` is the state of the audio capture of the recording (or of the last
 one), an `AudioStatus` without `device` and `command` (viewers see the
 record status); `meta.audio` the audio section of the session (see Audio).
@@ -257,7 +263,11 @@ Events: `record` carries a `Record` (every second while recording, and on
 every replay progress).
 
 `tabula -record -console <ip>` starts recording as soon as the console is
-synced and stops on exit — for unattended recording of a concert.
+synced (asking it again until it answers) and stops on exit — for
+unattended recording of a concert. `POST /api/record/start` waits (5 s at
+most) for an input test running, or a recording ended by a disconnect, to
+free the card; 409 if it does not. `Record.error` says when the console's
+changes cannot be written (a full disk): those after it are lost.
 
 ## Audio
 

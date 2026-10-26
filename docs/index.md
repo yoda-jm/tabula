@@ -159,8 +159,9 @@ tabula -console 192.168.1.62 -http :8033
 
 It is **read-only** until writes are armed, after a confirmation: on a real
 console, nothing moves by accident. **[Every page of the GUI](gui.md)** in
-detail. `-record` starts recording as soon as the console is synced, for
-unattended recording of a concert (`-audio-device hw:CARD=X32,DEV=0
+detail. `-record` starts recording as soon as the console is synced (asking
+it again until it answers, when the laptop starts first), for unattended
+recording of a concert (`-audio-device hw:CARD=X32,DEV=0
 -audio-tracks 1-16` adds the audio).
 
 Later: more band-specific screens.

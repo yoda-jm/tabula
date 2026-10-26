@@ -181,3 +181,55 @@ func TestReplayTiming(t *testing.T) {
 		t.Errorf("progress %v", progress)
 	}
 }
+
+// TestOpenDamagedEvents reads a session whose events have a damaged line in
+// the middle and a partial last line: only those are lost.
+func TestOpenDamagedEvents(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "meta.json"), []byte(`{"start":"2026-10-26T20:00:00Z"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	events := `{"t":1,"marker":"Song 1"}
+{"t":2,"addr":"/ch/01/mix/fader","text":"-10.0","value":0.5}
+{"t":3,"ad
+{"t":4,"marker":"Song 2"}
+{"t":5,"addr":"/ch/01/mix/on","text":"OFF","value":0}
+{"t":6,"mar`
+	if err := os.WriteFile(filepath.Join(dir, "events.jsonl"), []byte(events), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ts []float64
+	for _, e := range s.Events {
+		ts = append(ts, e.T)
+	}
+	if fmt.Sprint(ts) != "[1 2 4 5]" || fmt.Sprint(s.Damaged) != "[3 6]" {
+		t.Fatalf("events at %v, damaged lines %v; want [1 2 4 5], [3 6]", ts, s.Damaged)
+	}
+	if m := s.Markers(); len(m) != 2 || m[1].Marker != "Song 2" {
+		t.Fatalf("markers %+v", m)
+	}
+}
+
+// TestRecordWriteError keeps the first error writing the changes, for the
+// server to report: the changes after it are lost.
+func TestRecordWriteError(t *testing.T) {
+	live := demo(t)
+	rec, err := Start(t.TempDir(), live, "M32C test", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rec.Stop()
+	live.Set("/ch/12/mix/fader", osc.Float(0.6), "console")
+	if err := rec.Err(); err != nil {
+		t.Fatalf("error before the disk fails: %v", err)
+	}
+	rec.events.Close() // the disk fails
+	live.Set("/ch/12/mix/fader", osc.Float(0.7), "console")
+	if err := rec.Err(); err == nil {
+		t.Fatal("no error once the changes cannot be written")
+	}
+}

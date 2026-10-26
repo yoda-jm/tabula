@@ -324,4 +324,6 @@ engineer password, and sign out the devices signed in with it. See
 ## Connect
 
 Find the consoles on the network (a broadcast that X32/M32 consoles and
-`tabula-emu` answer) or type an address, connect and follow the sync.
+`tabula-emu` answer) or type an address, connect and follow the sync. A
+console that does not answer is asked again every few seconds (the page
+says why) until it does; connecting to another address replaces it.

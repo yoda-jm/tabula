@@ -65,6 +65,7 @@ type Recorder struct {
 	meta   Meta
 	cancel func()
 	closed bool
+	werr   error // the first error writing events.jsonl
 }
 
 // Start snapshots the store into dir (created, must not hold a session)
@@ -144,7 +145,22 @@ func (r *Recorder) record(changes []state.Change) {
 		}
 		r.writeEvent(e)
 	}
-	r.w.Flush() // keep the file usable if the program dies mid-show
+	r.flush() // keep the file usable if the program dies mid-show
+}
+
+// flush writes the events out, keeping the first error.
+func (r *Recorder) flush() {
+	if err := r.w.Flush(); err != nil && r.werr == nil {
+		r.werr = err
+	}
+}
+
+// Err returns the first error writing the changes (a full disk…): the
+// changes after it are lost.
+func (r *Recorder) Err() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.werr
 }
 
 func (r *Recorder) writeEvent(e Event) {
@@ -166,7 +182,7 @@ func (r *Recorder) Mark(label string) {
 		return
 	}
 	r.writeEvent(Event{T: time.Since(r.start).Seconds(), Marker: label})
-	r.w.Flush()
+	r.flush()
 }
 
 // Started is when the recording started: session times count from it.
@@ -233,6 +249,9 @@ type Session struct {
 	Meta   Meta
 	Start  []string // snapshot node lines (scene, then other nodes)
 	Events []Event  // in time order
+	// Damaged lists the lines of events.jsonl that could not be read, so
+	// their events are missing (the last line of a recording cut short).
+	Damaged []int
 }
 
 // Open loads a session directory.
@@ -266,13 +285,18 @@ func Open(dir string) (*Session, error) {
 	for n := 1; sc.Scan(); n++ {
 		var e Event
 		if err := json.Unmarshal(sc.Bytes(), &e); err != nil {
-			// A recording cut short may end with a partial line.
-			if n > 1 {
-				break
+			if n == 1 {
+				return nil, fmt.Errorf("events.jsonl line %d: %w", n, err)
 			}
-			return nil, fmt.Errorf("events.jsonl line %d: %w", n, err)
+			// A recording cut short may end with a partial line; a damaged
+			// line elsewhere loses that event only, not the ones after it.
+			s.Damaged = append(s.Damaged, n)
+			continue
 		}
 		s.Events = append(s.Events, e)
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("events.jsonl: %w", err)
 	}
 	sort.SliceStable(s.Events, func(i, j int) bool { return s.Events[i].T < s.Events[j].T })
 	if s.Meta.Duration == 0 && len(s.Events) > 0 {

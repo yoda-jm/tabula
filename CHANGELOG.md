@@ -75,6 +75,23 @@
   routing, local inputs a model does not have, recorded card tracks that
   carry nothing, 48 V on an input that feeds nothing, a mix that goes
   nowhere.
+- A console that does not answer when tabula connects (the laptop started
+  before the console or its Wi-Fi) is asked again every few seconds instead
+  of once: with `-record`, the show was not recorded at all. Connecting to
+  another address replaces a connection being made.
+- Disconnecting, or connecting to another console, during a recording no
+  longer freezes tabula for the seconds its files take to finish: they are
+  finished in the background, and the next recording waits for them.
+- **Start recording** during **Test the input** waits for the test to end:
+  the recording found the card busy and went on without its audio.
+- A full disk (or a disk pulled out) while recording is said on the Record
+  page and logged: the console's changes failed to be written without a
+  word. A session with a damaged line in its change log keeps the changes
+  after it (they were dropped), and the lines skipped are logged as an
+  error and listed (`damaged`).
+- The event stream sends a `ping` event every 5 s, so the GUI can tell a
+  stream that went silent; a browser too slow to take the events is told to
+  load the state again once it catches up (it stayed out of date).
 
 ### tabula-emu
 - The debug page says when a subscription expires (`in 8s`), not `-8s ago`.

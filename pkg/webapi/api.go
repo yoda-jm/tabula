@@ -103,13 +103,13 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	return s.protect(gzipJSON(s.guard(mux)))
 }
 
-// Connect connects to a console and starts syncing it (also used by -console).
+// Connect connects to a console and starts syncing it (also used by
+// -console). A console that does not answer is asked again until it does,
+// or until another address is chosen: a laptop started before the console
+// or its Wi-Fi still connects (and records with -record). Connecting again
+// replaces a connection being made (an address mistyped).
 func (s *Server) Connect(addr string) error {
 	s.mu.Lock()
-	if s.connecting {
-		s.mu.Unlock()
-		return errors.New("already connecting")
-	}
 	s.closeLocked()
 	s.connecting, s.lastErr = true, ""
 	ctx, cancel := context.WithCancel(context.Background())
@@ -119,18 +119,17 @@ func (s *Server) Connect(addr string) error {
 
 	go func() {
 		mirror := state.New(schema.Build(s.model))
-		dctx, dcancel := context.WithTimeout(ctx, 5*time.Second)
-		c, err := console.Dial(dctx, addr, mirror, s.log)
-		dcancel()
-		if err != nil {
-			s.mu.Lock()
-			s.connecting, s.lastErr = false, err.Error()
-			s.mu.Unlock()
-			s.publishStatus()
-			return
+		c := s.dial(ctx, addr, mirror)
+		if c == nil {
+			return // disconnected, or connecting elsewhere
 		}
 		s.mu.Lock()
-		s.client, s.mirror = c, mirror
+		if ctx.Err() != nil {
+			s.mu.Unlock()
+			c.Close()
+			return
+		}
+		s.client, s.mirror, s.lastErr = c, mirror, ""
 		s.mu.Unlock()
 		s.publishStatus()
 
@@ -143,6 +142,11 @@ func (s *Server) Connect(addr string) error {
 		})
 		unsub := mirror.Subscribe(s.publishChanges)
 		s.mu.Lock()
+		if ctx.Err() != nil || s.client != c { // disconnected while syncing
+			s.mu.Unlock()
+			unsub()
+			return
+		}
 		s.connecting, s.cancelSub = false, unsub
 		s.mu.Unlock()
 		s.publishStatus()
@@ -170,6 +174,34 @@ func (s *Server) Connect(addr string) error {
 	}()
 	return nil
 }
+
+// dial asks the console at addr until it answers (every second, then up to
+// every 10 s), saying why in the status meanwhile; nil once ctx is done.
+func (s *Server) dial(ctx context.Context, addr string, mirror *state.Store) *console.Client {
+	for wait := time.Second; ; wait = min(2*wait, dialRetryMax) {
+		dctx, dcancel := context.WithTimeout(ctx, 5*time.Second)
+		c, err := console.Dial(dctx, addr, mirror, s.log)
+		dcancel()
+		if err == nil {
+			return c
+		}
+		if ctx.Err() != nil {
+			return nil
+		}
+		s.mu.Lock()
+		s.lastErr = fmt.Sprintf("%v (asking again every %v)", err, wait)
+		s.mu.Unlock()
+		s.publishStatus()
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(wait):
+		}
+	}
+}
+
+// dialRetryMax is the longest wait between two tries to reach a console.
+var dialRetryMax = 10 * time.Second
 
 // RecordOnSync starts a recording as soon as a console is connected and synced.
 func (s *Server) RecordOnSync(on bool) {

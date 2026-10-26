@@ -34,6 +34,10 @@ type audioState struct {
 	savedAt time.Time
 	testing bool
 	source  func() (io.ReadCloser, error) // tests: replaces the recorder
+	// ending is closed once the recording ended on a disconnect has its
+	// files finished (in the background): until then its capture may hold
+	// the card, so a recording or a test starting waits for it
+	ending chan struct{}
 	// problems of the device of the running capture (audio.CheckDevice),
 	// shown as warnings of its status
 	problems []string
@@ -241,7 +245,7 @@ func (s *Server) endRecording(rec *session.Recorder, c *audio.Capture) (*audio.S
 	}
 	err := rec.Stop()
 	if last != nil && len(last.Tracks) > 0 {
-		ses, oerr := session.Open(rec.Dir())
+		ses, oerr := s.openSession(rec.Dir())
 		if oerr == nil {
 			oerr = ses.WriteExports()
 		}
@@ -252,17 +256,64 @@ func (s *Server) endRecording(rec *session.Recorder, c *audio.Capture) (*audio.S
 	return last, err
 }
 
-// endRecordingLocked ends the recording while s.mu is held (on disconnect).
+// endRecordingLocked ends the recording while s.mu is held (on disconnect,
+// or connecting to another console). Its files are finished in the
+// background, as that takes seconds and every request needs s.mu; see
+// audioState.ending.
 func (s *Server) endRecordingLocked() {
 	if s.rec == nil {
 		return
 	}
-	last, _ := s.endRecording(s.rec, s.audio.cap)
+	rec, c, prev := s.rec, s.audio.cap, s.audio.ending
 	s.rec, s.audio.cap = nil, nil
-	if last != nil {
-		s.audio.last = last
+	done := make(chan struct{})
+	s.audio.ending = done
+	go func() {
+		defer close(done)
+		if prev != nil {
+			<-prev
+		}
+		s.log.Info("recording stopped", "session", rec.Dir())
+		last, err := s.endRecording(rec, c)
+		if err != nil {
+			s.log.Error("recording", "err", err)
+		}
+		if last != nil {
+			s.mu.Lock()
+			s.audio.last = last
+			s.mu.Unlock()
+		}
+		s.publishRecord()
+	}()
+}
+
+// waitAudioFree waits for the card to be free (a recording ended on a
+// disconnect being finished, an input test running), 5 s at most.
+func (s *Server) waitAudioFree() error {
+	deadline := time.Now().Add(audioFreeWait)
+	for {
+		s.mu.Lock()
+		ending, testing := s.audio.ending, s.audio.testing
+		s.mu.Unlock()
+		if ending != nil {
+			select {
+			case <-ending:
+			case <-time.After(time.Until(deadline)):
+				return errors.New("the last recording is still being finished: try again in a few seconds")
+			}
+		}
+		if !testing {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return errors.New("the audio input is being tested: try again in a few seconds")
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
+
+// audioFreeWait is how long a recording or a test waits for the card.
+var audioFreeWait = 5 * time.Second
 
 // audioStatusLocked is the status of the capture running, or of the last
 // one; nil without audio.
@@ -434,6 +485,15 @@ func (s *Server) audioDevices(w http.ResponseWriter, r *http.Request) {
 // format, the levels of the tracks, or why it does not work. The body may
 // carry a configuration to try (default: the current one).
 func (s *Server) audioTest(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	ending := s.audio.ending
+	s.mu.Unlock()
+	if ending != nil {
+		select { // a recording ended on a disconnect may still hold the card
+		case <-ending:
+		case <-time.After(audioFreeWait):
+		}
+	}
 	s.audio.probeMu.Lock()
 	s.mu.Lock()
 	cfg := s.audio.cfg
@@ -493,7 +553,7 @@ func (s *Server) exportSession(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusNotFound, err)
 		return
 	}
-	ses, err := session.Open(dir)
+	ses, err := s.openSession(dir)
 	if err != nil {
 		httpError(w, http.StatusInternalServerError, err)
 		return

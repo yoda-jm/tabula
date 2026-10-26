@@ -51,8 +51,10 @@ Unattended, from the command line:
 tabula -console 192.168.1.62 -record -audio-device hw:CARD=X32,DEV=0 -audio-tracks 1-16,23-24
 ```
 
-`-record` starts recording once the console is synced; Ctrl-C stops the
-recording and finishes the files. The settings saved from the GUI are kept
+`-record` starts recording once the console is synced; a console that does
+not answer yet (the laptop started first, the Wi-Fi not up) is asked again
+every few seconds, and the recording starts as soon as it answers. Ctrl-C
+stops the recording and finishes the files. The settings saved from the GUI are kept
 in `<sessions>/audio.json` and used by every later run; flags given on the
 command line override them for that run.
 
@@ -194,6 +196,10 @@ hard to miss.
 - **Saving** refuses more channels than the card has: 32 channels from the
   laptop's 2-input card is said at once, under *Channels of the device*,
   with the console's card to choose instead when it is connected.
+- **Start recording** waits for **Test the input** to end when it runs (the
+  card can only be opened once: the recording would find it busy and go on
+  without its audio), and for a recording ended by a disconnect to finish
+  its files.
 - **Start recording** asks first when the audio settings were changed on the
   page and not saved: **Save and start** (a device picked in **Find
   devices** is then the one recorded), **Discard them and start** (the
@@ -227,6 +233,25 @@ devices** but not saved, so the recording used the laptop's card and its
 audio failed at once (*Channels count non available*). The failure only
 showed as a ⚠ next to REC and further down the page, and the show was
 recorded without its audio.
+
+## When the console's changes are not recorded
+
+The console's changes go to `events.jsonl` as they come. If that file cannot
+be written (a full disk, a USB disk pulled out), the Record page says so
+while recording (*the console's changes cannot be written…*) and `tabula`
+logs an error: the changes after it are lost, the audio goes on. A session
+whose `events.jsonl` has lines that do not read (the last line of a
+recording cut short by a power cut, a damaged file) still opens without
+them: `tabula` logs an error naming the lines, and `GET
+/api/sessions/{name}` lists them (`damaged`).
+
+## Disconnecting during a recording
+
+**Disconnect**, or connecting to another console, ends the recording, with
+its audio: the session is finished in the background (the files take a
+few seconds) and the next recording waits for it. A console lost on the
+way (Wi-Fi) does not end it: `tabula` connects again by itself and the
+recording goes on.
 
 ## How the tracks line up with the session
 
