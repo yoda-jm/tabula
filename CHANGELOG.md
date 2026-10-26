@@ -141,6 +141,13 @@
 - A name holding double quotes (`Vox "Lead"`) no longer breaks the scene
   files tabula writes and reads (sessions, scene files): node text has no
   escape for it, so it is written with an apostrophe.
+- Channel page: drag the EQ bands on the curve (sideways for the
+  frequency, up and down for the gain; the wheel or Page Up/Down for the
+  Q; the arrow keys), and the preamp low cut by its **LC** handle. The
+  selected band is named with its values on the curve and highlighted
+  below; on a phone the drawing is taller and a touch on a handle drags it
+  instead of scrolling. The slope of a low cut now runs out of the drawing
+  instead of lying flat along its bottom edge, as if it stopped at -18 dB.
 - Stopping a recording and starting another within the same second failed
   (*already holds a session*): the second one is named `…-2`. A console
   change arriving while a recording starts no longer races with the

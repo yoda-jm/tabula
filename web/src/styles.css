@@ -1094,15 +1094,52 @@ div.scribble {
 .eq-fill.off {
   fill: rgba(120, 128, 140, 0.08);
 }
+.eq-handle {
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+}
+.eq-handle.ro {
+  cursor: default;
+}
 .eq-handle circle {
   fill: #0b0d11;
   stroke: var(--accent);
   stroke-width: 2;
 }
+.eq-handle circle.eq-hit {
+  fill: transparent;
+  stroke: none;
+}
+.eq-handle.lc circle:not(.eq-hit) {
+  stroke: #8fb4ff;
+}
+.eq-handle.dim circle:not(.eq-hit) {
+  stroke: #5a6170;
+}
+.eq-handle.sel circle:not(.eq-hit) {
+  fill: var(--accent);
+}
+.eq-handle.lc.sel circle:not(.eq-hit) {
+  fill: #8fb4ff;
+}
+.eq-handle:focus-visible circle:not(.eq-hit) {
+  stroke: var(--text);
+  stroke-width: 3;
+}
 .eq-handle text {
   fill: var(--text);
   font-size: 11px;
   font-weight: 700;
+  pointer-events: none;
+}
+.eq-handle.sel text {
+  fill: #0b0d11;
+}
+.eq-readout {
+  fill: var(--text);
+  font-family: var(--mono);
+  pointer-events: none;
 }
 .eq-rta rect {
   fill: rgba(79, 216, 190, 0.22);
@@ -1124,6 +1161,15 @@ div.scribble {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 6px 18px;
+}
+.band {
+  border-radius: 6px;
+  padding: 0 6px;
+  margin: 0 -6px;
+}
+.band.sel {
+  background: rgba(242, 179, 61, 0.08);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .band h4 {
   margin-top: 4px;

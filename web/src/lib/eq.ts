@@ -120,3 +120,24 @@ export function response(bands: Band[], freqs: number[], extra: ((f: number) => 
     return db;
   });
 }
+
+/** A plot of a response: frequencies on a log axis, dB on a linear one, ±range dB in view. */
+export interface Plot {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  fLo: number;
+  fHi: number;
+  range: number;
+}
+
+export const plotX = (p: Plot, f: number) => p.left + ((p.right - p.left) * Math.log(f / p.fLo)) / Math.log(p.fHi / p.fLo);
+export const plotFreq = (p: Plot, x: number) => p.fLo * Math.pow(p.fHi / p.fLo, (x - p.left) / (p.right - p.left));
+
+/** plotY is not clamped to the range: what is out of it is drawn out of the plot (and clipped). */
+export const plotY = (p: Plot, db: number) => p.top + ((p.bottom - p.top) * (p.range - db)) / (2 * p.range);
+export const plotDb = (p: Plot, y: number) => p.range - (2 * p.range * (y - p.top)) / (p.bottom - p.top);
+
+/** hasGain is true for the band types with a gain (a handle drags it up and down). */
+export const hasGain = (type: string) => type === "PEQ" || type === "VEQ" || type === "LShv" || type === "HShv";

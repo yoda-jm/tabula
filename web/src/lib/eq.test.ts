@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bandDb, butterworthDb, logFrequencies, response } from "./eq";
+import { bandDb, butterworthDb, hasGain, logFrequencies, plotDb, plotFreq, plotX, plotY, response } from "./eq";
 
 describe("EQ responses", () => {
   it("a PEQ reaches its gain at its frequency and is flat far away", () => {
@@ -52,5 +52,22 @@ describe("EQ responses", () => {
     expect(f[0]).toBeCloseTo(10, 9);
     expect(f[1]).toBeCloseTo(100, 9);
     expect(f[3]).toBeCloseTo(10000, 6);
+  });
+
+  it("places frequencies and gains on the plot, and back", () => {
+    const p = { left: 34, right: 900, top: 0, bottom: 222, fLo: 20, fHi: 20000, range: 18 };
+    expect(plotX(p, 20)).toBeCloseTo(34, 6);
+    expect(plotX(p, 20000)).toBeCloseTo(900, 6);
+    expect(plotY(p, 18)).toBeCloseTo(0, 6);
+    expect(plotY(p, 0)).toBeCloseTo(111, 6);
+    for (const f of [20, 63, 1000, 12500]) expect(plotFreq(p, plotX(p, f))).toBeCloseTo(f, 6);
+    for (const db of [-15, -2.5, 0, 7.25]) expect(plotDb(p, plotY(p, db))).toBeCloseTo(db, 6);
+    // a low cut's slope is not clamped: it runs out of the plot
+    expect(plotY(p, -40)).toBeGreaterThan(p.bottom);
+  });
+
+  it("knows which bands have a gain", () => {
+    expect(["PEQ", "VEQ", "LShv", "HShv"].every(hasGain)).toBe(true);
+    expect(["LCut", "HCut", "BU12", "LR24"].some(hasGain)).toBe(false);
   });
 });

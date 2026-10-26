@@ -1,5 +1,6 @@
 // The selected strip in detail: only the sections its type has.
 
+import { useState } from "react";
 import { EqCurve } from "../components/EqCurve";
 import { useRtaWindow } from "../components/Geq";
 import { Headamp } from "../components/Headamp";
@@ -183,14 +184,22 @@ function EqSection({ strip }: { strip: Strip }) {
   const cur = src === undefined ? -1 : Number(src.value);
   const here = idx !== null && cur >= 0 && cur % RTA_POST === idx;
   const win = useRtaWindow();
+  const [sel, setSel] = useState<string | null>(null); // the handle selected on the curve
   return (
     <Section title="EQ" on={`${strip.path}/eq/on`} className="eq">
       {/* the curve subscribes to the RTA itself: its ~20 updates a second re-render only the bars */}
-      <EqCurve strip={strip.path} bands={bands} eqOn={on ? Number(on.value) === 1 : true} rtaWindow={here ? win : undefined} />
+      <EqCurve
+        strip={strip.path}
+        bands={bands}
+        eqOn={on ? Number(on.value) === 1 : true}
+        rtaWindow={here ? win : undefined}
+        selected={sel}
+        onSelect={setSel}
+      />
       {idx !== null && <RtaPicker source={idx} current={cur} />}
       <div className="bands">
         {bands.map((b, i) => (
-          <div key={b} className="band">
+          <div key={b} className={"band" + (sel === String(i + 1) ? " sel" : "")}>
             <h4>Band {i + 1}</h4>
             <Fields path={b} only={["type", "f", "g", "q"]} />
           </div>

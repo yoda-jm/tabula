@@ -71,7 +71,23 @@ names, DCA and mute groups, automix. Only the sections the strip has are
 shown. The EQ comes right after the preamp, so its curve is on screen when
 the page opens; the other sections fill balanced columns.
 
-![A vocal channel: the EQ with the RTA after the EQ behind its curve](img/channel.png)
+![A vocal channel: the EQ with the RTA after the EQ behind its curve, band 3 selected](img/channel.png)
+
+**EQ curve.** Each band has a numbered handle on the curve: drag it
+sideways for its frequency, up and down for its gain (the cuts and the
+crossover types have no gain: they only move sideways). A drag is relative,
+so touching a handle a little off never makes the band jump; Shift drags
+finely. The handle selected is filled, its band's fields below are
+highlighted, and its values are written at the top left of the curve; the
+mouse wheel over it, or Page Up/Down, changes its Q (Q is in the band's
+fields too, for a phone). A focused handle also moves with the arrow keys
+(Shift: by the smallest step). When the preamp low cut is on, the **LC**
+handle moves its frequency. A gain band's handle sits at its frequency and
+gain; the others sit on the curve. The curve shows ±18 dB: what goes
+further, such as the slope of a low cut, runs out of the drawing. On a
+phone the drawing is taller, so the handles stay big enough to drag, and a
+touch on a handle drags it instead of scrolling the page. Writes must be
+armed (or the in-ear access must cover the strip).
 
 **RTA.** When the console's RTA listens to the strip, its spectrum is
 drawn behind the EQ curve. Two buttons under the curve point the RTA at this
