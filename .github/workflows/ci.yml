@@ -27,6 +27,22 @@ jobs:
       - name: go test
         run: go test -race -count=1 ./...
 
+  # tabula is released for macOS and Windows too: their tests run there
+  test-os:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: git config --global core.autocrlf false # the scene files in testdata keep their line feeds
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: go test
+        run: go test -count=1 ./...
+
   web:
     runs-on: ubuntu-latest
     defaults:
@@ -39,8 +55,11 @@ jobs:
           node-version-file: web/.nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-go@v5 # the page tests render the pages from what tabula serves (go run ./web/fixture)
+        with:
+          go-version-file: go.mod
       - run: npm ci
-      - name: unit tests
+      - name: unit and page tests
         run: npm test -- --run
       - name: build
         run: npm run build

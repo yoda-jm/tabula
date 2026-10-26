@@ -85,7 +85,7 @@ and open <http://localhost:8033>. tabula starts **read-only**: arm writes
 
 ```sh
 make build   # cd web && npm ci && npm run build, then go build -o bin/ ./cmd/...
-make test    # go test ./... and the GUI unit tests
+make test    # go test ./... and the GUI tests (they run go run ./web/fixture: every page is rendered from the demo show)
 make dev     # emulator + tabula + Vite dev server with hot reload (http://localhost:5173)
 ```
 

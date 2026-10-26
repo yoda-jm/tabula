@@ -159,6 +159,13 @@
   version (`version` in the status), and a page left open while tabula was
   updated asks to be reloaded. A build from a git clone names its commit
   (`tabula -version`: `dev 9f91019`), for tabula-emu too.
+- Tests: every page of the GUI is rendered from what tabula serves for the
+  demo show on an emulated console (every strip on the Channel page, every
+  FX slot and in-ear mix, a musician's phone, a viewer): a page that throws,
+  shows NaN or undefined, or makes React warn fails the tests. tabula's
+  start-up is tested too (its flags, the log file, `-reset-password`, and
+  `-console -record` against an emulator, stopped as by Ctrl-C), and the Go
+  tests run on macOS and Windows as well as Linux.
 - Stopping a recording and starting another within the same second failed
   (*already holds a session*): the second one is named `…-2`. A console
   change arriving while a recording starts no longer races with the
