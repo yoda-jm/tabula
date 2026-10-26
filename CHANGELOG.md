@@ -103,6 +103,27 @@
   and stop, `/-action/playtrack` previous/next, folder mode
   (`/config/tape/autoplay`) and unmounting. No sound, and no recording to
   the stick (logged as unhandled). `testdata/usb` is a small demo stick.
+- Hardened against bad packets (a code review found them): one
+  `/formatsubscribe` with a huge number range hung the emulator and ran it
+  out of memory (ranges are now limited to 1000 numbers, 1024 parameters);
+  a crafted blob crashed the OSC decoder on 32-bit builds (linux/arm), the
+  tabula client's discovery included; string arguments past the end of a
+  packet read as thousands of empty ones. Traffic entries and unhandled
+  requests are kept to 512 bytes, unhandled kinds to 1000, a client to 64
+  subscriptions, and clients idle for a minute (without subscription or
+  `/xremote`) are forgotten.
+- `/` text with a line feed inside (or another control character) is
+  refused: it added lines to the scene files written later. Effect
+  parameter text kept verbatim no longer outlives a change of one of its
+  parameters.
+- `/renew meters/5` (the document's own example) and `/unsubscribe
+  /meters/6` find their meter subscriptions again: those meters stopped
+  after 10 s.
+- Sends from the FX returns to the buses reach the bus meters (a reverb in
+  an in-ear bus).
+- Frequencies at the top of their range read `20k00`, not `19k99`.
+- Meter subscriptions served together share one computation of the mix: a
+  quarter of a core with M32-Edit's subscriptions before.
 
 ### Docs
 - Screenshots of tabula (mixer, channel, phone) and of the emulator's
