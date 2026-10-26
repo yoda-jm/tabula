@@ -13,10 +13,12 @@ import (
 )
 
 // Subscriptions (/meters, /subscribe, /formatsubscribe, /batchsubscribe)
-// last 10 s unless renewed; updates are sent every 50 ms × time factor.
+// last 10 s unless renewed; updates are sent every 50 ms × time factor. A
+// client holds at most maxSubs of them at once.
 const (
 	subLease = 10 * time.Second
 	subTick  = 50 * time.Millisecond
+	maxSubs  = 64
 )
 
 type subscription struct {
@@ -26,7 +28,22 @@ type subscription struct {
 	interval time.Duration
 	expires  time.Time
 	next     time.Time
-	produce  func(now time.Time) (osc.Message, bool)
+	produce  func(t *tick) (osc.Message, bool)
+}
+
+// tick is one round of updates: the subscriptions served at the same time
+// share the meter levels, computed once, when the first of them needs them.
+type tick struct {
+	s   *Server
+	now time.Time
+	lv  *mixLevels
+}
+
+func (t *tick) levels() *mixLevels {
+	if t.lv == nil {
+		t.lv = t.s.levels(t.now)
+	}
+	return t.lv
 }
 
 // Subscription is the debug view of an active subscription.
@@ -43,20 +60,46 @@ type subscriptions struct {
 	list []*subscription
 }
 
-func (ss *subscriptions) add(s *subscription) {
+// add starts s, refused when its client already holds maxSubs live
+// subscriptions.
+func (ss *subscriptions) add(s *subscription) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
-	// A new request for the same name replaces the previous one.
+	live := 0
 	for i, o := range ss.list {
-		if o.client == s.client && o.name == s.name {
+		if o.client != s.client {
+			continue
+		}
+		// A new request for the same name replaces the previous one.
+		if o.name == s.name {
 			ss.list[i] = s
-			return
+			return nil
+		}
+		if o.expires.After(s.next) { // s.next is now: a subscription starts at once
+			live++
 		}
 	}
+	if live >= maxSubs {
+		return fmt.Errorf("%d subscriptions already, the most a client can hold", maxSubs)
+	}
 	ss.list = append(ss.list, s)
+	return nil
 }
 
-func sameName(a, b string) bool { return strings.TrimPrefix(a, "/") == strings.TrimPrefix(b, "/") }
+// matches reports whether a /renew or /unsubscribe naming name concerns s.
+// The leading slash is optional (the document's example has none), and a
+// meter subscription also answers to its address alone: "/meters/6" for the
+// one named "/meters/6 16".
+func (s *subscription) matches(name string) bool {
+	if name == "" {
+		return true
+	}
+	own, name := strings.TrimPrefix(s.name, "/"), strings.TrimPrefix(name, "/")
+	if addr, _, _ := strings.Cut(own, " "); s.kind == "meters" && addr == name {
+		return true
+	}
+	return own == name
+}
 
 // renew extends the client's subscriptions named name, or all of them.
 func (ss *subscriptions) renew(c *Client, name string, now time.Time) int {
@@ -64,7 +107,7 @@ func (ss *subscriptions) renew(c *Client, name string, now time.Time) int {
 	defer ss.mu.Unlock()
 	n := 0
 	for _, s := range ss.list {
-		if s.client == c && (name == "" || sameName(s.name, name)) && s.expires.After(now) {
+		if s.client == c && s.matches(name) && s.expires.After(now) {
 			s.expires = now.Add(subLease)
 			n++
 		}
@@ -77,7 +120,7 @@ func (ss *subscriptions) remove(c *Client, name string) {
 	defer ss.mu.Unlock()
 	kept := ss.list[:0]
 	for _, s := range ss.list {
-		if s.client == c && (name == "" || sameName(s.name, name)) {
+		if s.client == c && s.matches(name) {
 			continue
 		}
 		kept = append(kept, s)
@@ -108,6 +151,19 @@ func (ss *subscriptions) due(now time.Time) []*subscription {
 	return out
 }
 
+// clients returns the clients holding a live subscription.
+func (ss *subscriptions) clients(now time.Time) map[*Client]bool {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	out := map[*Client]bool{}
+	for _, s := range ss.list {
+		if s.expires.After(now) {
+			out[s.client] = true
+		}
+	}
+	return out
+}
+
 func (ss *subscriptions) view() []Subscription {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
@@ -126,8 +182,9 @@ func (s *Server) runSubscriptions(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case now := <-t.C:
+			tk := &tick{s: s, now: now}
 			for _, sub := range s.subs.due(now) {
-				if m, ok := sub.produce(now); ok {
+				if m, ok := sub.produce(tk); ok {
 					s.sendQuiet(sub.client, m)
 				}
 			}
@@ -182,13 +239,12 @@ func (s *Server) meters(m osc.Message, c *Client) error {
 		name += fmt.Sprintf(" %d", p)
 	}
 	now := time.Now()
-	s.subs.add(&subscription{
+	return s.subs.add(&subscription{
 		client: c, name: name, kind: "meters", interval: interval(tf), expires: now.Add(subLease), next: now,
-		produce: func(now time.Time) (osc.Message, bool) {
-			return osc.NewMessage(addr, osc.Blob(meterBlob(s.meterValues(id, params, now)))), true
+		produce: func(t *tick) (osc.Message, bool) {
+			return osc.NewMessage(addr, osc.Blob(meterBlob(s.meterValues(id, params, t.levels(), t.now)))), true
 		},
 	})
-	return nil
 }
 
 func meterID(path string) (int, error) {
@@ -224,9 +280,9 @@ func (s *Server) subscribe(m osc.Message, c *Client) error {
 		tf = m.Args[1].Int
 	}
 	now := time.Now()
-	s.subs.add(&subscription{
+	return s.subs.add(&subscription{
 		client: c, name: addr, kind: "subscribe", interval: interval(tf), expires: now.Add(subLease), next: now,
-		produce: func(time.Time) (osc.Message, bool) {
+		produce: func(*tick) (osc.Message, bool) {
 			v, l, err := s.store.Get(addr)
 			if err != nil {
 				return osc.Message{}, false
@@ -234,8 +290,15 @@ func (s *Server) subscribe(m osc.Message, c *Client) error {
 			return osc.NewMessage(l.Addr, v), true
 		},
 	})
-	return nil
 }
+
+// The widest range a /formatsubscribe pattern can take (the console's widest,
+// the USB stick listing /-usb/dir/001…999), and the most parameters it can
+// return: their 32-byte strings still fit in one packet.
+const (
+	maxFormatRange  = 1000
+	maxFormatParams = 1024
+)
 
 // formatSubscribe handles "/formatsubscribe ,ss[s…]iii <alias> <cmd>… <i0> <i1> <tf>";
 // runs of '*' in a command take each number of [i0, i1], zero-padded.
@@ -249,6 +312,16 @@ func (s *Server) formatSubscribe(m osc.Message, c *Client) error {
 	}
 	alias := ""
 	var addrs []string
+	add := func(a string) error {
+		if s.store.Schema().Leaf(a) == nil {
+			return fmt.Errorf("unknown parameter %s", a)
+		}
+		if len(addrs) == maxFormatParams {
+			return fmt.Errorf("more than %d parameters", maxFormatParams)
+		}
+		addrs = append(addrs, a)
+		return nil
+	}
 	for i, a := range m.Args[:len(m.Args)-3] {
 		if a.Tag != 's' {
 			return fmt.Errorf("argument %d must be a string", i+1)
@@ -258,22 +331,27 @@ func (s *Server) formatSubscribe(m osc.Message, c *Client) error {
 			continue
 		}
 		if !strings.Contains(a.Str, "*") {
-			addrs = append(addrs, a.Str)
+			if err := add(a.Str); err != nil {
+				return err
+			}
 			continue
 		}
-		for n := ints[0]; n <= ints[1]; n++ {
-			addrs = append(addrs, expandStars(a.Str, n))
+		// The range is counted in 64 bits: an int32 loop up to 2147483647
+		// would never end.
+		lo, hi := int64(ints[0]), int64(ints[1])
+		if hi < lo || hi-lo >= maxFormatRange {
+			return fmt.Errorf("range %d to %d: expects at most %d numbers, in order", lo, hi, maxFormatRange)
 		}
-	}
-	for _, a := range addrs {
-		if s.store.Schema().Leaf(a) == nil {
-			return fmt.Errorf("unknown parameter %s", a)
+		for n := lo; n <= hi; n++ {
+			if err := add(expandStars(a.Str, int32(n))); err != nil {
+				return err
+			}
 		}
 	}
 	now := time.Now()
-	s.subs.add(&subscription{
+	return s.subs.add(&subscription{
 		client: c, name: alias, kind: "formatsubscribe", interval: interval(ints[2]), expires: now.Add(subLease), next: now,
-		produce: func(time.Time) (osc.Message, bool) {
+		produce: func(*tick) (osc.Message, bool) {
 			body := make([]byte, 4, 4+4*len(addrs))
 			for _, a := range addrs {
 				v, _, _ := s.store.Get(a)
@@ -292,7 +370,6 @@ func (s *Server) formatSubscribe(m osc.Message, c *Client) error {
 			return osc.NewMessage(alias, osc.Blob(body)), true
 		},
 	})
-	return nil
 }
 
 func expandStars(pattern string, n int32) string {
@@ -320,11 +397,10 @@ func (s *Server) batchSubscribe(m osc.Message, c *Client) error {
 	}
 	params := ints[:meterArgCount[id]]
 	now := time.Now()
-	s.subs.add(&subscription{
+	return s.subs.add(&subscription{
 		client: c, name: alias, kind: "batchsubscribe", interval: interval(ints[2]), expires: now.Add(subLease), next: now,
-		produce: func(now time.Time) (osc.Message, bool) {
-			return osc.NewMessage(alias, osc.Blob(meterBlob(s.meterValues(id, params, now)))), true
+		produce: func(t *tick) (osc.Message, bool) {
+			return osc.NewMessage(alias, osc.Blob(meterBlob(s.meterValues(id, params, t.levels(), t.now)))), true
 		},
 	})
-	return nil
 }

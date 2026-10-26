@@ -2,12 +2,14 @@ package emu
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/yoda-jm/tabula/pkg/osc"
 )
@@ -19,6 +21,30 @@ const (
 	ReasonRejected      = "rejected"
 	ReasonMalformed     = "malformed packet"
 )
+
+// maxText bounds the text kept for one packet of the traffic log and for
+// each field of an unhandled request: a packet can carry 64 kB.
+const maxText = 512
+
+// clip shortens s to at most maxText bytes, cutting between two characters
+// and marking the cut with an ellipsis.
+func clip(s string) string {
+	if len(s) <= maxText {
+		return s
+	}
+	n := maxText - len("…")
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n] + "…"
+}
+
+// maxKinds bounds the kinds of unhandled requests kept, as clients choose
+// the addresses: past it, requests of a new kind are counted together under
+// the address "<other>".
+const maxKinds = 1000
+
+const otherKind = "\x00other" // its key: the others start with a reason
 
 // Unhandled aggregates one kind of request the emulator could not serve.
 type Unhandled struct {
@@ -56,22 +82,35 @@ func (u *Unhandleds) Record(m osc.Message, client, reason, detail string) {
 		for i, a := range m.Args {
 			parts[i] = a.String()
 		}
-		args = strings.Join(parts, " ")
+		args = clip(strings.Join(parts, " "))
 	}
-	key := reason + "\x00" + m.Address + "\x00" + m.Tags()
+	addr, tags, detail := clip(m.Address), clip(m.Tags()), clip(detail)
+	key := reason + "\x00" + addr + "\x00" + tags
 	if reason == ReasonRejected {
 		key += "\x00" + detail
 	}
 
 	u.mu.Lock()
 	k := u.kinds[key]
+	other := k == nil && len(u.kinds) >= maxKinds
+	if other {
+		k = u.kinds[otherKind]
+	}
 	first := k == nil
-	if first {
-		k = &Unhandled{Address: m.Address, Tags: m.Tags(), Reason: reason, Detail: detail, First: now}
+	switch {
+	case first && other:
+		k = &Unhandled{Address: "<other>", Reason: "various",
+			Detail: fmt.Sprintf("kinds past the first %d, counted together", maxKinds), First: now}
+		u.kinds[otherKind] = k
+	case first:
+		k = &Unhandled{Address: addr, Tags: tags, Reason: reason, Detail: detail, First: now}
 		u.kinds[key] = k
 	}
 	k.Count++
 	k.Last, k.LastClient, k.LastArgs = now, client, args
+	if other {
+		k.LastArgs = clip(strings.Join([]string{reason + ":", addr, tags, args}, " "))
+	}
 	if u.jsonl != nil {
 		line, _ := json.Marshal(struct {
 			Time    time.Time `json:"time"`
@@ -81,16 +120,19 @@ func (u *Unhandleds) Record(m osc.Message, client, reason, detail string) {
 			Args    string    `json:"args,omitempty"`
 			Reason  string    `json:"reason"`
 			Detail  string    `json:"detail,omitempty"`
-		}{now, client, m.Address, m.Tags(), args, reason, detail})
+		}{now, client, addr, tags, args, reason, detail})
 		u.jsonl.Write(append(line, '\n'))
 	}
 	u.mu.Unlock()
 
-	if first {
-		u.log.Warn("unhandled request", "reason", reason, "address", m.Address, "tags", m.Tags(),
+	switch {
+	case first && other:
+		u.log.Warn("too many kinds of unhandled requests, the new ones are counted together", "kinds", maxKinds)
+	case first:
+		u.log.Warn("unhandled request", "reason", reason, "address", addr, "tags", tags,
 			"args", args, "detail", detail, "client", client)
-	} else {
-		u.log.Debug("unhandled request", "reason", reason, "address", m.Address, "client", client)
+	default:
+		u.log.Debug("unhandled request", "reason", reason, "address", addr, "client", client)
 	}
 }
 
@@ -130,6 +172,7 @@ type traffic struct {
 func newTraffic(size int) *traffic { return &traffic{ring: make([]Packet, max(size, 1))} }
 
 func (t *traffic) add(p Packet) {
+	p.Text = clip(p.Text)
 	t.mu.Lock()
 	t.ring[t.next] = p
 	t.next = (t.next + 1) % len(t.ring)

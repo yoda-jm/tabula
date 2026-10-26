@@ -23,6 +23,22 @@ This page says what is simulated, how, and what is not.
   with several values, `/xremote`: a change is pushed to the other clients.
   Changes the console makes itself (linked partners, status values) are
   pushed to every client, the one that caused them included.
+- Node text sent with `/` is one line: the line feed M32-Edit leaves at its
+  end is accepted, a line feed inside it or any other control character is
+  refused. Effect parameters whose text does not parse are kept as text, so
+  that scenes still round-trip, until one of them is set.
+- Subscriptions (`/meters`, `/subscribe`, `/formatsubscribe`,
+  `/batchsubscribe`) last 10 s unless renewed. `/renew` and `/unsubscribe`
+  take the alias or the command, with or without its leading slash; a meter
+  subscription also answers to its address alone (`/renew ,s meters/5`
+  renews `/meters/5 3 1`). A client holds at most 64 subscriptions; a
+  `/formatsubscribe` range covers at most 1000 numbers, every address it
+  gives must exist, and a request returns at most 1024 parameters.
+- Requests the emulator refuses or does not know are logged as unhandled.
+  It keeps up to 1000 kinds of them (the next ones are counted together as
+  `<other>`), and the first 512 bytes of each packet's text. A client is
+  forgotten a minute after its last request, once it holds no subscription
+  or `/xremote` lease.
 - Status the console computes: `/-stat/solo`, `/-insert` (where each effect
   is inserted), `/-ha/NN/index` (headamp feeding each channel, from its
   source and the input routing), `/-stat/rtasource` (from
@@ -35,7 +51,8 @@ This page says what is simulated, how, and what is not.
 
 ## Audio flow (meters)
 
-Each meter frame is computed from the current parameters:
+Each meter frame is computed from the current parameters, once for all the
+meter subscriptions served at the same moment:
 
 1. **Inputs.** Every channel with an input source gets a signal breathing
    between about −42 and −14 dBFS, different for each channel. Aux inputs
@@ -49,7 +66,9 @@ Each meter frame is computed from the current parameters:
    assigned to the main L/R feeds it.
 5. **FX returns.** FX slots 1-4 fed from a bus (`/fx/N/source`) return half
    of that bus's level into FX returns 1-8; their strips then work like
-   channels (fader, mute, sends, L/R).
+   channels (fader, mute, sends, L/R). Their sends add to the buses after
+   the effects took their source, so an effect does not hear its own
+   return.
 6. **Mains.** Channels and buses assigned to L/R add up there, and to the
    mono bus through their mono level; then dynamics, mute and fader.
 7. **Matrices.** Fed by their sends from L/R, mono and the buses; then

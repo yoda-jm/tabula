@@ -147,24 +147,30 @@ func (s *Server) levels(now time.Time) *mixLevels {
 			}
 		}
 	}
-	finishBuses := func() {
+	buses := func() {
 		for b := 0; b < 16; b++ {
 			p := fmt.Sprintf("/bus/%02d", b+1)
 			x := math.Sqrt(busPow[b])
 			lv.busIn[b] = x
 			gate, comp := r.dynamics(p, x)
 			lv.busGR[b] = gate * comp
+			lv.bus[b] = 0
 			if r.on(p + "/mix/on") {
 				lv.bus[b] = x * lv.busGR[b] * r.gain(p+"/mix/fader")
 			}
-			if r.on(p + "/mix/st") {
-				mainPow += lv.bus[b] * lv.bus[b]
-			}
 		}
 	}
+	// The effects take the buses fed by the inputs; the FX returns' sends
+	// then add to the buses, without going round the effects again.
 	pass(0, 40)
-	finishBuses()
+	buses()
 	pass(40, 48)
+	buses()
+	for b := 0; b < 16; b++ {
+		if r.on(fmt.Sprintf("/bus/%02d/mix/st", b+1)) {
+			mainPow += lv.bus[b] * lv.bus[b]
+		}
+	}
 
 	x := math.Sqrt(mainPow)
 	lv.mainIn = x
@@ -241,9 +247,8 @@ func outputLevel(lv *mixLevels, src int) float64 {
 func f32(v float64) uint32 { return math.Float32bits(float32(v)) }
 
 // meterValues returns the values of /meters/<id> (as float32 bits, or packed
-// shorts for meters 15 and 16).
-func (s *Server) meterValues(id int, params []int32, now time.Time) []uint32 {
-	lv := s.levels(now)
+// shorts for meters 15 and 16) from the levels lv computed at now.
+func (s *Server) meterValues(id int, params []int32, lv *mixLevels, now time.Time) []uint32 {
 	r := reader{s}
 	var out []uint32
 	add := func(v ...float64) {

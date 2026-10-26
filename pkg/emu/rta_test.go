@@ -12,7 +12,7 @@ import (
 // rtaAt decodes /meters/15 at now into dB per band.
 func rtaAt(t *testing.T, s *Server, now time.Time) [rtaBands]float64 {
 	t.Helper()
-	v := s.meterValues(15, nil, now)
+	v := s.meterValues(15, nil, s.levels(now), now)
 	if len(v) != rtaBands/2 {
 		t.Fatalf("%d RTA values, want %d", len(v), rtaBands/2)
 	}

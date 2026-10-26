@@ -111,3 +111,34 @@ func TestEffectParameters(t *testing.T) {
 		t.Errorf("default pre delay: %q", got)
 	}
 }
+
+// Text kept verbatim for an effect gives way to its values once one of them
+// is set, even to the value it had. Text with control characters is never
+// kept: it is written back as one line of a scene file.
+func TestVerbatimTextGivesWay(t *testing.T) {
+	st := New(schema.Build("M32C"))
+	n := st.Schema().Node("/fx/1/par")
+	for _, set := range []float32{0.9, 0.9} {
+		if _, err := st.ApplyText("/fx/1/par 50 bogus", "test"); err == nil {
+			t.Fatal("bad text accepted")
+		}
+		if got := st.NodeLine(n); got != "/fx/1/par 50 bogus" {
+			t.Fatalf("verbatim: %q", got)
+		}
+		if _, err := st.Set("/fx/1/par/01", osc.Float(set), "test"); err != nil {
+			t.Fatal(err)
+		}
+		if got := st.NodeLine(n); strings.Contains(got, "bogus") {
+			t.Errorf("after a set: %q", got)
+		}
+	}
+	want := st.NodeLine(n)
+	for _, text := range []string{"/fx/1/par 50 bogus\n/ch/01/mix OFF", "/fx/1/par 50\tbogus", "/fx/1/par 50 bogus\x00"} {
+		if _, err := st.ApplyText(text, "test"); err == nil {
+			t.Errorf("%q accepted", text)
+		}
+		if got := st.NodeLine(n); got != want {
+			t.Errorf("%q kept: %q", text, got)
+		}
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/schema"
@@ -32,7 +33,8 @@ type Store struct {
 	mu   sync.RWMutex
 	vals map[*schema.Node][]osc.Arg
 	// raw keeps the verbatim text of variant nodes that are not modelled for
-	// their current selector, or whose text did not parse.
+	// their current selector, or whose text did not parse, until one of their
+	// parameters is set.
 	raw map[*schema.Node]string
 
 	subMu  sync.Mutex
@@ -233,8 +235,13 @@ func (st *Store) applyTextLocked(text, origin string) ([]Change, error) {
 	if n == nil {
 		return nil, fmt.Errorf("unknown node %s", path)
 	}
+	// Verbatim text is written back as one line of a scene file.
+	verbatim := !strings.ContainsFunc(rest, unicode.IsControl)
 	fs, ok := st.fieldsLocked(n)
 	if !ok {
+		if !verbatim {
+			return nil, fmt.Errorf("%s: control characters in node text", n.Path)
+		}
 		st.raw[n] = rest
 		return nil, nil
 	}
@@ -246,13 +253,12 @@ func (st *Store) applyTextLocked(text, origin string) ([]Change, error) {
 	}
 	vals, err := schema.ParseFields(n.Path, fs, toks)
 	if err != nil {
-		if n.Variant != nil {
+		if n.Variant != nil && verbatim {
 			st.raw[n] = rest // keep the text so scenes still round-trip
 			return nil, fmt.Errorf("%w (kept as text)", err)
 		}
 		return nil, err
 	}
-	delete(st.raw, n)
 	idx := make([]int, len(vals))
 	for i := range idx {
 		idx[i] = i
@@ -260,7 +266,10 @@ func (st *Store) applyTextLocked(text, origin string) ([]Change, error) {
 	return st.storeLocked(n, idx, vals, origin), nil
 }
 
+// storeLocked sets fields of n. Text kept verbatim for n no longer stands
+// for it, even when no value changes.
 func (st *Store) storeLocked(n *schema.Node, idx []int, vals []osc.Arg, origin string) []Change {
+	delete(st.raw, n)
 	cur := st.vals[n]
 	var ch []Change
 	for k, i := range idx {

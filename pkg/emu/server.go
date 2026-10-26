@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/schema"
@@ -21,6 +22,10 @@ import (
 
 // xremoteLease is how long a client keeps receiving changes after /xremote.
 const xremoteLease = 10 * time.Second
+
+// clientIdle is how long a client is remembered after its last request,
+// once it holds no subscription or /xremote lease.
+const clientIdle = 60 * time.Second
 
 // Config describes the emulated console.
 type Config struct {
@@ -55,8 +60,11 @@ type Server struct {
 
 	conn atomic.Pointer[net.UDPConn]
 
+	// mu guards the clients. Code holding it may take the subscriptions'
+	// lock, never the other way round.
 	mu      sync.Mutex
 	clients map[string]*Client
+	swept   time.Time // when idle clients were last forgotten
 
 	Unhandled *Unhandleds
 	traffic   *traffic
@@ -191,17 +199,38 @@ func (s *Server) Serve(ctx context.Context, conn *net.UDPConn) error {
 
 func (s *Server) client(from *net.UDPAddr) *Client {
 	key := from.String()
+	now := time.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	c := s.clients[key]
 	if c == nil {
-		c = &Client{Addr: key, FirstSeen: time.Now(), udp: from}
+		s.forgetIdleLocked(now)
+		c = &Client{Addr: key, FirstSeen: now, udp: from}
 		s.clients[key] = c
 		s.log.Info("new client", "client", key)
 	}
-	c.LastSeen = time.Now()
+	c.LastSeen = now
 	c.Requests++
 	return c
+}
+
+// forgetIdleLocked forgets the clients idle for clientIdle that hold no
+// subscription or /xremote lease, so that the map does not grow with every
+// address and port ever seen. A new client calls it, at most once a second;
+// s.mu is held. Requests are handled one at a time, so no subscription can
+// start for a client between the check and its removal.
+func (s *Server) forgetIdleLocked(now time.Time) {
+	if now.Sub(s.swept) < time.Second {
+		return
+	}
+	s.swept = now
+	live := s.subs.clients(now)
+	for key, c := range s.clients {
+		if now.Sub(c.LastSeen) > clientIdle && !c.XremoteUntil.After(now) && !live[c] {
+			delete(s.clients, key)
+			s.log.Debug("client forgotten", "client", key)
+		}
+	}
 }
 
 func (s *Server) handle(pkt []byte, from *net.UDPAddr) {
@@ -272,7 +301,7 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, "expects one string")
 			return
 		}
-		changes, err := s.store.ApplyText(text, origin)
+		changes, err := s.applyText(text, origin)
 		if err != nil {
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
 		} else if path, _ := schema.SplitLine(strings.TrimLeft(text, " /")); isCommand("/" + path) {
@@ -355,6 +384,17 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 		return
 	}
 	s.Unhandled.Record(m, c.Addr, ReasonUnknown, "")
+}
+
+// applyText applies the text of a "/" command. Node text is one line:
+// M32-Edit ends it with the line feed of /node replies, but a line feed
+// inside it would add a line to the scene files written later, and the
+// console's text has no other control characters.
+func (s *Server) applyText(text, origin string) ([]state.Change, error) {
+	if strings.ContainsFunc(strings.TrimRight(text, "\r\n"), unicode.IsControl) {
+		return nil, errors.New("control characters in node text")
+	}
+	return s.store.ApplyText(text, origin)
 }
 
 // node answers /node: a node line, or one parameter as text, "\n"-terminated,
