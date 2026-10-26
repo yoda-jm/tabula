@@ -76,7 +76,58 @@ The Source row of the Config section also shows the physical input
 
 ## Routing
 
-Where the signals come from and where they go, in six views:
+Where the signals come from and where they go, in seven views.
+
+### Patchbay
+
+Every path a signal takes through the console, drawn in five columns:
+
+- **Inputs**: the sockets a signal comes in by: the stage box inputs on
+  AES50 A and B (`A 12`, with the gain of its preamp and `48V` when phantom
+  power is on), the card's playback channels, the USB stick's player, the
+  console's own inputs on the models that have them;
+- **Channels**: the channels, aux inputs and FX returns fed by them;
+- **Mixes**: the buses, LR, M/C and the matrices;
+- **Outputs**: the outputs 1-16 (with their delay), the aux, P16, AES/EBU and
+  2-track outputs;
+- **Goes out on**: the sockets a signal goes out by: the stage box outputs
+  (`A 3 … out 3`), the card tracks a computer records (`REC` on those tabula
+  records with the sessions) and the console's XLR outputs, each with what
+  it carries.
+
+The lines are the routing (patches), the sends and assigns to the mixes
+(thinner; only sends above −∞), a bus feeding an effect that comes back on
+its FX return (dashed), and the lines from a muted strip (dotted). Only
+what is on a path shows: **Show unused** shows every socket and strip, and
+AES50 channels 17-48 (a stage box plays channels 1-16 on its outputs).
+The chips above choose the output ports shown; AES50 B shows by itself
+when a stage box is there. A dot on a strip lights green while it has a
+signal.
+
+Point at anything (or tap it) to light up its paths, from the sockets
+feeding it to the sockets it reaches; **Find** lights up the names and
+sockets matching (`Theo`, `A 12`, `Track 17`). A tap opens the paths
+spelled out at the bottom: where it comes from and where it goes, each step
+with the send's tap and level (`PRE 0.0`) or the output's delay, a chip per
+socket or strip to follow; Esc or ✕ closes it.
+
+![The patchbay: stage box inputs, channels, mixes, outputs, stage box outputs and card tracks](img/gui-patchbay.png)
+
+![The paths of a vocal channel: from A 12, to LR, the matrices, the delayed outputs 13-14, the stage box outputs and the card tracks](img/gui-patchbay-path.png)
+
+**Checks** under the title name what looks wrong:
+
+- the console's inputs come from the playback routing (PLAY): the channels
+  hear the card, not the stage;
+- local inputs are routed on a model without them (an M32C has none);
+- a card track recorded with the sessions carries nothing (an output
+  without a source);
+- phantom power is on for an input that feeds nothing;
+- a bus or a matrix gets a signal but goes nowhere.
+
+A check names a socket or a strip: click it to show its paths.
+
+### The other views
 
 - **Inputs**: the input routing of the 32 console inputs and the aux inputs,
   in blocks of 8, for live (REC) and playback (PLAY), with the console's
@@ -98,9 +149,10 @@ Where the signals come from and where they go, in six views:
   that have them) and the user routing (single-channel patches used by the
   UIN and UOUT blocks).
 
-Blocks are edited with the console's own names (`A1-8`, `OUT9-16`, `P161-8`…),
-with a plain description beside them; output sources are listed with the
-names of their strips.
+The patchbay only reads: the other views edit the routing. Blocks are edited
+with the console's own names (`A1-8`, `OUT9-16`, `P161-8`…), with a plain
+description beside them; output sources are listed with the names of their
+strips.
 
 ![The AES50 A view: what the stage box outputs carry](img/gui-routing.png)
 

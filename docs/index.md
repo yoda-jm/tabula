@@ -120,7 +120,9 @@ tabula -console 192.168.1.62 -http :8033
 - **Channel**: everything about one strip — config, preamp with the headamp
   feeding it (which input, gain, phantom power), gate, dynamics, EQ with its
   (approximate) response curve and the RTA, sends with the bus names.
-- **Routing**: the input patch (which stage box input feeds which channel,
+- **Routing**: a patchbay drawing every path from the stage box inputs to the
+  stage box outputs and the card tracks, to check at a glance where a
+  signal goes; the input patch (which stage box input feeds which channel,
   with its headamp), the outputs and where each one goes, and what each
   output port carries — AES50 A and B (a DL32's outputs), the card's tracks,
   P16, aux, AES/EBU — with the names of the buses, matrices and channels.

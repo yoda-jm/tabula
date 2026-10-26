@@ -1,7 +1,8 @@
-// Routing: where the channel inputs come from, what the outputs carry, and
-// what each output port (AES50 A and B, card, local XLR) sends, with sources
-// followed to the strips and names they carry. Edited with the console's own
-// routing blocks; everything stays read-only until writes are armed.
+// Routing: the patchbay of every signal path, where the channel inputs come
+// from, what the outputs carry, and what each output port (AES50 A and B,
+// card, local XLR) sends, with sources followed to the strips and names
+// they carry. Edited with the console's own routing blocks; everything
+// stays read-only until writes are armed.
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -30,14 +31,16 @@ import {
   userSource,
 } from "../lib/routing";
 import { prettyText } from "../lib/values";
+import { PatchbayView } from "./Patchbay";
 import { useNodes, useSchema, useValue } from "../store/hooks";
 import { lookup } from "../store/lookup";
 import { NotConnected } from "./common";
 import { range, two } from "../lib/num";
 
-type Tab = "inputs" | "outputs" | "AES50A" | "AES50B" | "CARD" | "other";
+type Tab = "patchbay" | "inputs" | "outputs" | "AES50A" | "AES50B" | "CARD" | "other";
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "patchbay", label: "Patchbay" },
   { id: "inputs", label: "Inputs" },
   { id: "outputs", label: "Outputs 1-16" },
   { id: "AES50A", label: "AES50 A" },
@@ -52,7 +55,7 @@ const WATCHED =
 
 export function RoutingPage() {
   const schema = useSchema();
-  const [tab, setTab] = usePersistent<Tab>("tabula.routing", "inputs");
+  const [tab, setTab] = usePersistent<Tab>("tabula.routing", "patchbay");
   const paths = useMemo(() => (schema ? schema.nodes.map((n) => n.path).filter((p) => WATCHED.test(p)) : []), [schema]);
   const version = useNodes(paths);
   const sourceOptions = useMemo(() => outputSourceOptions(), [version]);
@@ -76,6 +79,7 @@ export function RoutingPage() {
       </div>
       <NotConnected />
       <div role="tabpanel" aria-label={current.label}>
+        {current.id === "patchbay" && <PatchbayView />}
         {current.id === "inputs" && <InputsView />}
         {current.id === "outputs" && <OutputsView options={sourceOptions} />}
         {(current.id === "AES50A" || current.id === "AES50B" || current.id === "CARD") && (

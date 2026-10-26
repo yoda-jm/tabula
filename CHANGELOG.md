@@ -62,6 +62,17 @@
 - ffmpeg is found next to tabula's own program too (`ffmpeg.exe` next to
   `tabula.exe`), and a missing recorder says how to install it; the download
   page says where to get ffmpeg for macOS and Windows.
+- A **Patchbay** on the Routing page (its first view): every path a signal
+  takes, drawn in five columns, from the sockets it comes in by (the stage
+  box inputs with their gain and 48 V, the card, the USB player) through the
+  channels, the mixes and the outputs 1-16 to the sockets it goes out by
+  (the stage box outputs, the card tracks, marked when tabula records them).
+  Pointing at anything lights its paths up; a tap spells them out (where it
+  comes from, where it goes, with each send's tap and level) and finds any
+  name or socket. Checks under the title: inputs taken from the playback
+  routing, local inputs a model does not have, recorded card tracks that
+  carry nothing, 48 V on an input that feeds nothing, a mix that goes
+  nowhere.
 
 ### tabula-emu
 - The debug page says when a subscription expires (`in 8s`), not `-8s ago`.
