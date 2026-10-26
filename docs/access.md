@@ -93,6 +93,19 @@ A musician cannot change anything else: not the send taps (pre/post), not
 another musician's mix, not the channels themselves. `tabula` checks every
 write, so this holds for anything talking to its API, not only its pages.
 
+## Who is online
+
+The Access page says, for each link and signed-in device, whether a page is
+open with it now (*Online*, with the address of the device) or when it was
+last seen, and the Links card counts those online: at the soundcheck, you
+see whose phone has its in-ear page open. An open page keeps a connection
+to `tabula`; a phone that closes it, or whose screen locks for long, goes
+offline. A phone that drops off the Wi-Fi sends nothing more: on Linux,
+`tabula` closes its connection once 20 s of data go unanswered, so it shows
+offline within half a minute (elsewhere the system takes longer). *Last
+seen* counts from the start of `tabula`. Devices open without a link (with
+`-guest viewer`) are listed by address.
+
 ## Managing links
 
 - **Delete** ends an access at once: the pages opened with it stop and show

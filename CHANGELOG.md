@@ -116,8 +116,44 @@
   how many console changes are missing when lines of its log are damaged;
   mute and pan buttons are named for screen readers; the Channel page no
   longer redraws its EQ editors with every RTA frame.
+- **Backup on the console's USB stick** (Record page): with it on, Start
+  recording also starts the console's own recorder, a stereo WAV file of
+  the main mix made by the console alone, which goes on if the laptop
+  fails; Stop recording stops it. It is not started over music playing
+  from the stick, a recording started on the console is left alone, and
+  the page shows the file, the time and the console's dropouts, or why
+  there is no backup; the session keeps the file name (`usb_backup`).
+  `POST /api/record/usb`. Untested on the real M32.
+- Solo, mute groups, talkback and the oscillator, reachable before only in
+  the Browser: SOLO on every strip of the Mixer and **Clear solo**, the six
+  mute groups next to the banks, and a hatched MUTE on strips that a mute
+  group or a muted DCA silences. A new **Monitor** page: what is soloed,
+  the solo modes (exclusive, PFL/AFL…), the monitor's level, source, dim
+  and mono, TALK A and B (held, or latched) with their destinations, and
+  the oscillator, which asks before sending its tone (to the PA, when it
+  goes to the main mix).
+- The Access page says whose page is open now (*Online*, with the
+  device's address) or when each link was last seen, and how many links
+  are online; an `online` event keeps it current. A phone gone off the
+  Wi-Fi shows offline within half a minute on Linux: the GUI's connections
+  close after 20 s of unanswered data, not the quarter of an hour TCP
+  waits.
+- A name holding double quotes (`Vox "Lead"`) no longer breaks the scene
+  files tabula writes and reads (sessions, scene files): node text has no
+  escape for it, so it is written with an apostrophe.
+- Stopping a recording and starting another within the same second failed
+  (*already holds a session*): the second one is named `…-2`.
 
 ### tabula-emu
+- Recording to the USB stick: `/-stat/tape/state` 4 records and 3 pauses
+  the recording; the file is named after the time
+  (`/R_20261026-203512.wav`) and its time counts, but nothing is written.
+- Exclusive solo (`/config/solo/exclusive`): a solo switched on turns the
+  others off.
+- A name holding double quotes no longer drops its node from undo, the
+  library and saved scenes: node text writes the quote as an apostrophe
+  and reads a console's raw quotes. A backslash in a scene name or note is
+  no longer doubled.
 - The debug page says when a subscription expires (`in 8s`), not `-8s ago`.
 - A USB stick in the console: `-usb dir` makes a folder stand for it,
   browsed and played as with Maillot's `X32USB`: the `/-usb/dir` listing

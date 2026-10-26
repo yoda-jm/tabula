@@ -99,7 +99,8 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   shaped by the low cut, the EQ and the graphic EQ.
 - Linked channels, aux inputs, FX returns, buses and matrices kept in step
   as the console does, following the link options.
-- The USB stick's player and file browser, from a folder (`-usb`).
+- The USB stick's player and file browser, from a folder (`-usb`), and its
+  recorder (timed, nothing written).
 
 **[How the emulator simulates the console](emulator.md)**: audio flow,
 meters, RTA, effects, and exactly what linking two strips does.
@@ -122,7 +123,11 @@ tabula -console 192.168.1.62 -http :8033
 
 - **Mixer**: banks of strips (inputs, aux and FX returns, buses, matrices
   and mains, DCAs) with scribble strips in the console colours, meters,
-  faders, mutes and pans; linked pairs show as one stereo strip.
+  faders, solos, mutes and pans, the mute groups and Clear solo; linked
+  pairs show as one stereo strip, and a strip silenced by a mute group or a
+  DCA says so.
+- **Monitor**: what is soloed and how (PFL/AFL, exclusive), the monitor's
+  level, source and dim, talkback A and B, and the oscillator.
 - **Channel**: everything about one strip — config, preamp with the headamp
   feeding it (which input, gain, phantom power), gate, dynamics, EQ with its
   (approximate) response curve and the RTA, sends with the bus names.
@@ -150,12 +155,13 @@ tabula -console 192.168.1.62 -http :8033
 - **Record**: record a show (snapshot plus every change, with markers) and
   replay it onto the console or the emulator. With the console's USB card,
   the audio tracks are recorded too, one WAV file each, in sync with the
-  console moves, ready for Audacity or Reaper. See
-  [recording a show](recording.md).
+  console moves, ready for Audacity or Reaper; the console can keep a stereo
+  backup on its own USB stick. See [recording a show](recording.md).
 - **In-ear mixes for the band**: each musician scans a QR code and gets
   their own mix on their phone, and nothing else; viewers watch without
-  touching. An optional engineer password protects full control, on the
-  laptop too. See [access](access.md).
+  touching; the Access page shows whose phone is online. An optional
+  engineer password protects full control, on the laptop too. See
+  [access](access.md).
 - **Connect**: find consoles on the network or type an address.
 
 <p>

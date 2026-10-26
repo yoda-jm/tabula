@@ -253,6 +253,37 @@ few seconds) and the next recording waits for it. A console lost on the
 way (Wi-Fi) does not end it: `tabula` connects again by itself and the
 recording goes on.
 
+## Backup on the console's USB stick
+
+With **Backup on the console's USB stick** on (the Record page, kept in
+`audio.json` as `usb_backup`), **Start recording** also starts the
+console's own recorder (`/-stat/tape/state` RECORD). The console writes a
+stereo WAV file of what feeds its recorder to its USB stick: the main mix,
+unless the console's *Setup › Routing* sends its recorder something else
+(`/outputs/rec/01-02/src`). It does it by itself, so this backup goes on if
+the laptop crashes or its card drops out. **Stop recording** stops it; so
+do Disconnect and stopping `tabula`. Turned on during a recording, it
+starts at once.
+
+- The console names the file after the time (`R_20261026-203512.wav` on
+  the X32); the Record page shows it while it records, and the session's
+  `meta.json` keeps it (`usb_backup`), with the session details.
+- No stick in the console: the recording goes on without the backup, and
+  the page says why.
+- **Walk-in music** played from the stick is not interrupted: the console's
+  recorder cannot play and record at once, so the backup is not started
+  while the player plays or is paused. Start it on the console's recorder
+  screen once the music is over.
+- A recording started on the console already is left as it is: Stop
+  recording does not stop it.
+- The console counts dropouts while it records (a stick too slow): the
+  page shows them.
+- The console starts recording even when writes are not armed: the
+  setting asked for it.
+
+This backup is untested on the real M32 so far; `tabula-emu` records
+nothing, but names the file and counts its time.
+
 ## How the tracks line up with the session
 
 Session times count from the start of the recording; the audio starts a
@@ -396,4 +427,5 @@ these systems, only a failure of the recorder is told.
 
 See [the API](API.md#audio): the audio settings, the devices, a test of the
 input and the exports are engineer-only; the capture's state rides on the
-record status.
+record status, and so does the backup on the console's stick (`usb`, set
+with `POST /api/record/usb`).

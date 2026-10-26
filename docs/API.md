@@ -158,6 +158,8 @@ entries `/-usb/dir/001`…`999` are lazy nodes: not read when connecting.
   (made on the console or by another remote app), `local` (made through
   this server from its machine) or `web <name>` (through an access link);
 - `access`: the musicians' permission changed — read `/api/whoami` again;
+- `online`: which devices have a page open (`Online`, see Access), each
+  time an event stream opens or closes; to engineers only;
 - `resync`: the initial sync finished, or this stream dropped events (a
   browser too slow to take them) — reload `/api/state`;
 - `record`: a `Record` (recording, replay, audio);
@@ -209,7 +211,7 @@ A refused request gets 403 with `{"error": "..."}`.
 | GET | `/api/whoami` | | `{"role", "name"?, "bus"?, "buses"?, "local", "link", "session", "password", "musicians_can_write"}` |
 | POST | `/api/login` | `{"password": "..."}` | signs in with the engineer password: makes a session, sets the cookie, answers the new `whoami`; 403 wrong password, 429 too many wrong ones (with `Retry-After`), 409 no password set |
 | POST | `/api/logout` | | forgets the cookie (and ends a session); answers the new `whoami` |
-| GET | `/api/access` | | `{"grants": [Grant], "musicians_can_write", "password", "current"?, "guest", "urls", "reachable"}` |
+| GET | `/api/access` | | `{"grants": [Grant], "musicians_can_write", "password", "current"?, "guest", "urls", "reachable", "online": Online}` |
 | POST | `/api/access` | `{"name": "Theo", "role": "musician", "bus": 3}` | 201 + `Grant` |
 | DELETE | `/api/access/{id}` | | 204; event streams opened with it end |
 | POST | `/api/access/settings` | `{"musicians_can_write": false}` | the access status |
@@ -223,6 +225,15 @@ the caller. `urls` lists where other devices reach
 this `tabula` (one per address of the machine when it listens on all of
 them); `reachable` is false when it listens on the machine only.
 
+`Online`: `{"grants": {id: {"streams", "addr"?, "seen"}}, "guests":
+[address]}` — for each access used since `tabula` started, how many event
+streams are open with it now (0: offline), the IP address of the last one
+and when it last opened or closed one; `guests` are the addresses of the
+devices with a stream open without an access (not this machine). On Linux
+the GUI's connections close once their data goes unanswered for 20 s
+(`TCP_USER_TIMEOUT`), so a phone gone off the Wi-Fi goes offline within
+half a minute.
+
 `login` and a wrong `current` password count as tries: after 5 wrong
 passwords in a row a client waits 30 s, twice as long after each further
 one (up to an hour), and all clients together get 30 wrong passwords a
@@ -232,7 +243,8 @@ file; `tabula -reset-password` removes it.
 ## Recording and replay
 
 Sessions are directories under `-sessions` (default `./sessions`), named by
-their start time (`2026-10-17_203000`): `meta.json`, `start.scn` (the
+their start time (`2026-10-17_203000`, `2026-10-17_203000-2` for a second
+recording started within the same second): `meta.json`, `start.scn` (the
 snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 (one change or marker per line: `{"t": seconds, "addr", "text", "value",
 "origin"}` or `{"t", "marker"}`).
@@ -243,13 +255,24 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | POST | `/api/record/start` | `{"note": "set 1"}` | `Record` (409 if not connected or already recording). With audio, it answers once the audio delivers samples or has failed (3 s at most), so `audio.state` says whether it runs |
 | POST | `/api/record/mark` | `{"label": "Song 2"}` (default: `Marker 12m34s`, the time since the start) | `Record` |
 | POST | `/api/record/stop` | | `Record` |
+| POST | `/api/record/usb` | `{"on": true}` | `Record`: turns the backup on the console's USB stick on or off for the next recordings (kept in `audio.json` as `usb_backup`, which `POST /api/audio/config` leaves as it is); turned on during a recording, it starts now |
 | GET | `/api/sessions` | | `[{"name", "meta"}]`, newest first |
 | GET | `/api/sessions/{name}` | | `{"name", "meta", "markers": [Event], "snapshot", "scene"}`: `snapshot` counts the node lines of the console at the start (`start.scn` and `start.nodes`), `scene` says whether `start.scn` is there |
 | DELETE | `/api/sessions/{name}` | | 204: the session folder is removed, audio included (not `audio.json`); 409 while it is recorded or replayed |
 | POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console) |
 | POST | `/api/replay/stop` | | `Record` |
 
-`Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", "audio"?, …}, "replaying", "replay_of"?, "replay_at"?, "error"?, "audio"?}`.
+`Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", "audio"?, "usb_backup"?, …}, "replaying", "replay_of"?, "replay_at"?, "error"?, "audio"?, "usb"}`.
+`usb` is the backup on the console's USB stick: `{"on" (the setting),
+"starting"?, "file"?, "already"?, "error"?}` for the recording, or the last
+one — the file the console records (`/R_20261026-203512.wav`), `already`
+when the console was recording before (Stop recording leaves it on), or
+why there is no backup (no stick, the player in use, the console not
+starting). `meta.usb_backup` keeps `{"file"?, "already"?, "error"?}` in the
+session. With the setting on, starting a recording sets
+`/-stat/tape/state` to RECORD (4) without writes armed, unless the
+console's player plays or is paused, and stopping it (Stop, Disconnect,
+`tabula` stopping) sets it to STOP (0), unless the player was used since.
 A session's `damaged`: the lines of its `events.jsonl` that do not read (their
 changes are skipped, and logged as an error).
 `audio` is the state of the audio capture of the recording (or of the last

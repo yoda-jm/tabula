@@ -27,18 +27,26 @@ has.
 every page (once signed in, when an engineer password is set). Other
 devices get a role from an access link: viewers see the
 Mixer, Channel and Browser pages read-only; musicians only get their in-ear
-mix. Routing, FX, Scenes, USB, In-ears, Record, Access and Connect are
-engineer pages. See [access](access.md).
+mix. Monitor, Routing, FX, Scenes, USB, In-ears, Record, Access and Connect
+are engineer pages. See [access](access.md).
 
 ## Mixer
 
 Banks of strips, as on the console: inputs 1-16 and 17-32, aux inputs and
 FX returns, buses, matrices and mains, DCAs. Each strip has its scribble
-strip (name and colour), meter, fader, mute and pan. Tap a scribble strip to
-select it for the Channel page. Names of two words take two lines
+strip (name and colour), meter, fader, solo, mute and pan. Tap a scribble
+strip to select it for the Channel page. Names of two words take two lines
 (`Guitare Elec`), so the 12 characters the console allows show in full.
 
-![Inputs 1-16 of a show](img/mixer.png)
+Next to the banks, the console's six **mute groups** (red when on) and
+**Clear solo**, which says how many strips are soloed. A strip that a mute
+group or a muted DCA silences, though its own mute is off, shows a hatched
+MUTE: its tooltip says what silences it (*mute group 2*, *DCA 3*). SOLO
+works as on the console: what is soloed goes to the monitor and the
+headphones only (the [Monitor](#monitor) page sets how).
+
+![Inputs 1-16 of a show: Ch 01 and 05 soloed, Ch 02 muted, mute group 2
+on (Ch 03-04), DCA 3 muted (Ch 07, the vocals)](img/mixer.png)
 
 On a phone, the banks scroll sideways:
 
@@ -83,6 +91,26 @@ The Source row of the Config section also shows the physical input
 (`In 12 · AES50 A 12`).
 
 ![The Preamp section of a bass DI: AES50 A 7, gain, phantom on](img/gui-headamp.png)
+
+## Monitor
+
+What the console's monitor and headphone outputs play, and the talkback
+and the oscillator:
+
+- **Solo**: the strips soloed, each a button that unsolos it, and **Clear
+  solo**; *Exclusive* (one solo at a time), *Solo follows select*, *Select
+  follows solo*, and PFL or AFL for inputs, buses and DCAs.
+- **Monitor**: level, source (`LR`, `LR+C`, `LRPFL`, `LRAFL`, `AUX56`,
+  `AUX78`), source trim, mono, dim and by how much, dim PFL, mute, delay.
+- **Talkback** A and B: **TALK A** talks while held, as on the console
+  (with *Latch* on, a press turns it on and the next one off); its level,
+  whether it dims the monitor, and who it talks to (buses 1-16, LR, M/C).
+- **Oscillator**: where the tone goes (a bus, L, R, L+R, M/C, a matrix),
+  sine, pink or white noise, its level and two frequencies. **Start the
+  tone…** says what goes where and asks first: sent to the main mix, the
+  audience hears it. While it runs, the card says so.
+
+![The Monitor page](img/gui-monitor.png)
 
 ## Routing
 
@@ -260,7 +288,9 @@ the current folder of the stick: **Open** a folder (or the parent folder),
 console (after a confirmation: the console loads it from the stick). The
 file in the player is marked. Every command needs armed writes; the sound
 goes where the console's routing sends its USB player. While the console
-records to its stick (from its own screen), ■ Stop asks first.
+records to its stick, ■ Stop asks first, and says whether it is the backup
+of tabula's recording ([Record](#record)) or a recording started on the
+console.
 
 ![The console's USB stick and player](img/gui-usb.png)
 
@@ -306,6 +336,15 @@ Record a show as a session, which keeps two things, as the page says above
   When the audio settings were changed on the page and not saved, **Start
   recording** asks first: save them, discard them, or cancel, with what
   changed.
+- **USB stick**, when **Backup on the console's USB stick** is on: the
+  console's own recorder starts with the recording and writes a stereo WAV
+  file to the console's stick, by itself: a backup that goes on if the
+  laptop fails ([recording](recording.md#backup-on-the-consoles-usb-stick)).
+  The card shows it recording, its time and file (`/R_20261026-203512.wav`),
+  dropouts if the console reports some, and why it did not start (no stick,
+  the player in use); the session details keep the file name.
+
+![The backup on the console's USB stick, recording](img/record-usb-backup.png)
 
 ![Start recording asks about the audio settings not saved](img/audio-unsaved.png)
 
@@ -335,8 +374,11 @@ changes are missing, and where. See [recording](recording.md#replaying-a-session
 
 Make access links (with QR codes) for musicians, viewers and other engineer
 devices, and delete them to end that access. Set, change or remove the
-engineer password, and sign out the devices signed in with it. See
-[access](access.md).
+engineer password, and sign out the devices signed in with it. Each link
+and signed-in device says whether a page is open with it now (*Online*, with
+the device's address) or when it was last seen, and the links count those
+online: at the soundcheck, you see whose phone is on. See
+[access](access.md#who-is-online).
 
 ## Connect
 

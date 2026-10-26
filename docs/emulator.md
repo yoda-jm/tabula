@@ -18,7 +18,12 @@ This page says what is simulated, how, and what is not.
   preferences and status pages (`/-prefs`, `/-stat`, `/-show`, `/-libs`,
   `/-usb`, `/-urec`, `/-action`…). Values are stored as the console stores
   them: floats quantized to its steps, text written exactly as in its scene
-  files.
+  files. Node text cannot escape a double quote: a name holding one
+  (`Vox "Lead"`, set over OSC, where it is kept as sent) is written with an
+  apostrophe in node text, scene files and the library (`"Vox 'Lead'"`), so
+  that the line still reads back; a line a console wrote with the quote as
+  it is (`"Vox "Lead""`) still reads, a quote ending a string only before a
+  blank. What a real console does with it is not known.
 - Get and set of every parameter, node text with `/node` and `/`, node sets
   with several values, `/xremote`: a change is pushed to the other clients.
   Changes the console makes itself (linked partners, status values) are
@@ -39,6 +44,9 @@ This page says what is simulated, how, and what is not.
   `<other>`), and the first 512 bytes of each packet's text. A client is
   forgotten a minute after its last request, once it holds no subscription
   or `/xremote` lease.
+- Solo: `/-stat/solo` is on while a solo switch is; with
+  `/config/solo/exclusive` on, a solo switched on turns the others off;
+  `/-action/clearsolo` clears them.
 - Status the console computes: `/-stat/solo`, `/-insert` (where each effect
   is inserted), `/-ha/NN/index` (headamp feeding each channel, from its
   source and the input routing), `/-stat/rtasource` (from
@@ -180,15 +188,16 @@ tabula-emu -scene testdata/scenes/demo.scn -usb testdata/usb
 | `/-usb/dir/dirpos` | the entry last selected, 0 after entering a directory |
 | `/-usb/title` | the file selected, without its extension (`02 Opening`) |
 | `/-action/recselect n` | entry `n` of the current directory: `[..]` goes up, a directory is entered, a `.wav` file plays from its start, a `.scn` or `.snp` file is applied to the console as a scene load. Then it reads 0 again. |
-| `/-stat/tape/state` | 0 stop, 1 pause, 2 play (as the console's `STOP`, `PPAUSE`, `PLAY`). Setting 0 stops and goes back to the start of the file, 1 pauses a playing file, 2 resumes, or plays the stopped file again from its start. |
-| `/-stat/tape/file` | the file in the player, from the root of the stick: `/Breaks/Interval music.wav`; it stays after the end or a stop |
-| `/-stat/tape/etime`, `rtime` | the seconds played and left, pushed to the `/xremote` clients every second while playing; the length comes from the WAV header |
+| `/-stat/tape/state` | 0 stop, 1 pause, 2 play, 3 recording paused, 4 record (as the console's `STOP`, `PPAUSE`, `PLAY`, `RPAUSE`, `RECORD`). Setting 0 stops and goes back to the start of the file, 1 pauses a playing file, 2 resumes, or plays the stopped file again from its start. 4 records, 3 pauses the recording and 4 resumes it; while it records, the player and `/-action/recselect` wait. |
+| `/-stat/tape/file` | the file in the player, from the root of the stick: `/Breaks/Interval music.wav`; it stays after the end or a stop. While recording, the file being recorded, named after the time in the current directory: `/R_20261026-203512.wav`; empty once the recording stops (nothing was written). |
+| `/-stat/tape/etime`, `rtime` | the seconds played and left, pushed to the `/xremote` clients every second while playing; the length comes from the WAV header. While recording: the seconds recorded, and `rtime` -1 (the console counts dropouts there, as −(dropouts + 1): none here). |
 | `/-action/playtrack -1`, `1` | the previous or next WAV file of the player's directory, played from its start. Nothing changes at either end; with no file in the player, `1` plays the first WAV file of the current directory. |
 | `/config/tape/autoplay` | `ON` (folder mode): at the end of a file the next WAV file of its directory plays, the player stops after the last; `OFF`: it stops at the end of each file |
 
 Not emulated: no sound comes out (the WAV files are only read for their
-length); recording to the stick (`/-stat/tape/state` 3 and 4), fast forward
-and rewind (5, 6) are logged as unhandled and the player stays as it was;
+length); a recording writes nothing to the folder; fast forward and rewind
+(`/-stat/tape/state` 5, 6) are logged as unhandled and the player stays as
+it was;
 loading show, channel, effect, routing and preference files (`.shw`,
 `.chn`, `.efx`, `.rou`, `.prf`) from the stick is logged as unhandled;
 `/-usb/dir/NNN/type` stays empty (what the console writes there is not

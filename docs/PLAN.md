@@ -46,7 +46,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Effect parameters (`/fx/N/par/NN`): fields follow the effect type (switching effect loads its defaults); all 61 effects modelled, with ranges, steps, formats and defaults matching M32-Edit's built-in tables; 57 of 61 real parameter lines round-trip byte for byte, the other 4 (older firmware spellings) load and are written in today's form.
 - [x] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/add` (cues), `/showdump`, with listings in `/-show` and `/-libs`, optionally kept in a directory (`-library`). Scene safes and snippet filters are not applied yet.
 - [x] Side effects of `/-action/*` (go scene/snippet/cue, clear solo, undo checkpoint and undo, init) and computed status (`/-insert`, `/-ha/NN/index` from sources and input routing, `/-stat/solo`).
-- [x] USB stick from a folder (`-usb`): directory listing, `/-action/recselect` (enter a directory, play a WAV file, load a scene or snippet), player state and time (`/-stat/tape`), previous/next (`/-action/playtrack`), folder mode, unmount; no sound, no recording to the stick (`docs/emulator.md`).
+- [x] USB stick from a folder (`-usb`): directory listing, `/-action/recselect` (enter a directory, play a WAV file, load a scene or snippet), player state and time (`/-stat/tape`), previous/next (`/-action/playtrack`), folder mode, unmount, recording (named and timed, nothing written); no sound (`docs/emulator.md`).
 - [x] Factory presets: `-presets` imports M32-Edit's library (channel, effect and routing presets).
 - [x] RTA of the source chosen with `/-action/setrtasrc` (channels, buses, graphic EQs, pre/post EQ), shaped by low cut, EQ and graphic EQ.
 - [x] Linked strips (channels, aux, FX returns, buses, matrices) kept in step, following `/config/linkcfg`, with the rules of M32-Edit's offline logic (see `docs/emulator.md`).
@@ -66,6 +66,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Scene files kept on the laptop (`-scenes`): load into the console line by line, save the console as one, open from the browser (`/api/scenefiles`).
 - [x] The console's USB stick and player: browse, play WAV files, transport, load scenes from the stick (`/api/usb`). Not yet tried on the real M32.
 - [x] Linked pairs shown as stereo strips in the mixer.
+- [x] Solo and Clear solo on the mixer, the six mute groups, strips silenced by a mute group or a muted DCA; Monitor page: solo modes, monitor, talkback A/B, oscillator (asks before its tone).
 
 ### 4. Recording and replay *(in progress)*
 - [x] Session = start snapshot (`.scn`, opens in M32-Edit) + time-stamped log of every change (who/what/when) + markers (`pkg/session`).
@@ -73,11 +74,12 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] GUI for recording, markers, session browsing and replay.
 - [x] Audio of the console's USB card recorded with the session, in the same process (`pkg/audio`): an external recorder (arecord, parecord, ffmpeg or a custom command; no cgo) streams the card, one WAV file per track (24-bit by default, RF64 past 4 GiB, headers refreshed every 2 s), named from the console's routing; first-sample time and clock drift measured from the arrival of the samples and kept in `meta.json`; free space watched, clean stop before the disk is full; device listing; `-audio-*` flags (`docs/recording.md`).
 - [x] Exports for audio editors: Reaper project, Audacity label track, CSV of changes and markers.
+- [x] Backup on the console's USB stick, started and stopped with the recording (`POST /api/record/usb`). Not yet tried on the real M32.
 - [ ] Try the audio capture with the real DN32-USB card (Linux, then macOS/Windows through ffmpeg).
 
 ### 5. Live viewers, roles, band screens *(in progress)*
 - [x] One console connection shared by any number of browsers.
-- [x] Roles checked by the server: engineer (this machine, or an engineer link), musician (own in-ear bus only, phone page "In-ears", works without arming when allowed), viewer (read-only); access links with QR codes on the Access page, kept in `access.json`, revocable at once (`docs/access.md`).
+- [x] Roles checked by the server: engineer (this machine, or an engineer link), musician (own in-ear bus only, phone page "In-ears", works without arming when allowed), viewer (read-only); access links with QR codes on the Access page, kept in `access.json`, revocable at once (`docs/access.md`); the Access page shows which devices have a page open.
 - [ ] Board-mix audio streaming (WebRTC), setlist, PA calibration.
 
 ## Protocol notes
