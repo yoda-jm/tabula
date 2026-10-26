@@ -25,7 +25,12 @@ jobs:
       - name: go vet
         run: go vet ./...
       - name: go test
-        run: go test -race -count=1 ./...
+        run: |
+          set -o pipefail
+          go test -race -count=1 ./... 2>&1 | tee go-test.log
+      - name: failed tests as annotations # readable without signing in to GitHub
+        if: failure()
+        run: echo "::error::$(grep -E -e '--- FAIL|^FAIL|panic:|_test\.go:[0-9]+:|DATA RACE' go-test.log | head -60 | sed 's/%/%25/g' | awk 'BEGIN { ORS = "%0A" } { print }')"
 
   # tabula is released for macOS and Windows too: their tests run there
   test-os:
@@ -41,7 +46,14 @@ jobs:
         with:
           go-version-file: go.mod
       - name: go test
-        run: go test -count=1 ./...
+        shell: bash
+        run: |
+          set -o pipefail
+          go test -count=1 ./... 2>&1 | tee go-test.log
+      - name: failed tests as annotations # readable without signing in to GitHub
+        if: failure()
+        shell: bash
+        run: echo "::error::$(grep -E -e '--- FAIL|^FAIL|panic:|_test\.go:[0-9]+:' go-test.log | head -60 | sed 's/%/%25/g' | awk 'BEGIN { ORS = "%0A" } { print }')"
 
   web:
     runs-on: ubuntu-latest
