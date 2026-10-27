@@ -46,6 +46,8 @@ export interface Record {
   /** the replay plays the session's tracks to the card too: a virtual soundcheck */
   replay_audio?: boolean;
   error?: string;
+  /** console changes waiting for a slow disk for more than 2 s */
+  waiting?: number;
   /** the audio capture of the recording (or of the last one) */
   audio?: AudioStatus;
   usb?: UsbBackup;

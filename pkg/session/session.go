@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -64,20 +65,38 @@ type Event struct {
 	Marker string  `json:"marker,omitempty"`
 }
 
-// Recorder writes a session while a store changes.
+// Recorder writes a session while a store changes. The changes and
+// markers go through a queue to a goroutine writing events.jsonl: a disk
+// that hangs never holds up the store's other subscribers (the live view).
 type Recorder struct {
 	dir   string
 	store *state.Store
 	start time.Time
 
-	mu     sync.Mutex
-	events *os.File
-	w      *bufio.Writer
-	meta   Meta
-	cancel func()
-	closed bool
-	werr   error // the first error writing events.jsonl
+	// owned by the writing goroutine
+	events  io.WriteCloser
+	w       *bufio.Writer
+	queue   chan []Event
+	written chan struct{} // closed once the queue is written out
+
+	mu      sync.Mutex
+	meta    Meta
+	cancel  func()
+	closed  bool
+	werr    error     // the first error writing events.jsonl
+	waiting int       // events queued, not written yet
+	since   time.Time // when the oldest of them was queued
+	dropped int       // events lost: the queue was full (the disk hung)
+
+	metaMu sync.Mutex // one meta.json write at a time, outside mu
 }
+
+// createEvents creates events.jsonl (tests: a disk that hangs).
+var createEvents = func(path string) (io.WriteCloser, error) { return os.Create(path) }
+
+// queueBatches is how many batches of changes wait for the disk before
+// the next ones are dropped: minutes of a busy show.
+var queueBatches = 8192
 
 // Start snapshots the store into dir (created, must not hold a session)
 // and records its changes until Stop.
@@ -88,12 +107,13 @@ func Start(dir string, st *state.Store, consoleName, note string) (*Recorder, er
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
-	r := &Recorder{dir: dir, store: st}
-	f, err := os.Create(filepath.Join(dir, "events.jsonl"))
+	r := &Recorder{dir: dir, store: st, queue: make(chan []Event, queueBatches), written: make(chan struct{})}
+	f, err := createEvents(filepath.Join(dir, "events.jsonl"))
 	if err != nil {
 		return nil, err
 	}
 	r.events, r.w = f, bufio.NewWriter(f)
+	go r.write()
 
 	// Subscribe before the snapshot: a change made meanwhile is in both, and
 	// replaying it after the snapshot gives the right state either way.
@@ -139,11 +159,7 @@ func (r *Recorder) snapshot() error {
 
 func (r *Recorder) record(changes []state.Change) {
 	t := time.Since(r.start).Seconds()
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.closed {
-		return
-	}
+	batch := make([]Event, 0, len(changes))
 	for _, c := range changes {
 		e := Event{T: t, Addr: c.Leaf.Addr, Origin: c.Origin}
 		if typ := r.store.TypeOf(c.Leaf); typ != nil {
@@ -157,46 +173,95 @@ func (r *Recorder) record(changes []state.Change) {
 		case 's':
 			e.Value = c.Value.Str
 		}
-		r.writeEvent(e)
+		batch = append(batch, e)
 	}
-	r.flush() // keep the file usable if the program dies mid-show
+	r.enqueue(batch)
 }
 
-// flush writes the events out, keeping the first error.
-func (r *Recorder) flush() {
-	if err := r.w.Flush(); err != nil && r.werr == nil {
-		r.werr = err
+// enqueue hands events to the writing goroutine, without ever waiting:
+// when the queue is full (the disk has not taken anything for minutes),
+// they are counted as lost.
+func (r *Recorder) enqueue(batch []Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed || len(batch) == 0 {
+		return
+	}
+	select {
+	case r.queue <- batch:
+		if r.waiting == 0 {
+			r.since = time.Now()
+		}
+		r.waiting += len(batch)
+	default:
+		r.dropped += len(batch)
+	}
+}
+
+// write writes the queued events to events.jsonl, flushing whenever it
+// has caught up: the file stays usable if the program dies mid-show.
+func (r *Recorder) write() {
+	defer close(r.written)
+	var lost error
+	for batch := range r.queue {
+		var events, markers int
+		for _, e := range batch {
+			line, _ := json.Marshal(e)
+			r.w.Write(line)
+			r.w.WriteByte('\n')
+			if e.Marker != "" {
+				markers++
+			} else {
+				events++
+			}
+		}
+		if len(r.queue) == 0 && lost == nil {
+			lost = r.w.Flush()
+		}
+		r.mu.Lock()
+		r.meta.Events += events
+		r.meta.Markers += markers
+		r.waiting -= len(batch)
+		if r.waiting > 0 {
+			r.since = time.Now() // the oldest left is younger than this
+		}
+		if lost != nil && r.werr == nil {
+			r.werr = lost
+		}
+		r.mu.Unlock()
+	}
+	if err := r.w.Flush(); err != nil {
+		r.mu.Lock()
+		if r.werr == nil {
+			r.werr = err
+		}
+		r.mu.Unlock()
 	}
 }
 
 // Err returns the first error writing the changes (a full disk…): the
-// changes after it are lost.
+// changes after it are lost. Changes dropped because the disk did not
+// take them in time count too.
 func (r *Recorder) Err() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.werr == nil && r.dropped > 0 {
+		return fmt.Errorf("the disk did not take them in time: %d not written", r.dropped)
+	}
 	return r.werr
 }
 
-func (r *Recorder) writeEvent(e Event) {
-	line, _ := json.Marshal(e)
-	r.w.Write(line)
-	r.w.WriteByte('\n')
-	if e.Marker != "" {
-		r.meta.Markers++
-	} else {
-		r.meta.Events++
-	}
+// Backlog is how many changes wait to be written, and since when: a disk
+// that hangs (rather than fails) shows here first.
+func (r *Recorder) Backlog() (waiting int, since time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.waiting, r.since
 }
 
 // Mark adds a marker (song start, incident…) at the current time.
 func (r *Recorder) Mark(label string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.closed {
-		return
-	}
-	r.writeEvent(Event{T: time.Since(r.start).Seconds(), Marker: label})
-	r.flush()
+	r.enqueue([]Event{{T: time.Since(r.start).Seconds(), Marker: label}})
 }
 
 // Started is when the recording started: session times count from it.
@@ -206,13 +271,22 @@ func (r *Recorder) Started() time.Time { return r.start }
 // so far (nil: no audio) in meta.json.
 func (r *Recorder) SetAudio(a *audio.Info) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.meta.Audio = a
 	if r.closed {
+		r.mu.Unlock()
 		return nil
 	}
 	m := r.meta
 	m.Duration = time.Since(r.start).Seconds()
+	r.mu.Unlock()
+	return r.writeMeta(m)
+}
+
+// writeMeta writes meta.json without holding mu: a slow disk does not
+// hold up who reads the recording's state.
+func (r *Recorder) writeMeta(m Meta) error {
+	r.metaMu.Lock()
+	defer r.metaMu.Unlock()
 	return writeMeta(r.dir, m)
 }
 
@@ -220,14 +294,13 @@ func (r *Recorder) SetAudio(a *audio.Info) error {
 // meta.json.
 func (r *Recorder) SetUSBBackup(b *USBBackup) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.meta.USBBackup = b
-	if r.closed {
-		return writeMeta(r.dir, r.meta)
-	}
 	m := r.meta
-	m.Duration = time.Since(r.start).Seconds()
-	return writeMeta(r.dir, m)
+	if !r.closed {
+		m.Duration = time.Since(r.start).Seconds()
+	}
+	r.mu.Unlock()
+	return r.writeMeta(m)
 }
 
 // Elapsed is the time since the recording started.
@@ -244,21 +317,27 @@ func (r *Recorder) Meta() Meta {
 
 func (r *Recorder) Dir() string { return r.dir }
 
-// Stop ends the recording.
+// Stop ends the recording, once the changes queued are written.
 func (r *Recorder) Stop() error {
 	if r.cancel != nil {
 		r.cancel()
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.closed {
+		r.mu.Unlock()
 		return nil
 	}
 	r.closed = true
 	r.meta.End = time.Now()
 	r.meta.Duration = r.meta.End.Sub(r.start).Seconds()
-	err := errors.Join(r.w.Flush(), r.events.Close())
-	return errors.Join(err, writeMeta(r.dir, r.meta))
+	close(r.queue)
+	r.mu.Unlock()
+	<-r.written
+	r.mu.Lock()
+	err := errors.Join(r.werr, r.events.Close())
+	m := r.meta
+	r.mu.Unlock()
+	return errors.Join(err, r.writeMeta(m))
 }
 
 // writeMeta replaces meta.json at once: it is rewritten while recording.

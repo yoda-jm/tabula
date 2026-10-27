@@ -29,7 +29,10 @@ type recordView struct {
 	// virtual soundcheck, soundcheck.go)
 	ReplayAudio bool          `json:"replay_audio,omitempty"`
 	Error       string        `json:"error,omitempty"`
-	Audio       *audio.Status `json:"audio,omitempty"` // the audio capture of the recording, or of the last one
+	// Waiting: console changes waiting for the disk for more than
+	// slowDisk (a disk that hangs: they are written once it takes them)
+	Waiting int           `json:"waiting,omitempty"`
+	Audio   *audio.Status `json:"audio,omitempty"` // the audio capture of the recording, or of the last one
 	USB         usbBackupView `json:"usb"`             // the backup on the console's USB stick (usbbackup.go)
 }
 
@@ -49,9 +52,15 @@ func (s *Server) recordStatus() recordView {
 	if s.rec != nil {
 		m := s.rec.Meta()
 		v.Recording, v.Name, v.Meta = true, filepath.Base(s.rec.Dir()), &m
+		if n, since := s.rec.Backlog(); n > 0 && time.Since(since) > slowDisk {
+			v.Waiting = n
+		}
 	}
 	return v
 }
+
+// slowDisk is how long changes wait for the disk before the Record page says so.
+const slowDisk = 2 * time.Second
 
 func (s *Server) publishRecord() { s.hub.publish("record", s.recordStatus()) }
 

@@ -7,6 +7,11 @@
   (32 WAV files created, the recorder launched: longer on a slow disk):
   phones and pages keep their answers meanwhile, and the recording shows
   once it runs; a second Start meanwhile is refused at once (#12).
+- A disk that hangs no longer freezes the live view (#11): every console
+  change was written to the session before the pages and phones heard of
+  it. The changes now wait in a queue for the disk; after 2 s the Record
+  page says how many are waiting (`Record.waiting`), and only a disk taking
+  nothing for minutes loses the next ones (counted, as a write error).
 - Disarming writes while a scene file loads no longer leaves the console
   with half a scene: the file is sent to its end, then writes disarm (the
   button says *Disarms after the load*; click again to keep them armed).

@@ -296,7 +296,13 @@ recorded without its audio.
 
 ## When the console's changes are not recorded
 
-The console's changes go to `events.jsonl` as they come. If that file cannot
+The console's changes go to `events.jsonl` as they come, through a queue:
+a disk that hangs rather than fails (a dying USB disk, a network share)
+never holds up the live view or the phones. When changes wait for the disk
+more than 2 seconds, the Record page says how many (*The disk is slow…*);
+they are written once it takes them. If it takes nothing for minutes (the
+queue holds minutes of a busy show), the next changes are lost and counted,
+as below. If that file cannot
 be written (a full disk, a USB disk pulled out), the Record page says so
 while recording (*the console's changes cannot be written…*) and `tabula`
 logs an error: the changes after it are lost, the audio goes on. A session

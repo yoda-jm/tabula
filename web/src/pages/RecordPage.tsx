@@ -391,6 +391,12 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
           {err}
         </p>
       )}
+      {recording && rec.waiting ? (
+        <p className="warn-box" role="status">
+          The disk is slow: {plural(rec.waiting, "console change")} waiting to be written. They are kept and written once it
+          takes them; the live view is not held up.
+        </p>
+      ) : null}
       {unsaved.dialog}
     </section>
   );

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -268,7 +269,83 @@ func TestRecordWriteError(t *testing.T) {
 	}
 	rec.events.Close() // the disk fails
 	live.Set("/ch/12/mix/fader", osc.Float(0.7), "console")
-	if err := rec.Err(); err == nil {
-		t.Fatal("no error once the changes cannot be written")
+	for deadline := time.Now().Add(2 * time.Second); rec.Err() == nil; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("no error once the changes cannot be written")
+		}
+	}
+}
+
+// hangingDisk takes nothing until released, as a disk that hangs.
+type hangingDisk struct {
+	release chan struct{}
+	f       *os.File
+}
+
+func (h *hangingDisk) Write(p []byte) (int, error) {
+	<-h.release
+	return h.f.Write(p)
+}
+
+func (h *hangingDisk) Close() error { return h.f.Close() }
+
+// TestRecordHangingDisk: a disk that hangs never holds up the store (the
+// live view): the changes wait in a queue, the backlog says so, and once
+// the queue is full the next ones are counted as lost.
+func TestRecordHangingDisk(t *testing.T) {
+	disk := &hangingDisk{release: make(chan struct{})}
+	defer func(f func(string) (io.WriteCloser, error), n int) { createEvents, queueBatches = f, n }(createEvents, queueBatches)
+	createEvents = func(p string) (io.WriteCloser, error) {
+		f, err := os.Create(p)
+		disk.f = f
+		return disk, err
+	}
+	queueBatches = 50
+	live := demo(t)
+	dir := t.TempDir()
+	rec, err := Start(dir, live, "M32C test", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() {
+		for i := range 4096 + 60 { // more than the queue and the writer's buffer hold
+			live.Set("/ch/12/mix/fader", osc.Float(float32(i%100)/100), "console")
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the store waits for the disk")
+	}
+	if n, since := rec.Backlog(); n == 0 || since.IsZero() {
+		t.Errorf("backlog: %d since %v", n, since)
+	}
+	if err := rec.Err(); err == nil || !strings.Contains(err.Error(), "not written") {
+		t.Errorf("lost changes: %v", err)
+	}
+	close(disk.release) // the disk is back: what was queued is written
+	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		if n, _ := rec.Backlog(); n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the queue is not written once the disk is back")
+		}
+	}
+	rec.Mark("after")
+	if err := rec.Stop(); err != nil && !strings.Contains(err.Error(), "not written") {
+		t.Fatal(err)
+	}
+	if n, _ := rec.Backlog(); n != 0 {
+		t.Errorf("backlog after the stop: %d", n)
+	}
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := s.Markers(); len(m) != 1 || m[0].Marker != "after" || len(s.Events) < 50 {
+		t.Errorf("%d events, markers %+v", len(s.Events), m)
 	}
 }
