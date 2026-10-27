@@ -293,7 +293,7 @@ func (s *Server) endRecording(rec *session.Recorder, c *audio.Capture) (*audio.S
 // background, as that takes seconds and every request needs s.mu; see
 // audioState.ending.
 func (s *Server) endRecordingLocked() {
-	if s.rec == nil {
+	if s.rec == nil || !s.rec.Attached() { // the audio alone goes on: a console joins it once synced
 		return
 	}
 	rec, c, prev := s.rec, s.audio.cap, s.audio.ending

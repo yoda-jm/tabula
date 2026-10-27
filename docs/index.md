@@ -194,9 +194,10 @@ made from tabula, and writes that can stop a show (clock, network, card,
 initialize) ask first. On a weak Wi-Fi, tabula reads the console back
 slowly to catch the changes lost on the way, and tells how the link is
 doing. **[Every page of the GUI](gui.md)** in
-detail. `-record` starts recording as soon as the console is synced (asking
-it again until it answers, when the laptop starts first), for unattended
-recording of a concert (`-audio-device hw:CARD=X32,DEV=0
+detail. `-record` records from the start, for unattended recording of a
+concert: the audio at once when its tracks are on, the console as soon as
+it is synced (asking it again until it answers, when the laptop starts
+first or the Wi-Fi is not up yet) (`-audio-device hw:CARD=X32,DEV=0
 -audio-tracks 1-16` adds the audio).
 
 **The log** goes to the terminal and to `tabula.log` in the sessions

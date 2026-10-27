@@ -9,6 +9,8 @@ export interface SessionMeta {
   start: string;
   end?: string;
   console?: string;
+  /** when the console joined a recording started without it (the audio alone), in seconds */
+  console_from?: number;
   note?: string;
   events: number;
   markers: number;
@@ -48,6 +50,10 @@ export interface Record {
   error?: string;
   /** console changes waiting for a slow disk for more than 2 s */
   waiting?: number;
+  /** audio tracks are recorded: a recording can start without the console */
+  audio_on?: boolean;
+  /** the recording runs without the console yet: the audio alone */
+  no_console?: boolean;
   /** the audio capture of the recording (or of the last one) */
   audio?: AudioStatus;
   usb?: UsbBackup;

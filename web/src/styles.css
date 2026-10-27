@@ -3627,3 +3627,6 @@ code.wrap {
 .check-summary .check-dot {
   margin-top: 0;
 }
+.warn-text {
+  color: var(--busy);
+}

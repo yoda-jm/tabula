@@ -45,7 +45,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, ready fun
 		webDir   = fs.String("web-dir", "", "serve the GUI from this directory instead of the embedded build")
 		sessions = fs.String("sessions", "sessions", "directory where recorded sessions are kept")
 		scenes   = fs.String("scenes", "scenes", "directory of the scene files (.scn) to load into the console, or to save it as")
-		record   = fs.Bool("record", false, "start recording as soon as the console is connected and synced (stops on exit)")
+		record   = fs.Bool("record", false, "record from the start (stops on exit): the audio tracks at once when they are on, the console once connected and synced")
 		accessF  = fs.String("access", "access.json", "file keeping the access links made on the Access page")
 		guest    = fs.String("guest", "none", "role of other devices without an access link: none, viewer or engineer")
 		resetPw  = fs.Bool("reset-password", false, "remove the engineer password (and its sessions) from the access file, then exit")
@@ -143,7 +143,6 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, ready fun
 		return 2
 	}
 	api.SetAudioConfig(audioCfg, audioFile)
-	api.RecordOnSync(*record)
 	ln, err := webapi.Listen(*httpAddr)
 	if err != nil {
 		log.Error("listen", "err", err)
@@ -153,6 +152,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, ready fun
 	defer api.StopRecording() // first: a recording ends cleanly, then the console is let go
 	if *consoleA != "" {
 		api.Connect(*consoleA)
+	}
+	if *record {
+		api.RecordAtStart() // the audio from now when it is on, the console once synced
 	}
 	api.SetListenAddr(ln.Addr().String())
 	srv := &http.Server{Handler: api.Handler(web.Handler(*webDir)), ReadHeaderTimeout: 5 * time.Second}

@@ -176,9 +176,12 @@ func (s *Server) Connect(addr string) error {
 		s.publishStatus()
 		s.hub.publish("resync", json.RawMessage(`{}`))
 		s.mu.Lock()
-		auto := s.recordOnSync
+		auto, rec := s.recordOnSync, s.rec
 		s.mu.Unlock()
-		if auto {
+		switch {
+		case rec != nil: // started without the console (the audio alone)
+			s.joinConsole(rec)
+		case auto:
 			if err := s.StartRecording("started with -record"); err != nil {
 				s.log.Error("recording", "err", err)
 			}

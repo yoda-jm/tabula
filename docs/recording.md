@@ -60,10 +60,24 @@ Unattended, from the command line:
 tabula -console 192.168.1.62 -record -audio-device hw:CARD=X32,DEV=0 -audio-tracks 1-16,23-24
 ```
 
-`-record` starts recording once the console is synced; a console that does
-not answer yet (the laptop started first, the Wi-Fi not up) is asked again
-every few seconds, and the recording starts as soon as it answers. Ctrl-C
-stops the recording and finishes the files. The settings saved from the GUI are kept
+`-record` starts recording at once when the audio tracks are on, and the
+console joins the session as soon as it is synced: a console that does not
+answer yet (the laptop started first, the Wi-Fi not up) is asked again
+every few seconds, while its audio is already recorded (the USB card does
+not need the network). Without audio, the recording starts once the console
+is synced. Ctrl-C stops the recording and finishes the files.
+
+**Without the console.** With the audio tracks on, **Start recording**
+works without a console connected (the Wi-Fi down at the start): the audio
+is recorded alone (the top of the Record page says *console: not connected
+yet*), and the console joins the same session once it is connected and
+synced, with its snapshot of then, its changes from then on, and a
+*console connected* marker. Disconnecting or connecting to a console does
+not end such a recording; once the console has joined, Disconnect ends it,
+as for any recording. The tracks are named *Track 01.wav*… when the console
+was not there to name them. A session that never saw the console holds the
+audio alone: it opens, exports and plays back (virtual soundcheck) like
+any other, and a replay has no console moves to write. The settings saved from the GUI are kept
 in `<sessions>/audio.json` and used by every later run; flags given on the
 command line override them for that run.
 

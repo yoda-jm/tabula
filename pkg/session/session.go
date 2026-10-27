@@ -32,14 +32,18 @@ import (
 
 // Meta describes a session.
 type Meta struct {
-	Format   int       `json:"format"`
-	Start    time.Time `json:"start"`
-	End      time.Time `json:"end,omitempty"`
-	Console  string    `json:"console,omitempty"` // model and name, e.g. "M32C M32C-0A-EB-1A"
-	Note     string    `json:"note,omitempty"`
-	Events   int       `json:"events"`
-	Markers  int       `json:"markers"`
-	Duration float64   `json:"duration"` // seconds
+	Format  int       `json:"format"`
+	Start   time.Time `json:"start"`
+	End     time.Time `json:"end,omitempty"`
+	Console string    `json:"console,omitempty"` // model and name, e.g. "M32C M32C-0A-EB-1A"
+	// ConsoleFrom is when the console joined a recording started without
+	// it (the audio alone), in seconds after the start: the snapshot is
+	// of that time, and the changes start then.
+	ConsoleFrom float64 `json:"console_from,omitempty"`
+	Note        string  `json:"note,omitempty"`
+	Events      int     `json:"events"`
+	Markers     int     `json:"markers"`
+	Duration    float64 `json:"duration"` // seconds
 	// Audio describes the audio tracks recorded with the session.
 	Audio *audio.Info `json:"audio,omitempty"`
 	// USBBackup is the console's own recording on its USB stick, started
@@ -99,7 +103,8 @@ var createEvents = func(path string) (io.WriteCloser, error) { return os.Create(
 var queueBatches = 8192
 
 // Start snapshots the store into dir (created, must not hold a session)
-// and records its changes until Stop.
+// and records its changes until Stop. With no store (the console not
+// connected yet: the audio alone is recorded), Attach adds it later.
 func Start(dir string, st *state.Store, consoleName, note string) (*Recorder, error) {
 	if _, err := os.Stat(filepath.Join(dir, "meta.json")); err == nil {
 		return nil, fmt.Errorf("%s already holds a session", dir)
@@ -115,23 +120,67 @@ func Start(dir string, st *state.Store, consoleName, note string) (*Recorder, er
 	r.events, r.w = f, bufio.NewWriter(f)
 	go r.write()
 
-	// Subscribe before the snapshot: a change made meanwhile is in both, and
-	// replaying it after the snapshot gives the right state either way.
 	r.start = time.Now()
 	r.meta = Meta{Format: 1, Start: r.start, Console: consoleName, Note: note}
-	r.cancel = st.Subscribe(r.record)
-	if err := r.snapshot(); err != nil {
-		r.Stop()
-		return nil, err
+	if st != nil {
+		r.store = st
+		if err := r.attach(st); err != nil {
+			r.Stop()
+			return nil, err
+		}
 	}
 	r.mu.Lock()
 	m := r.meta // the changes recorded meanwhile count in it
 	r.mu.Unlock()
-	if err := writeMeta(r.dir, m); err != nil {
+	if err := r.writeMeta(m); err != nil {
 		r.Stop()
 		return nil, err
 	}
 	return r, nil
+}
+
+// attach records st (r.store) from now: its snapshot, then its changes.
+func (r *Recorder) attach(st *state.Store) error {
+	// Subscribe before the snapshot: a change made meanwhile is in both, and
+	// replaying it after the snapshot gives the right state either way.
+	cancel := st.Subscribe(r.record)
+	r.mu.Lock()
+	r.cancel = cancel
+	r.mu.Unlock()
+	return r.snapshot()
+}
+
+// Attach adds the console to a recording started without it: the snapshot
+// is of now, its changes recorded from now on.
+func (r *Recorder) Attach(st *state.Store, consoleName string) error {
+	r.mu.Lock()
+	switch {
+	case r.closed:
+		r.mu.Unlock()
+		return errors.New("the recording is over")
+	case r.store != nil:
+		r.mu.Unlock()
+		return errors.New("the recording has its console already")
+	}
+	r.store = st
+	r.meta.Console, r.meta.ConsoleFrom = consoleName, time.Since(r.start).Seconds()
+	r.mu.Unlock()
+	if err := r.attach(st); err != nil {
+		return err
+	}
+	r.Mark("console connected")
+	r.mu.Lock()
+	m := r.meta
+	m.Duration = time.Since(r.start).Seconds()
+	r.mu.Unlock()
+	return r.writeMeta(m)
+}
+
+// Attached tells whether the recording has its console.
+func (r *Recorder) Attached() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.store != nil
 }
 
 func (r *Recorder) snapshot() error {
@@ -319,8 +368,11 @@ func (r *Recorder) Dir() string { return r.dir }
 
 // Stop ends the recording, once the changes queued are written.
 func (r *Recorder) Stop() error {
-	if r.cancel != nil {
-		r.cancel()
+	r.mu.Lock()
+	cancel := r.cancel
+	r.mu.Unlock()
+	if cancel != nil {
+		cancel()
 	}
 	r.mu.Lock()
 	if r.closed {

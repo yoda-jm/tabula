@@ -349,3 +349,48 @@ func TestRecordHangingDisk(t *testing.T) {
 		t.Errorf("%d events, markers %+v", len(s.Events), m)
 	}
 }
+
+// TestRecordConsoleLater: a recording started without the console (the
+// audio alone) gets it once it connects: its snapshot of then, its changes
+// from then on.
+func TestRecordConsoleLater(t *testing.T) {
+	dir := t.TempDir()
+	rec, err := Start(dir, nil, "", "doors")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Attached() {
+		t.Error("attached without a console")
+	}
+	time.Sleep(20 * time.Millisecond)
+	live := demo(t)
+	if err := rec.Attach(live, "M32C test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rec.Attach(live, "again"); err == nil {
+		t.Error("attached twice")
+	}
+	live.Set("/ch/12/mix/fader", osc.Float(0.25), "console")
+	if err := rec.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := s.Markers()
+	if s.Meta.Console != "M32C test" || s.Meta.ConsoleFrom < 0.02 || len(s.Start) < 1000 || s.Meta.Events < 1 ||
+		len(m) != 1 || m[0].Marker != "console connected" || m[0].T < s.Meta.ConsoleFrom {
+		t.Errorf("meta %+v, %d snapshot lines, markers %+v", s.Meta, len(s.Start), m)
+	}
+
+	// never connected: a session of the audio alone, which opens
+	dir = t.TempDir()
+	if rec, err = Start(dir, nil, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	rec.Stop()
+	if s, err = Open(dir); err != nil || len(s.Start) != 0 || len(s.Events) != 0 {
+		t.Errorf("audio alone: %v %+v", err, s)
+	}
+}

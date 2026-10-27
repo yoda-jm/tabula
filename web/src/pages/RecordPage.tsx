@@ -274,7 +274,13 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
                 <span className="danger-text">
                   <strong>● REC</strong>
                 </span>
-                <span>console: {plural(rec.meta?.events ?? 0, "change")}</span>
+                {rec.no_console ? (
+                  <span className="warn-text" title="Its moves join the session once it is connected and synced">
+                    console: not connected yet
+                  </span>
+                ) : (
+                  <span>console: {plural(rec.meta?.events ?? 0, "change")}</span>
+                )}
                 <span>{plural(rec.meta?.markers ?? 0, "marker")}</span>
                 {rec.audio?.state === "failed" ? (
                   <strong className="danger-text">⚠ NO AUDIO</strong>
@@ -362,13 +368,19 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
               <span className="field-label">Note (optional)</span>
               <input className="input" type="text" value={note} placeholder="Set 1, venue…" onChange={(e) => setNote(e.target.value)} />
             </label>
-            <button type="submit" className="btn big rec-start" disabled={busy || !status.connected}>
+            <button type="submit" className="btn big rec-start" disabled={busy || (!status.connected && !rec.audio_on)}>
               ● Start recording
             </button>
           </form>
         </>
       )}
-      {!recording && !status.connected && <p className="muted">Connect to a console to record it.</p>}
+      {!recording && !status.connected && (
+        <p className="muted">
+          {rec.audio_on
+            ? "No console connected: Start records the audio alone, and the console's moves join the session once it is connected and synced (a Wi-Fi down at the start does not cost the recording)."
+            : "Connect to a console to record it (with the audio tracks on, the audio can be recorded without it)."}
+        </p>
+      )}
       {err && (
         <p className="error" role="alert">
           {err}
@@ -472,7 +484,11 @@ function Session(props: { name: string; rec: RecordStatus | null; audio: AudioVi
           </dd>
           <dt>Console</dt>
           <dd>
-            {plural(detail.meta.events, "change")} after the start; {plural(detail.meta.markers, "marker")}
+            {!detail.meta.console && !detail.meta.events
+              ? "not connected during the recording: the audio alone"
+              : `${plural(detail.meta.events, "change")} after the start`}
+            ; {plural(detail.meta.markers, "marker")}
+            {detail.meta.console_from ? ` (the console joined at ${formatDuration(detail.meta.console_from)})` : ""}
           </dd>
           {detail.meta.console && (
             <>

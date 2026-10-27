@@ -357,9 +357,15 @@ the console's settings is saved first, as before every replay.
 Events: `record` carries a `Record` (every second while recording, and on
 every replay progress).
 
-`tabula -record -console <ip>` starts recording as soon as the console is
-synced (asking it again until it answers) and stops on exit — for
-unattended recording of a concert. `POST /api/record/start` waits (5 s at
+`tabula -record -console <ip>` starts recording at once when the audio
+tracks are on (the audio alone until the console is synced, then the
+console joins the session), else as soon as the console is synced (asking
+it again until it answers), and stops on exit — for unattended recording
+of a concert. `POST /api/record/start` without a console connected records
+the audio alone when the audio tracks are on (409 otherwise): `Record` has
+`"no_console": true` until the console joins (its snapshot of then, its
+changes from then on, `meta.console_from` its time, a `console connected`
+marker); `Record.audio_on` says whether the audio tracks are on. `POST /api/record/start` waits (5 s at
 most) for an input test running, or a recording ended by a disconnect, to
 free the card; 409 if it does not. `Record.error` says when the console's
 changes cannot be written (a full disk): those after it are lost.

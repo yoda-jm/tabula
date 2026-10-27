@@ -36,6 +36,14 @@
   the console's USB stick for the backup, and whether phones reach tabula.
   Checked again every few seconds; the Record page sums it up above Start
   recording (`GET /api/check`).
+- The audio is recorded without the console link (#5): with the audio
+  tracks on, **Start recording** works with no console connected (the
+  Wi-Fi down at the start), and `-record` starts the audio at once. The
+  console joins the same session once it is connected and synced, with its
+  snapshot of then, its changes from then on and a *console connected*
+  marker; until then the Record page says *console: not connected yet*.
+  Connecting or disconnecting does not end such a recording
+  (`Record.no_console`, `Record.audio_on`, `meta.console_from`).
 - Disarming writes while a scene file loads no longer leaves the console
   with half a scene: the file is sent to its end, then writes disarm (the
   button says *Disarms after the load*; click again to keep them armed).

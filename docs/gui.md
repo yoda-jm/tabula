@@ -495,6 +495,10 @@ to fix, 1 to look at*), with a link here.
 
 ## Record
 
+Without a console connected, **Start recording** records the audio alone
+when its tracks are on, and the console joins the session once synced
+([recording without the console](recording.md#quick-start)).
+
 Record a show as a session, which keeps two things, as the page says above
 **Start recording**:
 

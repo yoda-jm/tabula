@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"github.com/yoda-jm/tabula/pkg/audio"
+	"github.com/yoda-jm/tabula/pkg/console"
 	"github.com/yoda-jm/tabula/pkg/session"
+	"github.com/yoda-jm/tabula/pkg/state"
 )
 
 // Recording and replay of shows. Sessions live in subdirectories of the
@@ -31,9 +33,14 @@ type recordView struct {
 	Error       string `json:"error,omitempty"`
 	// Waiting: console changes waiting for the disk for more than
 	// slowDisk (a disk that hangs: they are written once it takes them)
-	Waiting int           `json:"waiting,omitempty"`
-	Audio   *audio.Status `json:"audio,omitempty"` // the audio capture of the recording, or of the last one
-	USB     usbBackupView `json:"usb"`             // the backup on the console's USB stick (usbbackup.go)
+	Waiting int `json:"waiting,omitempty"`
+	// AudioOn: audio tracks are recorded with the sessions; a recording can
+	// then start without the console (it joins once synced)
+	AudioOn bool `json:"audio_on"`
+	// NoConsole: the recording runs without the console yet (the audio alone)
+	NoConsole bool          `json:"no_console,omitempty"`
+	Audio     *audio.Status `json:"audio,omitempty"` // the audio capture of the recording, or of the last one
+	USB       usbBackupView `json:"usb"`             // the backup on the console's USB stick (usbbackup.go)
 }
 
 // SetSessionsDir sets where sessions are kept.
@@ -48,10 +55,10 @@ func (s *Server) recordStatus() recordView {
 	defer s.mu.Unlock()
 	v := recordView{Replaying: s.replayCancel != nil, ReplayOf: s.replayOf, ReplayAt: s.replayAt, ReplayAudio: s.sc.on,
 		Error: s.recordErr, Audio: publicAudio(s.audioStatusLocked()), USB: s.backup.view}
-	v.USB.On = s.audio.cfg.USBBackup
+	v.USB.On, v.AudioOn = s.audio.cfg.USBBackup, s.audio.cfg.Enabled
 	if s.rec != nil {
 		m := s.rec.Meta()
-		v.Recording, v.Name, v.Meta = true, filepath.Base(s.rec.Dir()), &m
+		v.Recording, v.Name, v.Meta, v.NoConsole = true, filepath.Base(s.rec.Dir()), &m, !s.rec.Attached()
 		if n, since := s.rec.Backlog(); n > 0 && time.Since(since) > slowDisk {
 			v.Waiting = n
 		}
@@ -82,10 +89,11 @@ func (s *Server) StartRecording(note string) error {
 	s.audio.probeMu.Lock() // see audioState.probeMu
 	defer s.audio.probeMu.Unlock()
 	s.mu.Lock()
+	console := s.mirror != nil && !s.connecting
 	switch {
-	case s.mirror == nil || s.connecting:
+	case !console && !s.audio.cfg.Enabled:
 		s.mu.Unlock()
-		return errors.New("not connected (or still syncing)")
+		return errors.New("not connected (or still syncing), and the audio tracks are off: nothing to record")
 	case s.rec != nil || s.recStarting != nil:
 		s.mu.Unlock()
 		return errors.New("already recording")
@@ -93,9 +101,14 @@ func (s *Server) StartRecording(note string) error {
 		s.mu.Unlock()
 		return errors.New("the audio input is being tested: try again in a few seconds")
 	}
-	st := s.client.Status()
-	mirror, dir, consoleName := s.mirror, s.sessionsDir, strings.TrimSpace(st.Info.Model+" "+st.Info.Name)
-	cfg, source := s.audio.cfg.Normalized(), s.audio.source
+	// without the console (not connected, or the Wi-Fi down), the audio
+	// alone: the console joins the session once synced (joinConsole)
+	var mirror *state.Store
+	consoleName := ""
+	if console {
+		mirror, consoleName = s.mirror, consoleNameOf(s.client.Status())
+	}
+	dir, cfg, source := s.sessionsDir, s.audio.cfg.Normalized(), s.audio.source
 	starting := make(chan struct{})
 	s.recStarting = starting
 	s.mu.Unlock()
@@ -122,7 +135,7 @@ func (s *Server) StartRecording(note string) error {
 	case err != nil:
 		s.mu.Unlock()
 		return err
-	case s.mirror != mirror: // disconnected meanwhile
+	case mirror != nil && s.mirror != mirror: // disconnected meanwhile
 		s.mu.Unlock()
 		s.endRecording(rec, c)
 		return errors.New("disconnected while the recording started")
@@ -137,8 +150,58 @@ func (s *Server) StartRecording(note string) error {
 	s.setlistLocked()
 	s.sessionSetlistLocked()
 	s.setlist.mu.Unlock()
+	if mirror == nil {
+		s.log.Info("recording the audio alone: the console joins once connected and synced", "session", rec.Dir())
+		s.joinConsole(rec) // synced while the recording started
+	}
 	go s.tickRecord(rec)
 	return nil
+}
+
+func consoleNameOf(st console.Status) string {
+	return strings.TrimSpace(st.Info.Model + " " + st.Info.Name)
+}
+
+// joinConsole adds the console, once connected and synced, to a recording
+// started without it: its snapshot of now, its changes from now on.
+func (s *Server) joinConsole(rec *session.Recorder) {
+	s.mu.Lock()
+	c, mirror := s.client, s.mirror
+	ok := s.rec == rec && mirror != nil && !s.connecting
+	s.mu.Unlock()
+	if !ok || rec.Attached() {
+		return
+	}
+	if err := rec.Attach(mirror, consoleNameOf(c.Status())); err != nil {
+		s.log.Warn("recording: the console does not join", "err", err)
+		return
+	}
+	s.log.Info("recording: the console joins the session", "session", rec.Dir())
+	s.mu.Lock()
+	if s.rec == rec {
+		s.startUSBBackupLocked(rec)
+	}
+	s.mu.Unlock()
+	s.publishRecord()
+}
+
+// RecordAtStart records from now when the audio tracks are on (the audio
+// alone until the console is connected and synced: the Wi-Fi may be down
+// at the start), else as soon as the console is synced (-record).
+func (s *Server) RecordAtStart() {
+	s.RecordOnSync(true)
+	s.mu.Lock()
+	audioOn := s.audio.cfg.Enabled
+	s.mu.Unlock()
+	if !audioOn {
+		return
+	}
+	go func() {
+		if err := s.StartRecording("started with -record"); err != nil {
+			s.log.Error("recording", "err", err)
+		}
+		s.publishRecord()
+	}()
 }
 
 // tickRecord publishes the recording status every second.
