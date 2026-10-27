@@ -8,6 +8,18 @@
   button says *Disarms after the load*; click again to keep them armed).
   `POST /api/arm` answers 202 meanwhile, and the file's progress says
   `disarm_after` (#13).
+- One wrong click can be put back (#9):
+  - before anything overwrites the console's settings (a scene file load, a
+    replay, a recall of a scene, snippet, cue or preset, a file loaded from
+    the USB stick, initialize, undo), tabula saves them as `Backup
+    2026-10-27 21.14.05.scn` with the scene files; the Scene files tab lists
+    the backups apart, to load one back. The newest 30 are kept, the same
+    settings are not saved twice, and a backup that fails (a full disk) is
+    told without stopping the load;
+  - writes that can stop a show ask first, in the Browser and every generic
+    editor: clock source and sample rate, network settings, the card's
+    settings, initialize, undo, formatting the X-Live! card, locking or
+    shutting down the console, recalls typed by hand.
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,

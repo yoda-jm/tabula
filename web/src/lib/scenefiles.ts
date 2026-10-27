@@ -25,13 +25,23 @@ export interface SceneProgress {
   error?: string;
   /** writes were disarmed during the load: they disarm once it is over */
   disarm_after?: boolean;
+  /** the console's settings before the load, saved as this file */
+  backup?: string;
 }
 
 export interface SceneFiles {
   dir: string;
   files: SceneFile[];
   loading?: SceneProgress;
+  /** the last backup before a load failed (a full disk…) */
+  backup_error?: string;
 }
+
+/**
+ * isBackup tells the files tabula saves before a load, a replay, a recall or
+ * an undo overwrites the console's settings ("Backup 2026-10-27 21.14.05.scn").
+ */
+export const isBackup = (file: string) => /^Backup \d{4}-\d\d-\d\d \d\d\.\d\d\.\d\d(-\d+)?\.scn$/.test(file);
 
 const fileUrl = (file: string) => `/api/scenefiles/${encodeURIComponent(file)}`;
 

@@ -26,7 +26,15 @@ var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 func TestMain(m *testing.M) {
 	probeCards = func(context.Context, []audio.Device) {} // never open this machine's cards
-	os.Exit(m.Run())
+	// the backups before a recall or a replay go to a scenes folder: not this one
+	dir, err := os.MkdirTemp("", "tabula-scenes-")
+	if err != nil {
+		panic(err)
+	}
+	defaultScenesDir = dir
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
 }
 
 func startEmu(t *testing.T) (*emu.Server, string) {

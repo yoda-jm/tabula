@@ -9,9 +9,12 @@ import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import { formatBytes } from "../lib/audio";
 import type { SceneFile, SceneFiles as Listing } from "../lib/scenefiles";
-import { headerOf, looksLikeScene, sceneFileName, sceneFilesApi } from "../lib/scenefiles";
+import { headerOf, isBackup, looksLikeScene, sceneFileName, sceneFilesApi } from "../lib/scenefiles";
 import { useCanWrite, useSceneLoad, useStatus } from "../store/hooks";
 import { store } from "../store/store";
+
+/** KEEP_BACKUPS is how many backups tabula keeps (keepBackups in pkg/webapi/scenebackup.go). */
+const KEEP_BACKUPS = 30;
 
 interface Ask {
   title: string;
@@ -28,6 +31,8 @@ export function SceneFiles() {
   const status = useStatus();
   const loading = useSceneLoad();
   const busy = !!loading && !loading.done;
+  const files = (list?.files ?? []).filter((f) => !isBackup(f.file));
+  const backups = (list?.files ?? []).filter((f) => isBackup(f.file)).reverse(); // newest first
 
   const refresh = useCallback(async () => {
     try {
@@ -70,8 +75,8 @@ export function SceneFiles() {
             phantom power…), as M32-Edit's PC → Mixer does.
           </p>
           <p className="muted">
-            The console's scene safes do not apply. The current mix is lost unless it is saved first (Save below, or as a scene
-            of the console).
+            The console's scene safes do not apply. tabula first saves the current settings as a backup (listed under Backups),
+            to put them back if needed.
           </p>
         </>
       ),
@@ -89,7 +94,7 @@ export function SceneFiles() {
       <section className="card">
         <header className="section-head">
           <h3>
-            Scene files <span className="muted">({list?.files.length ?? 0})</span>
+            Scene files <span className="muted">({files.length})</span>
           </h3>
           <button type="button" className="btn" onClick={() => void refresh()}>
             Refresh
@@ -102,52 +107,82 @@ export function SceneFiles() {
         )}
         {error && <p className="error">{error}</p>}
         <LoadProgress />
-        {list && !list.files.length && <p className="muted">No scene file yet: open one from this computer, or save the console's settings.</p>}
+        {list && !files.length && <p className="muted">No scene file yet: open one from this computer, or save the console's settings.</p>}
         <div className="slots">
-          {list?.files.map((f) => (
-            <div key={f.file} className="slot scene-file">
-              <div className="slot-head">
-                <span className="slot-name static">
-                  <strong>{f.name || f.file}</strong>
-                  {f.note && <span className="muted slot-note">{f.note}</span>}
-                  <span className="muted slot-note">
-                    {f.file} · {formatBytes(f.size)} · {new Date(f.modified).toLocaleString()}
-                  </span>
-                </span>
-                <button type="button" className="btn primary" disabled={!can || busy} onClick={() => load(f)}>
-                  {loading && !loading.done && loading.file === f.file ? "Loading…" : "Load"}
-                </button>
-                <a className="btn" href={sceneFilesApi.downloadUrl(f.file)} download={f.file} title="Download the file">
-                  ⤓
-                </a>
-                <button
-                  type="button"
-                  className="btn danger"
-                  aria-label={`Delete ${f.file}`}
-                  title="Delete the file"
-                  onClick={() =>
-                    setAsk({
-                      title: `Delete ${f.file}?`,
-                      confirm: "Delete",
-                      body: <p>The file is removed from the machine running tabula. The console keeps its settings.</p>,
-                      go: () => sceneFilesApi.remove(f.file),
-                    })
-                  }
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
+          {files.map((f) => (
+            <FileRow key={f.file} f={f} can={can} busy={busy} onLoad={load} ask={setAsk} />
           ))}
         </div>
-        {!can && list?.files.length ? <p className="muted lib-note">Loading a file changes the console: it needs armed writes.</p> : null}
+        {!can && files.length ? <p className="muted lib-note">Loading a file changes the console: it needs armed writes.</p> : null}
       </section>
+      {(backups.length > 0 || list?.backup_error) && (
+        <section className="card">
+          <details>
+            <summary className="section-head">
+              <h3>
+                Backups <span className="muted">({backups.length})</span>
+              </h3>
+            </summary>
+            <p className="muted">
+              The console's settings as they were before a scene file load, a replay, a recall, a load from the USB stick or an
+              undo, saved by tabula. Load one to put the console back as it was. The newest {KEEP_BACKUPS} are kept.
+            </p>
+            <div className="slots">
+              {backups.map((f) => (
+                <FileRow key={f.file} f={f} can={can} busy={busy} onLoad={load} ask={setAsk} />
+              ))}
+            </div>
+          </details>
+          {list?.backup_error && <p className="error">{list.backup_error}</p>}
+        </section>
+      )}
       {ask && (
         <ConfirmDialog title={ask.title} confirm={ask.confirm} onCancel={() => setAsk(null)} onConfirm={() => void act(ask.title.replace(/\?$/, ""), ask.go)}>
           {ask.body}
         </ConfirmDialog>
       )}
     </>
+  );
+}
+
+/** FileRow is one scene file: Load, download, delete. */
+function FileRow(props: { f: SceneFile; can: boolean; busy: boolean; onLoad(f: SceneFile): void; ask(a: Ask): void }) {
+  const { f } = props;
+  const loading = useSceneLoad();
+  return (
+    <div className="slot scene-file">
+      <div className="slot-head">
+        <span className="slot-name static">
+          <strong>{f.name || f.file}</strong>
+          {f.note && <span className="muted slot-note">{f.note}</span>}
+          <span className="muted slot-note">
+            {f.file} · {formatBytes(f.size)} · {new Date(f.modified).toLocaleString()}
+          </span>
+        </span>
+        <button type="button" className="btn primary" disabled={!props.can || props.busy} onClick={() => props.onLoad(f)}>
+          {loading && !loading.done && loading.file === f.file ? "Loading…" : "Load"}
+        </button>
+        <a className="btn" href={sceneFilesApi.downloadUrl(f.file)} download={f.file} title="Download the file">
+          ⤓
+        </a>
+        <button
+          type="button"
+          className="btn danger"
+          aria-label={`Delete ${f.file}`}
+          title="Delete the file"
+          onClick={() =>
+            props.ask({
+              title: `Delete ${f.file}?`,
+              confirm: "Delete",
+              body: <p>The file is removed from the machine running tabula. The console keeps its settings.</p>,
+              go: () => sceneFilesApi.remove(f.file),
+            })
+          }
+        >
+          ✕
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -170,6 +205,12 @@ function LoadProgress() {
       ) : (
         <p>
           <strong>{p.file}</strong> loaded: {p.sent} lines.{p.disarm_after && " Writes are disarmed."}
+          {p.backup && (
+            <span className="muted">
+              {" "}
+              The settings before it are in <code>{p.backup}</code>.
+            </span>
+          )}
         </p>
       )}
       {!p.done && (

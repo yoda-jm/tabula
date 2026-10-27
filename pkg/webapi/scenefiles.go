@@ -48,6 +48,8 @@ type sceneProgress struct {
 	Error   string   `json:"error,omitempty"`
 	// writes were disarmed during the load: they disarm once it is over
 	DisarmAfter bool `json:"disarm_after,omitempty"`
+	// the console's settings before the load, saved as this file (scenebackup.go)
+	Backup string `json:"backup,omitempty"`
 }
 
 func (s *Server) sceneFileRoutes(mux *http.ServeMux) {
@@ -130,10 +132,14 @@ func fileNameFor(name string) string {
 func (s *Server) listSceneFiles(w http.ResponseWriter, r *http.Request) {
 	dir := s.scenesFolder()
 	out := struct {
-		Dir     string         `json:"dir"`
-		Files   []sceneFile    `json:"files"`
-		Loading *sceneProgress `json:"loading,omitempty"`
+		Dir         string         `json:"dir"`
+		Files       []sceneFile    `json:"files"`
+		Loading     *sceneProgress `json:"loading,omitempty"`
+		BackupError string         `json:"backup_error,omitempty"` // the last backup failed (scenebackup.go)
 	}{Dir: dir, Files: []sceneFile{}}
+	s.mu.Lock()
+	out.BackupError = s.backupErr
+	s.mu.Unlock()
 	if abs, err := filepath.Abs(dir); err == nil {
 		out.Dir = abs
 	}
@@ -401,6 +407,10 @@ func (s *Server) loadSceneFile(w http.ResponseWriter, r *http.Request) {
 		s.scenes.mu.Unlock()
 		s.hub.publish("scenefile", v)
 	}
+	backup := s.backupBefore("loading " + prog.File)
+	s.scenes.mu.Lock()
+	prog.Backup = backup
+	s.scenes.mu.Unlock()
 	publish()
 	s.log.Info("scene file: loading", "file", prog.File, "lines", len(send), "skipped", len(skipped))
 	start := time.Now()

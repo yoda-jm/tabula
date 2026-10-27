@@ -239,6 +239,9 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, errors.New("not connected"))
 		return
 	}
+	if what := req.backupWhat(c.Mirror()); what != "" && c.Status().Armed {
+		s.backupBefore(what)
+	}
 	err = c.Library(r.Context(), cmd, args...)
 	switch {
 	case errors.Is(err, console.ErrReadOnly):

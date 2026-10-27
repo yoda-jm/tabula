@@ -61,6 +61,7 @@ type Server struct {
 
 	scenesDir string         // scenefiles.go
 	scenes    sceneLoadState // scenefiles.go
+	backupErr string         // scenebackup.go
 	usb       usbState       // usb.go
 	backup    usbBackupState // usbbackup.go
 
@@ -69,8 +70,11 @@ type Server struct {
 	started time.Time // about.go
 }
 
+// defaultScenesDir is the scenes folder until SetScenesDir (tests keep it out of the source tree).
+var defaultScenesDir = "scenes"
+
 func New(log *slog.Logger) *Server {
-	s := &Server{log: log, model: "M32C", schema: schema.Build("M32C"), sessionsDir: "sessions", scenesDir: "scenes", version: "dev", started: time.Now()}
+	s := &Server{log: log, model: "M32C", schema: schema.Build("M32C"), sessionsDir: "sessions", scenesDir: defaultScenesDir, version: "dev", started: time.Now()}
 	s.hub.init()
 	s.acc.init()
 	return s
@@ -541,6 +545,11 @@ func (s *Server) set(w http.ResponseWriter, r *http.Request) {
 		arg, err = decodeValue(c.Mirror(), req.Addr, req.Value)
 	default:
 		err = errors.New(`"text" or "value" is required`)
+	}
+	if err == nil && c.Status().Armed {
+		if what := actionBackup(c.Mirror(), req.Addr, arg); what != "" {
+			s.backupBefore(what)
+		}
 	}
 	if err == nil {
 		err = c.SetAs(req.Addr, arg, who.origin(), unarmed)

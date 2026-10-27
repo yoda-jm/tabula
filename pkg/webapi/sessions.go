@@ -320,6 +320,7 @@ func (s *Server) replayStart(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, errors.New("already replaying"))
 		return
 	}
+	s.backupBefore("replaying " + req.Session)
 	ctx, cancel := context.WithCancel(context.Background())
 	s.mu.Lock()
 	s.replayCancel, s.replayOf, s.replayAt, s.recordErr = cancel, req.Session, req.From, ""

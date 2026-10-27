@@ -294,6 +294,14 @@ M32-Edit, saved by the console on a USB stick, or a backup of the console.
 - **Save the console's settings as a file** writes the current settings as
   `<name>.scn`, which M32-Edit opens (reading needs no armed writes).
 - ⤓ downloads a file, ✕ deletes it.
+- **Backups**: before anything overwrites the console's settings (a scene
+  file load, a replay, a recall of a scene, snippet, cue or preset, a file
+  loaded from the USB stick, initialize, undo), tabula saves them as
+  `Backup 2026-10-27 21.14.05.scn` in the same folder, listed apart, newest
+  first. **Load** one to put the console back as it was. The newest 30 are
+  kept (about 70 KB each); the same settings twice in a row are saved once.
+  A backup that fails (a full disk) does not stop the load: the error shows
+  here and in the log.
 
 ![Scene files kept on the machine running tabula](img/gui-scene-files.png)
 
@@ -329,6 +337,13 @@ branches you open are remembered.
 The filter searches paths and values (`/ch/01/eq`, `Theo`, `GATE`): the tree
 keeps only the matches and opens down to them, as far as a couple of
 hundred rows; the counts tell where the other matches are.
+
+Writes that can stop a show ask first, saying what happens: the clock
+source and sample rate, the network settings (`/-prefs/ip`, set IP), the
+card's settings (`/-prefs/card`: the DN32-USB restarts), initialize
+(console, library, show), undo, formatting or deleting on the X-Live! card,
+locking or shutting down the console (`/-stat/lock`), and recalls written
+by hand (`/-action/goscene`…). The same editors ask on every page.
 
 ## In-ears
 

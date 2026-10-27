@@ -1,17 +1,54 @@
 // Generic parameter editors, chosen by type kind: they read the value from
 // the store and write through it, and are disabled unless writes are armed.
-// A headamp's phantom power asks first, as on the Channel page.
+// A headamp's phantom power asks first, as on the Channel page, and so do
+// the writes that can stop a show (lib/risky.ts: clock, network, card…).
 
 import { useEffect, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import type { TypeInfo } from "../lib/api";
 import type { PhantomAsk } from "../lib/phantom";
 import { isPhantom, phantomAsk, phantomPort, phantomTarget } from "../lib/phantom";
+import type { Risk } from "../lib/risky";
+import { riskOf } from "../lib/risky";
 import { isOnOff, prettyText, setBit, stepSize } from "../lib/values";
 import { useCanWrite, useLeaf, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import type { Val } from "../store/store";
 import { PhantomDialog, PhantomToggle } from "./Phantom";
+import { ConfirmDialog } from "./shell";
+
+/**
+ * useGuard runs a write at once, or after a confirmation for a write that
+ * can stop a show; dialog is to render with the editor.
+ */
+function useGuard(addr: string): [(value: number | string, write: () => void) => void, ReactNode] {
+  const [ask, setAsk] = useState<{ risk: Risk; write(): void } | null>(null);
+  const guard = (value: number | string, write: () => void) => {
+    const risk = riskOf(addr, value);
+    if (risk) setAsk({ risk, write });
+    else write();
+  };
+  const dialog = ask && (
+    <ConfirmDialog
+      title={ask.risk.title}
+      confirm={ask.risk.confirm}
+      onConfirm={() => {
+        setAsk(null);
+        ask.write();
+      }}
+      onCancel={() => setAsk(null)}
+    >
+      <p>{ask.risk.body}</p>
+      <p className="muted">
+        <code>{addr}</code>
+      </p>
+    </ConfirmDialog>
+  );
+  return [guard, dialog];
+}
+
+/** set writes a value, after a confirmation when it can stop a show. */
+const set = (guard: ReturnType<typeof useGuard>[0], addr: string, value: number | string) => guard(value, () => store.set(addr, value));
 
 export interface ControlProps {
   addr: string;
@@ -57,6 +94,7 @@ interface EditorProps {
 }
 
 function Toggle({ addr, val, disabled, onLabel, offLabel, mute }: ControlProps & { val: Val | undefined; disabled: boolean }) {
+  const [guard, dialog] = useGuard(addr);
   const on = Number(val?.value) === 1;
   if (mute) {
     return (
@@ -72,33 +110,40 @@ function Toggle({ addr, val, disabled, onLabel, offLabel, mute }: ControlProps &
     );
   }
   return (
-    <button
-      type="button"
-      className={"btn toggle" + (on ? " lit" : "")}
-      aria-pressed={on}
-      disabled={disabled}
-      onClick={() => store.set(addr, on ? 0 : 1)}
-    >
-      {on ? (onLabel ?? "ON") : (offLabel ?? "OFF")}
-    </button>
+    <>
+      <button
+        type="button"
+        className={"btn toggle" + (on ? " lit" : "")}
+        aria-pressed={on}
+        disabled={disabled}
+        onClick={() => set(guard, addr, on ? 0 : 1)}
+      >
+        {on ? (onLabel ?? "ON") : (offLabel ?? "OFF")}
+      </button>
+      {dialog}
+    </>
   );
 }
 
 function EnumSelect({ addr, t, val, disabled }: EditorProps) {
+  const [guard, dialog] = useGuard(addr);
   return (
-    <select
-      className="select"
-      value={val === undefined ? "" : String(val.value)}
-      disabled={disabled}
-      onChange={(e) => store.set(addr, Number(e.target.value))}
-    >
-      {val === undefined && <option value="">—</option>}
-      {(t.names ?? []).map((n, i) => (
-        <option key={i} value={i}>
-          {n}
-        </option>
-      ))}
-    </select>
+    <>
+      <select
+        className="select"
+        value={val === undefined ? "" : String(val.value)}
+        disabled={disabled}
+        onChange={(e) => set(guard, addr, Number(e.target.value))}
+      >
+        {val === undefined && <option value="">—</option>}
+        {(t.names ?? []).map((n, i) => (
+          <option key={i} value={i}>
+            {n}
+          </option>
+        ))}
+      </select>
+      {dialog}
+    </>
   );
 }
 
@@ -110,50 +155,58 @@ function useDraft(current: string) {
 }
 
 function IntInput({ addr, t, val, disabled }: EditorProps) {
+  const [guard, dialog] = useGuard(addr);
   const current = val === undefined ? "" : String(val.value);
   const [text, dirty, setDraft] = useDraft(current);
   const commit = () => {
     if (!dirty) return;
     const n = Math.round(Number(text));
     if (text.trim() === "" || Number.isNaN(n)) return setDraft(null);
-    store.set(addr, Math.min(t.max ?? n, Math.max(t.min ?? n, n)));
+    set(guard, addr, Math.min(t.max ?? n, Math.max(t.min ?? n, n)));
     setDraft(null);
   };
   return (
-    <input
-      className="input num"
-      type="number"
-      inputMode="numeric"
-      min={t.min}
-      max={t.max}
-      value={text}
-      disabled={disabled}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => onEnter(e, commit, () => setDraft(null))}
-    />
+    <>
+      <input
+        className="input num"
+        type="number"
+        inputMode="numeric"
+        min={t.min}
+        max={t.max}
+        value={text}
+        disabled={disabled}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => onEnter(e, commit, () => setDraft(null))}
+      />
+      {dialog}
+    </>
   );
 }
 
 function StringInput({ addr, t, val, disabled }: EditorProps) {
+  const [guard, dialog] = useGuard(addr);
   const current = val === undefined ? "" : String(val.value);
   const [text, dirty, setDraft] = useDraft(current);
   const commit = () => {
-    if (dirty && text !== current) store.set(addr, text);
+    if (dirty && text !== current) set(guard, addr, text);
     setDraft(null);
   };
   return (
-    <input
-      className="input"
-      type="text"
-      maxLength={t.max}
-      value={text}
-      disabled={disabled}
-      spellCheck={false}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => onEnter(e, commit, () => setDraft(null))}
-    />
+    <>
+      <input
+        className="input"
+        type="text"
+        maxLength={t.max}
+        value={text}
+        disabled={disabled}
+        spellCheck={false}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => onEnter(e, commit, () => setDraft(null))}
+      />
+      {dialog}
+    </>
   );
 }
 
@@ -168,10 +221,12 @@ function onEnter(e: KeyboardEvent<HTMLInputElement>, commit: () => void, cancel:
 }
 
 function BitToggles({ addr, t, val, disabled }: EditorProps) {
+  const [guard, dialog] = useGuard(addr);
   const bits = t.bits ?? 0;
   const v = Number(val?.value ?? 0);
   return (
     <div className="bits" role="group">
+      {dialog}
       {Array.from({ length: bits }, (_, i) => {
         const on = ((v >>> i) & 1) === 1;
         return (
@@ -182,7 +237,7 @@ function BitToggles({ addr, t, val, disabled }: EditorProps) {
             aria-pressed={on}
             aria-label={`bit ${i + 1}`}
             disabled={disabled}
-            onClick={() => store.set(addr, setBit(v, i, !on))}
+            onClick={() => set(guard, addr, setBit(v, i, !on))}
           >
             {i + 1}
           </button>
@@ -226,10 +281,13 @@ export function TextSetter({ addr }: { addr: string }) {
   const can = useCanWrite(addr);
   const [text, setText] = useState("");
   const [ask, setAsk] = useState<PhantomAsk | null>(null);
+  const [guard, dialog] = useGuard(addr);
   const send = async () => {
     if (!text.trim()) return;
     if (!isPhantom(addr)) {
-      if (await store.setText(addr, text)) setText("");
+      guard(text, async () => {
+        if (await store.setText(addr, text)) setText("");
+      });
       return;
     }
     // phantom power pops through the PA: asked first, as on its button
@@ -272,6 +330,7 @@ export function TextSetter({ addr }: { addr: string }) {
           onCancel={() => setAsk(null)}
         />
       )}
+      {dialog}
     </>
   );
 }

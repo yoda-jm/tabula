@@ -62,6 +62,10 @@ func usbKind(name string) (string, string) {
 	return "file", name
 }
 
+// usbLoads are the files whose opening loads settings into the console:
+// they are backed up first (scenebackup.go).
+var usbLoads = map[string]bool{"scene": true, "snippet": true, "show": true, "effect": true, "routing": true, "channel": true, "prefs": true}
+
 // usbState keeps one USB command at a time: the listing read after one
 // belongs to it.
 type usbState struct {
@@ -221,6 +225,9 @@ func (s *Server) usbCommand(w http.ResponseWriter, r *http.Request) {
 	if req.Op == "open" && entry == nil {
 		httpError(w, http.StatusBadRequest, fmt.Errorf("no entry %d in this directory", req.Index))
 		return
+	}
+	if entry != nil && usbLoads[entry.Kind] && c.Status().Armed {
+		s.backupBefore(fmt.Sprintf("loading %s from the USB stick", entry.Name))
 	}
 	err := c.Set(addr, osc.Int(val))
 	switch {

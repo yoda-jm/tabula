@@ -127,7 +127,7 @@ write them. Engineer only.
 
 | Method | Path | Body | Answer |
 |---|---|---|---|
-| GET | `/api/scenefiles` | | `{"dir", "files": [{"file", "name", "note"?, "size", "modified"}], "loading"?}`: `name` and `note` from the file's first line (`#4.0# "name" "note" …`); `loading` while one is being sent |
+| GET | `/api/scenefiles` | | `{"dir", "files": [{"file", "name", "note"?, "size", "modified"}], "loading"?, "backup_error"?}`: `name` and `note` from the file's first line (`#4.0# "name" "note" …`); `loading` while one is being sent; `backup_error` when the last backup (below) failed |
 | GET | `/api/scenefiles/{file}` | | the file, as a download; 404 |
 | PUT | `/api/scenefiles/{file}` | the file's text | 204: kept in the folder (`?replace=1` to replace one of the same name, else 409); 400 for a name that is not `something.scn` or a text without parameter lines; 413 above 2 MB |
 | DELETE | `/api/scenefiles/{file}` | | 204; 404 |
@@ -135,8 +135,19 @@ write them. Engineer only.
 | POST | `/api/scenefiles/{file}/load` | | `SceneProgress`, once sent: the file sent to the console, line by line with the `/` command (each echoed before the next goes, as the editors' PC → Mixer). Every parameter it holds changes at once, without the console's scene safes. Lines this console's schema does not know are skipped and listed. 403 unless writes are armed; 409 when not connected, while a replay runs or another file loads; 404 |
 
 `SceneProgress`: `{"file", "sent", "total", "done", "skipped"?: [line],
-"error"?, "disarm_after"?}`, also sent as `scenefile` events while a file loads (every 50
-lines) and when it is done. A load goes on if the browser leaves.
+"error"?, "disarm_after"?, "backup"?}` (`backup`: the file the console's
+settings were saved as before the load), also sent as `scenefile` events
+while a file loads (every 50 lines) and when it is done. A load goes on if
+the browser leaves.
+
+**Backups.** Before anything overwrites the console's settings, they are
+saved as `Backup YYYY-MM-DD hh.mm.ss.scn` in this folder: a scene file load,
+`POST /api/replay/start`, a library `load` (`POST /api/library`), opening a
+scene, snippet, show or preset file of the USB stick, and `POST /api/set` of
+`/-action/goscene`, `gosnippet`, `gocue`, `initall 1` or `doundo 1`, armed.
+The newest 30 are kept; settings equal to the newest backup are not saved
+again. A backup that fails does not stop the command: it is logged, and
+`GET /api/scenefiles` says `"backup_error"` until one works again.
 
 ## USB stick
 
