@@ -67,6 +67,7 @@ type Server struct {
 	backupErr string         // scenebackup.go
 	undo      undoState      // undo.go
 	setlist   setlistState   // setlist.go
+	check     checkState     // check.go
 	usb       usbState       // usb.go
 	backup    usbBackupState // usbbackup.go
 	home      homeState      // takehome.go
@@ -111,6 +112,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("DELETE /api/sessions/{name}", s.deleteSession)
 	mux.HandleFunc("POST /api/replay/start", s.replayStart)
 	mux.HandleFunc("POST /api/replay/stop", s.replayStop)
+	mux.HandleFunc("GET /api/check", s.getCheck)
 	mux.HandleFunc("GET /api/undo", s.getUndo)
 	mux.HandleFunc("POST /api/undo", s.postUndo)
 	mux.HandleFunc("POST /api/strips/copy", s.copyStrips)

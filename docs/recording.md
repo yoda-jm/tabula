@@ -25,6 +25,11 @@ replay moves faders and settings; it plays no sound).
 
 ## Quick start
 
+Before a show, open the **Check** page: it lists what would spoil the
+recording (the card's mode and sample rate against the audio settings, the
+device, the disk space for the show's length, the power, sleep), each with
+what to do ([the Check page](gui.md#check)).
+
 On the **Record** page, in **Audio tracks**: tick *Record the audio tracks
 with every recording*, choose the device (**Find devices** lists them; the
 console's card is marked ★), the tracks, and **Save**. **Test the input**

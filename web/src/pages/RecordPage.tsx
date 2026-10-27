@@ -19,6 +19,7 @@ import { store } from "../store/store";
 import type { Audio } from "./AudioPanel";
 import { AudioPanel, CheckProblems, SessionAudio, saveDraft, useAudio, useUnsaved } from "./AudioPanel";
 import { SetlistCard } from "./Setlist";
+import { CheckSummaryLine } from "./CheckPage";
 import { TakeHome } from "./TakeHome";
 import { UsbBackupCard } from "./UsbBackup";
 
@@ -347,6 +348,7 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
         <>
           <RecordsWhat audio={audioPlan(audio.draft ?? audio.view?.config)} usb={rec.usb?.on} />
           <CheckProblems audio={audio} />
+          <CheckSummaryLine />
           {audio.draft && <p className="note">The audio settings below are not saved yet: Start recording asks whether to save them.</p>}
           <form
             className="row"

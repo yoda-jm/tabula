@@ -20,6 +20,7 @@ import { store } from "../store/store";
 import { AccessPage } from "./AccessPage";
 import { BrowserPage } from "./BrowserPage";
 import { ChannelPage } from "./ChannelPage";
+import { CheckLines, CheckPage } from "./CheckPage";
 import { ConnectPage } from "./ConnectPage";
 import { FxPage } from "./FxPage";
 import { MixerPage } from "./MixerPage";
@@ -56,6 +57,7 @@ beforeAll(async () => {
     "/api/state": json("state"),
     "/api/status": status,
     "/api/record": json("record"),
+    "/api/check": json("check"),
   };
   vi.stubGlobal("fetch", async (url: string) => {
     const body = answers[url.split("?")[0]];
@@ -161,6 +163,14 @@ describe("pages", () => {
 
   it("browser", () => {
     expect(render(<BrowserPage />)).toContain("/ch");
+  });
+
+  it("the pre-show check", () => {
+    const check = JSON.parse(readFileSync(join(dir, "check.json"), "utf8"));
+    expect(render(<CheckPage />)).toContain("Pre-show check");
+    const html = render(<CheckLines view={check} />);
+    for (const id of ["Console", "Card mode", "Sample rate", "Disk", "Power", "Sleep", "Phones"]) expect(html).toContain(id);
+    expect(html).toContain("tabula-emu · M32C · fw 4.06: connected and synced");
   });
 
   it("record, connect, access", () => {

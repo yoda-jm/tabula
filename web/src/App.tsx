@@ -11,6 +11,7 @@ import { prettyText } from "./lib/values";
 import { AccessPage } from "./pages/AccessPage";
 import { BrowserPage } from "./pages/BrowserPage";
 import { ChannelPage } from "./pages/ChannelPage";
+import { CheckPage } from "./pages/CheckPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { FxPage } from "./pages/FxPage";
 import { MixPage, MusicianApp } from "./pages/MixPage";
@@ -37,6 +38,7 @@ const NAV: { page: Page; label: string; role: Role }[] = [
   { page: "usb", label: "USB", role: "engineer" },
   { page: "browser", label: "Browser", role: "viewer" },
   { page: "mix", label: "In-ears", role: "engineer" },
+  { page: "check", label: "Check", role: "engineer" },
   { page: "record", label: "Record", role: "engineer" },
   { page: "access", label: "Access", role: "engineer" },
   { page: "connect", label: "Connect", role: "engineer" },
@@ -133,6 +135,8 @@ function ConsoleApp({ role }: { role: Role }) {
           <UsbPage />
         ) : page === "browser" ? (
           <BrowserPage />
+        ) : page === "check" && engineer ? (
+          <CheckPage />
         ) : page === "record" && engineer ? (
           <RecordPage />
         ) : page === "mix" && engineer ? (

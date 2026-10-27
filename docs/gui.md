@@ -46,8 +46,8 @@ the console's name in the top bar is followed by what goes wrong
 every page (once signed in, when an engineer password is set). Other
 devices get a role from an access link: viewers see the Mixer, Channel,
 Meters and Browser pages read-only; musicians only get their in-ear mix.
-Monitor, Routing, FX, Scenes, USB, In-ears, Record, Access and Connect are
-engineer pages. See [access](access.md).
+Monitor, Routing, FX, Scenes, USB, In-ears, Check, Record, Access and
+Connect are engineer pages. See [access](access.md).
 
 ## Mixer
 
@@ -454,6 +454,44 @@ The in-ear mix of one bus as a musician sees it on their phone: a desk of
 tall faders, one per source sending to the bus, with the bus volume on the
 right. The engineer can open any
 bus here; musicians get only theirs. See [access](access.md).
+
+## Check
+
+A pre-show check, to find before the doors open what would spoil the
+recording or the show. Each line is green (good), amber (to look at), red
+(to fix) or grey (this machine cannot tell, or nothing to check), says what
+it found and what to do; the page checks again every few seconds, and
+*The show lasts* sets the length the disk is checked for (3 h by default,
+remembered by the browser).
+
+- **Console**: connected and synced, or why not (values that never
+  answered: another firmware).
+- **Link to the console**: the round trip and the requests left unanswered,
+  measured by reading the console back, as in the top bar.
+- **Card mode** (`/-prefs/card/USBmode`): the channels the card sends to
+  the computer against what the audio settings expect, and the tracks
+  recorded (the first number of `32/8`, as Maillot's document writes
+  *32in/8out*; which way round is a guess).
+- **Sample rate**: the console's (`/-prefs/clockrate`) against the audio
+  settings'.
+- **Audio device**: the device recorded from is there and is the console's
+  card, as the Record page checks.
+- **Disk**: what the show takes (the audio tracks, the console moves) against
+  the free space of the sessions disk, how long fits, and that the sessions
+  folder can be written.
+- **Power**: on mains or on battery, and how much is left.
+- **Sleep**: whether something keeps the laptop awake, and what closing the
+  lid does (Linux: logind's `systemd-inhibit --list` and `HandleLidSwitch`;
+  macOS: `pmset`). tabula does not keep the laptop awake itself yet.
+- **Console's USB stick**: there when the backup on it is on.
+- **Phones**: whether phones can reach tabula (`-http :8033`), at which
+  addresses, and how many musicians have their mix open.
+- **Recording**: nothing recorded or replayed now.
+
+The Record page sums it up above **Start recording** (*Pre-show check: 2
+to fix, 1 to look at*), with a link here.
+
+![The pre-show check: the console and card are fine, the audio device is not connected, the disk is too small for 3 h](img/gui-check.png)
 
 ## Record
 

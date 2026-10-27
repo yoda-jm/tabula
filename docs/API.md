@@ -297,6 +297,7 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | Method | Path | Body | Answer |
 |---|---|---|---|
 | GET | `/api/record` | | `Record` |
+| GET | `/api/check` | `?hours=3` | `{"lines": [CheckLine], "hours", "at"}`: the pre-show check for a show of `hours` (3 by default, 0.25 to 24). `CheckLine`: `{"id", "title", "level", "text", "fix"?}`, `id` one of `console`, `link` (when connected), `card`, `rate`, `device`, `disk`, `power`, `sleep`, `usb`, `phones`, `busy`; `level` `ok`, `warn`, `bad`, `unknown` (this machine cannot tell) or `info` (nothing to check). What is slow to find (power, sleep, the audio devices) is kept 5 s. Engineer only |
 | POST | `/api/record/start` | `{"note": "set 1"}` | `Record` (409 if not connected or already recording). With audio, it answers once the audio delivers samples or has failed (3 s at most), so `audio.state` says whether it runs |
 | POST | `/api/record/mark` | `{"label": "Song 2"}`, or `{"next": true}` (the next song of the setlist, then the next one moves on), or `{"song": 2}` (that song of the setlist, from 0; the next one is the one after it); with none of them, or when no song is left: `Marker 12m34s`, the time since the start | `Record` and `"marked": {"label", "t"}`, the marker added (`t`: seconds after the start); 409 when not recording, 400 for a song not in the setlist |
 | POST | `/api/record/stop` | | `Record` |

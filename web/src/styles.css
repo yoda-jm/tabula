@@ -3530,4 +3530,100 @@ code.wrap {
   align-items: center;
   gap: 10px;
   min-height: 36px;
+/* The pre-show check */
+.precheck {
+  max-width: 900px;
+}
+.check-form {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.check-form .input.num {
+  width: 7em;
+}
+.check-sum {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.check-sum.ok {
+  color: var(--ok);
+  border: 1px solid var(--ok);
+}
+.check-sum.warn {
+  color: var(--busy);
+  border: 1px solid var(--busy);
+}
+.check-sum.bad {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.check-lines {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.check-line {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+}
+.check-line.ok {
+  border-left-color: var(--ok);
+}
+.check-line.warn {
+  border-left-color: var(--busy);
+}
+.check-line.bad {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel));
+}
+.check-body p {
+  margin: 2px 0 0;
+}
+.check-fix {
+  color: var(--muted);
+}
+.check-fix::before {
+  content: "→ ";
+}
+.check-dot {
+  flex: none;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.ok > .check-dot {
+  background: var(--ok);
+}
+.warn > .check-dot {
+  background: var(--busy);
+}
+.bad > .check-dot {
+  background: var(--danger);
+}
+.info > .check-dot {
+  background: var(--line);
+}
+.check-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.check-summary .check-dot {
+  margin-top: 0;
 }

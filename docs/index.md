@@ -163,6 +163,11 @@ tabula -console 192.168.1.62 -http :8033
   (`ch` → `01` → `eq` → `1`), searchable by path or value, each with an
   editor; values can also be typed as on the console (`-6`,
   `1k20`, `GATE`).
+- **Check**: a pre-show check of what would spoil the show: the console and
+  the link to it, the card's mode and sample rate against the audio
+  settings, the audio device, the disk space for the show's length, the
+  power, sleep, the console's USB stick and the phones, each with what to
+  do.
 - **Record**: record a show (snapshot plus every change, with markers) and
   replay it onto the console or the emulator. With the console's USB card,
   the audio tracks are recorded too, one WAV file each, in sync with the

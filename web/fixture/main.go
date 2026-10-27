@@ -99,7 +99,7 @@ func write(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	for name, path := range map[string]string{"schema": "/api/schema", "state": "/api/state", "status": "/api/status", "record": "/api/record"} {
+	for name, path := range map[string]string{"schema": "/api/schema", "state": "/api/state", "status": "/api/status", "record": "/api/record", "check": "/api/check"} {
 		b, err := get(path)
 		if err != nil {
 			return err
