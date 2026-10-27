@@ -12,6 +12,20 @@
   it. The changes now wait in a queue for the disk; after 2 s the Record
   page says how many are waiting (`Record.waiting`), and only a disk taking
   nothing for minutes loses the next ones (counted, as a write error).
+- Markers from any page, and a setlist (#23): while recording, **⚑** in
+  the top bar of every engineer page (or the M key, anywhere but in a text
+  field) adds a marker. With a setlist typed on the Record page, one song
+  per line, one tap marks the next song with its name (*3. Song name*) and
+  moves on; **▾** marks another song (one played out of order), goes back
+  or skips one, or marks with a label of yours (*Break*). The setlist is
+  kept next to the sessions (`setlist.json`: it survives a restart) and
+  shared by the engineer's devices, which never mark the same song twice.
+  A session keeps the setlist it was recorded with, and its details list
+  each song with the time it was marked (*Replay from here*); the markers
+  go to the Reaper, Audacity and CSV exports as before. `GET`/`PUT
+  /api/setlist`, `POST /api/setlist/next`, `POST /api/record/mark` takes
+  `{"next": true}` or `{"song": n}` and answers the marker added,
+  `setlist` events.
 - Disarming writes while a scene file loads no longer leaves the console
   with half a scene: the file is sent to its end, then writes disarm (the
   button says *Disarms after the load*; click again to keep them armed).

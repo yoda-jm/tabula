@@ -133,6 +133,10 @@ func (s *Server) StartRecording(note string) error {
 	s.startUSBBackupLocked(rec)
 	s.mu.Unlock()
 	s.noteCapture(rec, cfg, c, failed)
+	s.setlist.mu.Lock() // the session keeps the setlist it is recorded with (setlist.go)
+	s.setlistLocked()
+	s.sessionSetlistLocked()
+	s.setlist.mu.Unlock()
 	go s.tickRecord(rec)
 	return nil
 }
