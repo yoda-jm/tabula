@@ -69,12 +69,12 @@ func (s *Server) newSoundcheck(c *console.Client, ses *session.Session, speed fl
 		return nil, http.StatusConflict, err
 	}
 	s.mu.Lock()
-	cfg, recording := s.audio.cfg.Normalized(), s.rec != nil
+	cfg, recording, sink := s.audio.cfg.Normalized(), s.rec != nil, s.sc.sink
 	s.mu.Unlock()
 	if recording {
 		return nil, http.StatusConflict, errors.New("a recording is running: stop it before a virtual soundcheck")
 	}
-	if _, err := cfg.PlayCommandLine(info.Channels, info.Rate); err != nil {
+	if _, err := cfg.PlayCommandLine(info.Channels, info.Rate); err != nil && sink == nil {
 		return nil, http.StatusConflict, fmt.Errorf("the tracks cannot be played: %w (Audio settings)", err)
 	}
 	return &soundcheck{s: s, c: c, cfg: cfg, ses: ses, routed: -1}, 0, nil

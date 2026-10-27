@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -16,7 +17,8 @@ import (
 	"github.com/yoda-jm/tabula/pkg/state"
 )
 
-// streamSink keeps what a soundcheck plays.
+// streamSink keeps what a soundcheck plays, taking it as fast as a card
+// of 32 channels at 48 kHz does (else it is over before the test looks).
 type streamSink struct {
 	mu     sync.Mutex
 	b      bytes.Buffer
@@ -24,6 +26,7 @@ type streamSink struct {
 }
 
 func (s *streamSink) Write(p []byte) (int, error) {
+	time.Sleep(time.Duration(len(p)) * time.Second / (32 * 4 * 48000))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -178,6 +181,9 @@ func TestVirtualSoundcheck(t *testing.T) {
 	}
 
 	// a player that cannot play ends the soundcheck, saying why
+	if runtime.GOOS == "windows" {
+		return // no sh to play the failing player
+	}
 	api.mu.Lock()
 	api.sc.sink = nil
 	api.audio.cfg.PlayCommand = `sh -c 'echo "aplay: main:850: audio open error: Device or resource busy" >&2; exit 1'`
