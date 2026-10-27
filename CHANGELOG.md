@@ -93,6 +93,20 @@
   matrix, main and DCA at once, with their gain reductions and a clip light
   that stays lit until cleared. The channels' gain reductions (`/meters/1`)
   and the DCAs (`/meters/5 0 0`) are asked for only while a page shows them.
+- Virtual soundcheck (#26): a session recorded with its audio plays back
+  through the console. Ticked in the session's details on the Record page,
+  the replay also plays the tracks to the console's USB card, each on the
+  channel it was recorded from, in step with the console moves, at 1×, so
+  the show can be mixed again, or a soundcheck rehearsed, without the band.
+  tabula can switch the console's inputs to the card for the time of it
+  (routing PLAY, `/config/routing/routswitch`) and back as they were at the
+  end or on Stop, and says which inputs the PLAY routing takes from the
+  card. The tracks stream to a player matching the recorder (aplay, pacat,
+  ffmpeg) read from the WAV files as they play, nothing written to the disk;
+  *Play the tracks to* and *Command to play them* (only chosen on the
+  machine running tabula) in the audio settings. Not during a recording.
+  `POST /api/replay/start` takes `"audio"` and `"routing"`;
+  `Record.replay_audio`.
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,
