@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entryAction, formatClock, isPlaying, recordsToStick } from "./usb";
+import { entryAction, formatClock, isPlaying, loadWhat, recordsToStick, winding } from "./usb";
 
 describe("USB stick", () => {
   it("shows times as the console does", () => {
@@ -13,8 +13,18 @@ describe("USB stick", () => {
     expect(entryAction("dir")).toEqual({ label: "Open" });
     expect(entryAction("wav")).toEqual({ label: "▶ Play" });
     expect(entryAction("scene")).toEqual({ label: "Load…", asks: true });
-    expect(entryAction("show")).toBeNull();
+    expect(entryAction("show")).toEqual({ label: "Load…", asks: true });
+    expect(entryAction("monitor")).toEqual({ label: "Load…", asks: true });
+    expect(entryAction("prefs")).toBeNull();
     expect(entryAction("file")).toBeNull();
+    expect(loadWhat("scene")).toBe("the whole mix changes at once");
+    expect(loadWhat("show")).toContain("the mix itself does not change");
+  });
+
+  it("tells when the player winds", () => {
+    expect(winding("FF")).toBe(true);
+    expect(winding("REW")).toBe(true);
+    expect(winding("PLAY")).toBe(false);
   });
 
   it("finds the file playing in the directory shown", () => {

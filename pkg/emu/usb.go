@@ -16,6 +16,7 @@ import (
 
 	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/scene"
+	"github.com/yoda-jm/tabula/pkg/schema"
 )
 
 // The USB stick, emulated by a folder (-usb). As in Maillot's X32USB tool:
@@ -23,12 +24,13 @@ import (
 // the number of entries of the current directory, /-usb/dir/001… their
 // names ("[..]" for the parent, "[name]" for directories), and
 // /-action/recselect n "selects and executes" entry n: enters a directory,
-// plays a WAV file, loads a scene or a snippet. /-stat/tape/state stops (0),
-// pauses (1) and resumes (2) the player; /-action/playtrack -1 and 1 play
-// the previous and next WAV file. No sound comes out. /-stat/tape/state 4
-// records (3 pauses the recording): the file is named as the console names
-// it, R_20261026-203512.wav in the current directory, and its time counts,
-// but nothing is written to the stick.
+// plays a WAV file, loads a scene, a snippet, a preset or a show (see
+// loadLocked). /-stat/tape/state stops (0), pauses (1) and resumes (2) the
+// player, winds it forward (5) or back (6); /-action/playtrack -1 and 1
+// play the previous and next WAV file. No sound comes out.
+// /-stat/tape/state 4 records (3 pauses the recording): the file is named
+// as the console names it, R_20261026-203512.wav in the current directory,
+// and its time counts, but nothing is written to the stick.
 
 // Tape states, as /-stat/tape/state numbers them.
 const (
@@ -37,7 +39,13 @@ const (
 	tapePlay     = 2
 	tapeRecPause = 3
 	tapeRecord   = 4
+	tapeFF       = 5
+	tapeRew      = 6
 )
+
+// windStep is how far fast forward and rewind move in a second of
+// playback. A guess: the document does not say how fast the console winds.
+const windStep = 10
 
 // usbMaxEntries is the most entries a directory listing holds.
 const usbMaxEntries = 999
@@ -103,6 +111,11 @@ func (s *Server) unmountLocked() {
 }
 
 func (s *Server) setStr(addr, v string) { s.store.Set(addr, osc.String(v), originConsole) }
+
+func (s *Server) strAt(addr string) string {
+	v, _, _ := s.store.Get(addr)
+	return v.Str
+}
 
 // listLocked reads the current directory into the listing; dirpos is the
 // selected entry.
@@ -199,6 +212,8 @@ func (s *Server) rtimeLocked() int32 {
 
 func recording(state int32) bool { return state == tapeRecord || state == tapeRecPause }
 
+func winding(state int32) bool { return state == tapeFF || state == tapeRew }
+
 // usbControl runs a client's set of /-stat/usbmounted or /-stat/tape/state.
 func (s *Server) usbControl(addr string, v osc.Arg, origin string) {
 	u := &s.usb
@@ -239,15 +254,19 @@ func (s *Server) usbControl(addr string, v osc.Arg, origin string) {
 		case recording(u.state):
 			// the player waits for the recording to stop
 		case v.Int == tapePause:
-			if u.state == tapePlay {
+			if u.state == tapePlay || winding(u.state) {
 				u.state = tapePause
 			}
 		case v.Int == tapePlay:
 			if u.file != "" {
-				u.state = tapePlay // resumes, or plays again from the start
+				u.state = tapePlay // resumes where it was, or plays again from the start
 			}
-		case v.Int != tapeRecord:
-			reject(ReasonUnimplemented, "fast forward and rewind are not emulated")
+		case winding(v.Int):
+			if u.file != "" {
+				u.state = v.Int // from where it is, until play, pause or stop, or an end of the file
+			}
+		default:
+			reject(ReasonRejected, fmt.Sprintf("no tape state %d (0 to 6)", v.Int))
 		}
 		s.tapeLocked() // what the player does, whatever was asked
 	}
@@ -289,24 +308,169 @@ func (s *Server) recselect(n int, origin string) {
 	rel := path.Join(u.dir, e.name)
 	s.setInt("/-usb/dir/dirpos", int32(n))
 	s.setStr("/-usb/title", strings.TrimSuffix(e.name, path.Ext(e.name)))
-	switch ext := strings.ToLower(path.Ext(e.name)); ext {
-	case ".wav":
+	if strings.EqualFold(path.Ext(e.name), ".wav") {
 		s.playLocked(rel)
+		return
+	}
+	if reason, detail := s.loadLocked(rel, origin); reason != "" {
+		reject(reason, detail)
+	}
+}
+
+// loadLocked loads a file of the stick, as the console does on its USB
+// screen; it returns why not (a journal reason and its detail) when it
+// cannot. Scenes (.scn) and snippets (.snp) change what they hold. The
+// preset files are those of the library (as M32-Edit writes them, or the
+// emulator's -library files): a channel preset (.chn) goes to the
+// selected strip (/-stat/selidx), an effect preset (.efx) to the effect
+// slot shown on the Effects screen (/-stat/screen/FX/page, slot 1 on its
+// home page): both guesses, as the document does not say where the
+// console puts them; routing (.rou) and AES50/DP48 (.mon) presets apply
+// as they are. A show (.shw) replaces the show (loadShowLocked).
+// Preference files (.prf) are refused: their format is not known.
+func (s *Server) loadLocked(rel, origin string) (reason, detail string) {
+	u := &s.usb
+	file := filepath.Join(u.root, filepath.FromSlash(rel))
+	ext := strings.ToLower(path.Ext(rel))
+	switch ext {
 	case ".scn", ".snp":
-		f, err := os.Open(filepath.Join(u.root, filepath.FromSlash(rel)))
+		f, err := os.Open(file)
 		if err != nil {
-			reject(ReasonRejected, err.Error())
-			return
+			return ReasonRejected, err.Error()
 		}
 		defer f.Close()
 		_, errs := scene.Load(f, s.store, origin)
 		s.log.Info("usb stick: loaded", "file", rel, "problems", len(errs))
+		return "", ""
+	case ".shw":
+		return s.loadShowLocked(rel, origin)
+	case ".chn", ".efx", ".rou", ".mon":
+	case ".prf":
+		return ReasonUnimplemented, "loading preference files (.prf) is not emulated: their format is not known"
+	case "":
+		return ReasonUnimplemented, "loading files without an extension from the USB stick is not emulated"
 	default:
-		if ext == "" {
-			ext = "these"
-		}
-		reject(ReasonUnimplemented, fmt.Sprintf("loading %s files from the USB stick is not emulated", ext))
+		return ReasonUnimplemented, fmt.Sprintf("loading %s files from the USB stick is not emulated", ext)
 	}
+	e, err := readEntry(file)
+	if err != nil {
+		return ReasonRejected, err.Error()
+	}
+	base := ""
+	switch ext {
+	case ".chn":
+		strip, ok := stripPath(int(s.intAt("/-stat/selidx")))
+		if !ok {
+			return ReasonRejected, "no strip selected"
+		}
+		base = strip
+	case ".efx":
+		slot := s.intAt("/-stat/screen/FX/page") // HOME, FX1…FX8
+		base = fmt.Sprintf("/fx/%d", max(slot, 1))
+		fxRelative(e)
+	}
+	var lines []string
+	for _, l := range e.Lines {
+		if s.store.Schema().Node(base+l.Suffix) != nil {
+			lines = append(lines, base+l.Suffix+" "+l.Rest)
+		}
+	}
+	to := base
+	if to == "" {
+		to = "the console"
+	}
+	if len(lines) == 0 {
+		return ReasonRejected, fmt.Sprintf("%s: no line of the file is a parameter of %s", path.Base(rel), to)
+	}
+	errs := s.store.ApplyLines(lines, origin)
+	s.log.Info("usb stick: loaded", "file", rel, "to", to, "lines", len(lines), "skipped", len(e.Lines)-len(lines), "problems", len(errs))
+	return "", ""
+}
+
+// loadShowLocked loads a show file of the stick: the show (name, scene
+// safes), its cues and the listings of its scenes and snippets, as
+// M32-Edit writes a show (showfile/show, showfile/cue/000…, the /-show
+// prefix left out); the scenes and snippets themselves come from the files
+// saved next to it, Show.000.scn, Show.001.snp…, named as M32-Edit names
+// them. A scene listed without its file is listed empty. The library
+// directory (-library) is not changed: it keeps what was saved there.
+func (s *Server) loadShowLocked(rel, origin string) (reason, detail string) {
+	u := &s.usb
+	dir := filepath.Join(u.root, filepath.FromSlash(path.Dir("/" + rel)[1:]))
+	data, err := os.ReadFile(filepath.Join(u.root, filepath.FromSlash(rel)))
+	if err != nil {
+		return ReasonRejected, err.Error()
+	}
+	sch := s.store.Schema()
+	var lines []string
+	skipped := 0
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "showfile/"):
+			line = "/-show/" + line
+		case strings.HasPrefix(line, "-show/"):
+			line = "/" + line
+		}
+		p, _ := schema.SplitLine(line)
+		if !strings.HasPrefix(p, "/-show/showfile/") {
+			continue
+		}
+		if sch.Node(p) == nil {
+			skipped++ // cues past the hundredth, as M32-Edit writes 500
+			continue
+		}
+		lines = append(lines, line)
+	}
+	if len(lines) == 0 {
+		return ReasonRejected, fmt.Sprintf("%s: no show in the file", path.Base(rel))
+	}
+	errs := s.store.ApplyLines(lines, origin)
+
+	// the files of the directory, by lower-case name
+	files := map[string]string{}
+	if des, err := os.ReadDir(dir); err == nil {
+		for _, de := range des {
+			files[strings.ToLower(de.Name())] = de.Name()
+		}
+	}
+	stem := strings.TrimSuffix(path.Base(rel), path.Ext(rel))
+	var missing []string
+	lib := s.lib
+	lib.mu.Lock()
+	for _, kind := range []string{"scene", "snippet"} {
+		listing := libKinds[kind].listing
+		for i := 0; i < libSlots; i++ {
+			p := fmt.Sprintf("%s/%03d", listing, i)
+			lib.items[kind][i] = nil
+			if s.intAt(p+"/hasdata") != 1 {
+				continue
+			}
+			name := fmt.Sprintf("%s.%03d.%s", stem, i, libKinds[kind].ext)
+			var e *entry
+			if real, ok := files[strings.ToLower(name)]; ok {
+				if read, err := readEntry(filepath.Join(dir, real)); err == nil && len(read.Lines) > 0 {
+					e = read
+				}
+			}
+			if e == nil {
+				missing = append(missing, name)
+				s.store.Set(p+"/hasdata", osc.Int(0), origin)
+				continue
+			}
+			e.Name, e.Note = s.strAt(p+"/name"), ""
+			if kind == "scene" {
+				e.Note = s.strAt(p + "/notes")
+			}
+			lib.items[kind][i] = e
+		}
+	}
+	lib.mu.Unlock()
+	s.log.Info("usb stick: show loaded", "file", rel, "lines", len(lines), "skipped", skipped, "problems", len(errs), "missing", len(missing))
+	if len(missing) > 0 {
+		return ReasonRejected, fmt.Sprintf("%s: loaded, but %d scenes or snippets it lists are not on the stick (%s…), listed empty", path.Base(rel), len(missing), missing[0])
+	}
+	return "", ""
 }
 
 // playLocked starts playing a WAV file of the stick from its beginning.
@@ -394,16 +558,27 @@ func (s *Server) tickUSB() {
 		s.setInt("/-stat/tape/etime", u.etime)
 		return
 	}
-	if u.state != tapePlay {
+	switch u.state {
+	case tapePlay:
+		u.etime++
+	case tapeFF:
+		u.etime += windStep
+	case tapeRew:
+		if u.etime -= windStep; u.etime <= 0 {
+			u.state, u.etime = tapeStop, 0 // back at the start
+			s.tapeLocked()
+			return
+		}
+	default:
 		return
 	}
-	u.etime++
 	if u.etime < u.dur {
 		s.setInt("/-stat/tape/etime", u.etime)
 		s.setInt("/-stat/tape/rtime", u.dur-u.etime)
 		return
 	}
-	// End of the file: the next one in folder mode (autoplay), else stop.
+	// End of the file, played or wound to: the next one in folder mode
+	// (autoplay), else stop.
 	if s.intAt("/config/tape/autoplay") == 1 {
 		if next := s.siblingLocked(1); next != "" {
 			s.playLocked(next)

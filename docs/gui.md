@@ -309,12 +309,15 @@ M32-Edit, saved by the console on a USB stick, or a backup of the console.
 
 The USB stick in the console, as on its USB recorder screen. The **USB
 player** shows the file loaded, whether it plays, its elapsed and remaining
-time, with |◀ (previous file), ▶ Play / ❚❚ Pause, ■ Stop, ▶| (next file),
-and *Then the next file of the folder* (the console's folder mode). Below,
-the current folder of the stick: **Open** a folder (or the parent folder),
-**▶ Play** a WAV file, **Load…** a scene, snippet or preset file into the
-console (after a confirmation: the console loads it from the stick). The
-file in the player is marked. Every command needs armed writes; the sound
+time, with |◀ (previous file), ◀◀ (rewind), ▶ Play / ❚❚ Pause, ■ Stop,
+▶▶ (fast forward), ▶| (next file), and *Then the next file of the folder*
+(the console's folder mode). ◀◀ and ▶▶ stay lit while the player winds:
+pressed again, the player goes back to playing (or to its pause); ▶ Play
+plays from where it is. Below, the current folder of the stick: **Open** a
+folder (or the parent folder), **▶ Play** a WAV file, **Load…** a scene,
+snippet, preset (channel, effect, routing, AES50/DP48) or show file into
+the console, after a confirmation saying what it changes (the console
+loads it from the stick). The file in the player is marked. Every command needs armed writes; the sound
 goes where the console's routing sends its USB player. While the console
 records to its stick, ■ Stop asks first, and says whether it is the backup
 of tabula's recording ([Record](#record)) or a recording started on the
@@ -323,7 +326,8 @@ console.
 ![The console's USB stick and player](img/gui-usb.png)
 
 The emulator has a stick too, with `-usb dir` ([emulator](emulator.md#usb-stick)):
-its WAV files play silently, time running.
+its WAV files play and wind silently, time running, and it loads the
+scenes, snippets, presets and shows of the folder.
 
 ## Browser
 

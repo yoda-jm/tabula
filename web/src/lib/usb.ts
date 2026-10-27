@@ -14,6 +14,7 @@ export type UsbKind =
   | "effect"
   | "routing"
   | "channel"
+  | "monitor"
   | "prefs"
   | "volume"
   | "file";
@@ -36,7 +37,8 @@ export interface UsbView {
   entries: UsbEntry[];
 }
 
-export type UsbOp = "play" | "pause" | "stop" | "prev" | "next";
+/** ff and rew wind the player until play, pause or stop (or an end of the file) */
+export type UsbOp = "play" | "pause" | "stop" | "ff" | "rew" | "prev" | "next";
 
 export const usbApi = {
   // the console reads its stick slowly: tabula gives it 10 to 15 s
@@ -59,10 +61,36 @@ export function entryAction(kind: UsbKind): { label: string; asks?: boolean } | 
     case "effect":
     case "routing":
     case "channel":
+    case "monitor":
+    case "show":
       return { label: "Load…", asks: true };
   }
-  return null; // shows, preferences, other files: not from here
+  return null; // preferences, other files: not from here
 }
+
+/** loadWhat says what loading a file of the stick changes, before it is loaded. */
+export function loadWhat(kind: UsbKind): string {
+  switch (kind) {
+    case "scene":
+      return "the whole mix changes at once";
+    case "snippet":
+      return "the parameters the snippet holds change at once";
+    case "channel":
+      return "the console applies the channel preset to its selected strip";
+    case "effect":
+      return "the console applies the effect preset to an effect slot (the one shown on its Effects screen)";
+    case "routing":
+      return "the console's routing (inputs, outputs, card) changes at once";
+    case "monitor":
+      return "the AES50 / DP48 personal monitor settings change at once";
+    case "show":
+      return "the console's show is replaced: its cues, scenes and snippets (the mix itself does not change)";
+  }
+  return "the parameters it holds change at once";
+}
+
+/** winding tells whether the player winds forward or back (/-stat/tape/state FF, REW). */
+export const winding = (state: string) => state === "FF" || state === "REW";
 
 export const KIND_LABEL: Record<UsbKind, string> = {
   parent: "up",
@@ -74,6 +102,7 @@ export const KIND_LABEL: Record<UsbKind, string> = {
   effect: "effect",
   routing: "routing",
   channel: "channel",
+  monitor: "AES50/DP48",
   prefs: "prefs",
   volume: "system",
   file: "file",

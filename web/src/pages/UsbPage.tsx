@@ -1,13 +1,14 @@
 // The USB stick in the console, as on its USB recorder screen: the player
-// (the file playing, its time, play, pause, stop, previous and next) and
-// the current directory of the stick, to open a folder, play a WAV file or
-// load a scene from it. Commands change the console: armed writes.
+// (the file playing, its time, play, pause, stop, rewind, fast forward,
+// previous and next) and the current directory of the stick, to open a
+// folder, play a WAV file or load a scene, a preset or a show from it.
+// Commands change the console: armed writes.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { UsbEntry, UsbOp, UsbView } from "../lib/usb";
-import { KIND_LABEL, TAPE_STATES, entryAction, formatClock, isPlaying, recordsToStick, usbApi } from "../lib/usb";
+import { KIND_LABEL, TAPE_STATES, entryAction, formatClock, isPlaying, loadWhat, recordsToStick, usbApi, winding } from "../lib/usb";
 import { useCanWrite, useRecord, useStatus, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
@@ -89,10 +90,9 @@ export function UsbPage() {
           }}
         >
           <p>
-            <strong>The console loads the file from its USB stick</strong>: the parameters it holds change at once (a scene: the
-            whole mix).
+            <strong>The console loads the file from its USB stick</strong>: {loadWhat(ask.kind)}.
           </p>
-          <p className="muted">The current mix is lost unless it is saved first.</p>
+          <p className="muted">{ask.kind === "show" ? "The current show is lost unless it is saved first." : "The current mix is lost unless it is saved first."}</p>
         </ConfirmDialog>
       )}
     </div>
@@ -137,6 +137,7 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
   const rtime = useValue("/-stat/tape/rtime");
   const autoplay = useValue("/config/tape/autoplay");
   const [stopping, setStopping] = useState(false); // asking before stopping the console's own recording
+  const resume = useRef<UsbOp>("play"); // what winding goes back to: playing or paused
   const backup = useRecord()?.usb;
   const st = String(state?.text ?? "STOP").trim();
   const recording = recordsToStick(st);
@@ -146,13 +147,23 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
   const path = String(file?.value ?? "");
   const name = path.split("/").filter(Boolean).pop() ?? "";
   const playing = st === "PLAY";
+  const winds = winding(st);
+  // a wind button starts winding; pressed again, the player goes back to what it did
+  const wind = (o: "ff" | "rew") => {
+    if (st === (o === "ff" ? "FF" : "REW")) return onOp(resume.current);
+    if (!winds) resume.current = playing ? "play" : "pause";
+    onOp(o);
+  };
   // tabula's backup of the recording (Record page), not one started on the console
   const ours = !!backup?.file && backup.file === path && !backup.already;
   return (
     <section className="card player">
       <header className="section-head">
         <h3>USB player</h3>
-        <span className={playing ? "danger-text" : "muted"}>{playing ? "▶ " : ""}{TAPE_STATES[st] ?? st}</span>
+        <span className={playing || winds ? "danger-text" : "muted"}>
+          {playing ? "▶ " : st === "FF" ? "▶▶ " : st === "REW" ? "◀◀ " : ""}
+          {TAPE_STATES[st] ?? st}
+        </span>
       </header>
       <p className="player-file">
         {name ? <strong>{name.replace(/\.wav$/i, "")}</strong> : <span className="muted">Nothing loaded: play a WAV file of the stick below.</span>}
@@ -168,6 +179,17 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
       <div className="row transport">
         <button type="button" className="btn big" disabled={!can} onClick={() => onOp("prev")} aria-label="Previous file">
           |◀
+        </button>
+        <button
+          type="button"
+          className={"btn big" + (st === "REW" ? " lit" : "")}
+          disabled={!can || !name || recording}
+          aria-pressed={st === "REW"}
+          onClick={() => wind("rew")}
+          aria-label="Rewind"
+          title="Rewind; press again to stop rewinding"
+        >
+          ◀◀
         </button>
         {playing ? (
           <button type="button" className="btn big primary" disabled={!can} onClick={() => onOp("pause")}>
@@ -185,6 +207,17 @@ function Player({ can, onOp }: { can: boolean; onOp(o: UsbOp): void }) {
           onClick={() => (recording ? setStopping(true) : onOp("stop"))}
         >
           ■ Stop
+        </button>
+        <button
+          type="button"
+          className={"btn big" + (st === "FF" ? " lit" : "")}
+          disabled={!can || !name || recording}
+          aria-pressed={st === "FF"}
+          onClick={() => wind("ff")}
+          aria-label="Fast forward"
+          title="Fast forward; press again to stop winding"
+        >
+          ▶▶
         </button>
         <button type="button" className="btn big" disabled={!can} onClick={() => onOp("next")} aria-label="Next file">
           ▶|

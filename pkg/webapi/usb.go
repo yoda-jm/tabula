@@ -20,8 +20,9 @@ import (
 // screen, with the commands of Maillot's X32USB: /-usb/dir lists the
 // current directory (001 to maxpos, "[..]" and "[name]" for directories),
 // /-action/recselect n enters a directory, plays a WAV file or loads a
-// scene; /-stat/tape/state pauses, plays and stops the player, and
-// /-action/playtrack goes to the previous or next file. The console does
+// scene, a snippet, a preset or a show; /-stat/tape/state pauses, plays,
+// stops and winds the player, and /-action/playtrack goes to the previous
+// or next file. The console does
 // not push its listing: it is read again after each change. The player's
 // state (/-stat/tape) comes with the other changes. See docs/API.md, "USB
 // stick".
@@ -30,7 +31,8 @@ type usbEntry struct {
 	Index int    `json:"index"` // as recselect numbers it, from 1
 	Name  string `json:"name"`  // without the brackets of directories
 	// Kind: parent, dir, wav, scene, snippet, show, effect, routing,
-	// channel, prefs, volume (System Volume Information) or file.
+	// channel, monitor (AES50/DP48), prefs, volume (System Volume
+	// Information) or file.
 	Kind string `json:"kind"`
 }
 
@@ -42,7 +44,8 @@ type usbView struct {
 	Entries []usbEntry `json:"entries"`
 }
 
-// usbKind is what an entry is, from its name (as X32USB tells).
+// usbKind is what an entry is, from its name (as X32USB tells; .mon, the
+// AES50/DP48 presets, as M32-Edit names them).
 func usbKind(name string) (string, string) {
 	if strings.HasPrefix(name, "[") && strings.HasSuffix(name, "]") {
 		inner := name[1 : len(name)-1]
@@ -55,7 +58,7 @@ func usbKind(name string) (string, string) {
 		return "dir", inner
 	}
 	kinds := map[string]string{".wav": "wav", ".scn": "scene", ".snp": "snippet", ".shw": "show",
-		".efx": "effect", ".rou": "routing", ".chn": "channel", ".prf": "prefs"}
+		".efx": "effect", ".rou": "routing", ".chn": "channel", ".mon": "monitor", ".prf": "prefs"}
 	if k, ok := kinds[strings.ToLower(path.Ext(name))]; ok {
 		return k, name
 	}
@@ -171,8 +174,9 @@ func (s *Server) getUSB(w http.ResponseWriter, r *http.Request) {
 var usbSettle = 1500 * time.Millisecond
 
 // usbCommand runs one command: open (an entry: enters a directory, plays
-// a WAV file, loads a scene…), play, pause, stop, prev, next. It changes
-// the console, so writes must be armed. open answers the listing after it.
+// a WAV file, loads a scene…), play, pause, stop, ff, rew (fast forward and
+// rewind, until play, pause or stop), prev, next. It changes the console,
+// so writes must be armed. open answers the listing after it.
 func (s *Server) usbCommand(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Op    string `json:"op"`
@@ -196,12 +200,12 @@ func (s *Server) usbCommand(w http.ResponseWriter, r *http.Request) {
 	switch req.Op {
 	case "open":
 		addr, val = "/-action/recselect", int32(req.Index)
-	case "play", "pause", "stop":
-		addr, val = "/-stat/tape/state", map[string]int32{"stop": 0, "pause": 1, "play": 2}[req.Op]
+	case "play", "pause", "stop", "ff", "rew":
+		addr, val = "/-stat/tape/state", map[string]int32{"stop": 0, "pause": 1, "play": 2, "ff": 5, "rew": 6}[req.Op]
 	case "prev", "next":
 		addr, val = "/-action/playtrack", map[string]int32{"prev": -1, "next": 1}[req.Op]
 	default:
-		httpError(w, http.StatusBadRequest, fmt.Errorf("unknown op %q (open, play, pause, stop, prev, next)", req.Op))
+		httpError(w, http.StatusBadRequest, fmt.Errorf("unknown op %q (open, play, pause, stop, ff, rew, prev, next)", req.Op))
 		return
 	}
 	var before usbView
@@ -254,12 +258,17 @@ func (s *Server) usbCommand(w http.ResponseWriter, r *http.Request) {
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
-	case "scene", "snippet":
-		// what the load changed: read back like a recall (library.go)
+	case "scene", "snippet", "channel", "effect", "routing", "monitor", "show":
+		// what the load changed: read back like a recall (library.go); a
+		// show changes the show's listings only
+		match := func(n *schema.Node) bool { return n.InScene || strings.HasPrefix(n.Path, "/-ha/") }
+		if entry.Kind == "show" {
+			match = func(n *schema.Node) bool { return strings.HasPrefix(n.Path, "/-show/") }
+		}
 		ctx, cancel := s.lib.start(time.Minute)
 		go func() {
 			defer cancel()
-			if err := c.Refresh(ctx, func(n *schema.Node) bool { return n.InScene || strings.HasPrefix(n.Path, "/-ha/") }); err != nil && !errors.Is(err, context.Canceled) {
+			if err := c.Refresh(ctx, match); err != nil && !errors.Is(err, context.Canceled) {
 				s.log.Warn("usb: reading back", "err", err)
 			}
 		}()

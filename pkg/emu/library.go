@@ -435,15 +435,8 @@ func (s *Server) ImportM32EditPresets(dir string) (int, error) {
 			s.log.Warn("preset file", "file", file, "err", err)
 			continue
 		}
-		if kind == "libfx" { // "type AMBI", "source …", "par …" are relative to /fx/N
-			for i, l := range e.Lines {
-				switch l.Suffix {
-				case "type":
-					e.Lines[i].Suffix = ""
-				case "source", "par":
-					e.Lines[i].Suffix = "/" + l.Suffix
-				}
-			}
+		if kind == "libfx" {
+			fxRelative(e)
 		}
 		s.lib.mu.Lock()
 		free := s.lib.items[kind][idx-1] == nil
@@ -457,4 +450,17 @@ func (s *Server) ImportM32EditPresets(dir string) (int, error) {
 		}
 	}
 	return n, nil
+}
+
+// fxRelative makes the lines of an effect preset as M32-Edit writes it,
+// "type AMBI", "source …", "par …", relative to /fx/N like the others.
+func fxRelative(e *entry) {
+	for i, l := range e.Lines {
+		switch l.Suffix {
+		case "type":
+			e.Lines[i].Suffix = ""
+		case "source", "par":
+			e.Lines[i].Suffix = "/" + l.Suffix
+		}
+	}
 }

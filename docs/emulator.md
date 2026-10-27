@@ -54,8 +54,9 @@ This page says what is simulated, how, and what is not.
 - Library: scenes, snippets and presets (`/save`, `/load`, `/copy`,
   `/delete`, `/rename`, `/add`, `/showdump`). A recall applies the stored
   values as they are; scene safes and snippet filters are not applied yet.
-- A USB stick (`-usb dir`): browsing its folders, playing its WAV files,
-  loading its scenes, as described [below](#usb-stick).
+- A USB stick (`-usb dir`): browsing its folders, playing, winding and
+  recording on its player, loading its scenes, snippets, presets and shows,
+  as described [below](#usb-stick).
 
 ## Audio flow (meters)
 
@@ -187,19 +188,38 @@ tabula-emu -scene testdata/scenes/demo.scn -usb testdata/usb
 | `/-usb/dir/001…/name` | the entries, numbered from 1: `[..]` first in a subdirectory, then the directories as `[name]`, then the files with their extension, each group in alphabetical order (case ignored); hidden files (starting with a dot) are left out. Entries past `maxpos` are empty. |
 | `/-usb/dir/dirpos` | the entry last selected, 0 after entering a directory |
 | `/-usb/title` | the file selected, without its extension (`02 Opening`) |
-| `/-action/recselect n` | entry `n` of the current directory: `[..]` goes up, a directory is entered, a `.wav` file plays from its start, a `.scn` or `.snp` file is applied to the console as a scene load. Then it reads 0 again. |
-| `/-stat/tape/state` | 0 stop, 1 pause, 2 play, 3 recording paused, 4 record (as the console's `STOP`, `PPAUSE`, `PLAY`, `RPAUSE`, `RECORD`). Setting 0 stops and goes back to the start of the file, 1 pauses a playing file, 2 resumes, or plays the stopped file again from its start. 4 records, 3 pauses the recording and 4 resumes it; while it records, the player and `/-action/recselect` wait. |
+| `/-action/recselect n` | entry `n` of the current directory: `[..]` goes up, a directory is entered, a `.wav` file plays from its start, another file is loaded (see [Loading files](#loading-files)). Then it reads 0 again. |
+| `/-stat/tape/state` | 0 stop, 1 pause, 2 play, 3 recording paused, 4 record, 5 fast forward, 6 rewind (as the console's `STOP`, `PPAUSE`, `PLAY`, `RPAUSE`, `RECORD`, `FF`, `REW`). Setting 0 stops and goes back to the start of the file, 1 pauses a playing or winding file, 2 resumes where it is, or plays the stopped file again from its start. 5 and 6 wind the file in the player, playing, paused or stopped, 10 seconds for each second (a guess: the document does not say how fast the console winds), until 1, 2 or 0; wound to its end, the file ends as when played to its end; rewound to its start, the player stops there. 4 records, 3 pauses the recording and 4 resumes it; while it records, the player (winding too) and `/-action/recselect` wait. |
 | `/-stat/tape/file` | the file in the player, from the root of the stick: `/Breaks/Interval music.wav`; it stays after the end or a stop. While recording, the file being recorded, named after the time in the current directory: `/R_20261026-203512.wav`; empty once the recording stops (nothing was written). |
-| `/-stat/tape/etime`, `rtime` | the seconds played and left, pushed to the `/xremote` clients every second while playing; the length comes from the WAV header. While recording: the seconds recorded, and `rtime` -1 (the console counts dropouts there, as −(dropouts + 1): none here). |
+| `/-stat/tape/etime`, `rtime` | the seconds played and left, pushed to the `/xremote` clients every second while playing or winding; the length comes from the WAV header. While recording: the seconds recorded, and `rtime` -1 (the console counts dropouts there, as −(dropouts + 1): none here). |
 | `/-action/playtrack -1`, `1` | the previous or next WAV file of the player's directory, played from its start. Nothing changes at either end; with no file in the player, `1` plays the first WAV file of the current directory. |
 | `/config/tape/autoplay` | `ON` (folder mode): at the end of a file the next WAV file of its directory plays, the player stops after the last; `OFF`: it stops at the end of each file |
 
+### Loading files
+
+The file types are those of Maillot's `X32USB` (which loads scenes,
+snippets and presets with `/-action/recselect`) and of M32-Edit (`.mon`,
+and the names of a show's files). The presets are read as M32-Edit writes
+them (`~/.config/.M32-Edit/Xlib`), or as the emulator's `-library`
+directory keeps them.
+
+| File | What loading it does |
+|---|---|
+| `.scn` scene, `.snp` snippet | its lines are applied to the console, as a scene load (without scene safes) |
+| `.chn` channel preset | to the strip selected on the console (`/-stat/selidx`): its configuration, preamp, gate, dynamics, EQ and sends, whatever the strip has of them |
+| `.efx` effect preset | to the effect slot shown on the console's Effects screen (`/-stat/screen/FX/page` `FX1`…`FX8`), slot 1 on its home page |
+| `.rou` routing preset, `.mon` AES50/DP48 preset | applied as they are (`/config/routing/…`, `/config/dp48/…`) |
+| `.shw` show | replaces the show: its name and scene safes, the cues, the listings of its scenes and snippets (`showfile/…` lines as M32-Edit writes them, cues past the hundredth left out), and the scenes and snippets themselves, read from the files saved next to it as M32-Edit names them: `Gig.001.scn`, `Gig.004.snp` for `Gig.shw` (case ignored). A scene or snippet listed without its file is listed empty, and the load is logged as rejected with the first missing file. The `-library` directory is not changed: it keeps what was saved there with `/save` |
+| `.prf` preferences, other files | not loaded, logged as unhandled: the format of preference files is not known |
+
+Guesses: where the console puts a channel or an effect preset loaded from
+its USB screen (the document does not say; the console may also ask), and
+that a show loaded from the stick changes the show only, not the mix. A
+preset none of whose lines is a parameter of where it goes is logged as
+rejected.
+
 Not emulated: no sound comes out (the WAV files are only read for their
-length); a recording writes nothing to the folder; fast forward and rewind
-(`/-stat/tape/state` 5, 6) are logged as unhandled and the player stays as
-it was;
-loading show, channel, effect, routing and preference files (`.shw`,
-`.chn`, `.efx`, `.rou`, `.prf`) from the stick is logged as unhandled;
+length); a recording writes nothing to the folder;
 `/-usb/dir/NNN/type` stays empty (what the console writes there is not
 documented). The WAV files of `testdata/usb` are silent and sampled at
 100 Hz, so a 3-minute file weighs 20 kB.

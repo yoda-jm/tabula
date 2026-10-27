@@ -157,15 +157,16 @@ of Maillot's X32USB). Engineer only.
 | Method | Path | Body | Answer |
 |---|---|---|---|
 | GET | `/api/usb` | | `UsbView`, read from the console (it does not push its listing); 409 when not connected, 504 when it does not answer |
-| POST | `/api/usb` | `{"op": "open", "index"}` | `UsbView` after it: `/-action/recselect index` enters a directory (the listing is read again once the console changed `/-usb/path`, 1.5 s at most), plays a WAV file, or loads a scene, snippet or preset file (the console's values it may have changed are then read again, as after a recall); 400 for an entry not in the directory, 409 without a stick |
-| POST | `/api/usb` | `{"op": "play"}`, or `pause`, `stop`, `prev`, `next` | 204: `/-stat/tape/state` 2, 1, 0, or `/-action/playtrack` -1, 1 |
+| POST | `/api/usb` | `{"op": "open", "index"}` | `UsbView` after it: `/-action/recselect index` enters a directory (the listing is read again once the console changed `/-usb/path`, 1.5 s at most), plays a WAV file, or loads a scene, snippet, preset or show file (the console's values it may have changed are then read again, as after a recall; the show's listings after a show); 400 for an entry not in the directory, 409 without a stick |
+| POST | `/api/usb` | `{"op": "play"}`, or `pause`, `stop`, `ff`, `rew`, `prev`, `next` | 204: `/-stat/tape/state` 2, 1, 0, 5 (fast forward), 6 (rewind), or `/-action/playtrack` -1, 1. The player winds until `play`, `pause` or `stop` |
 
 Commands need armed writes (403). `UsbView`: `{"mounted", "path" (the
 current directory's name, "" at the root), "title" (the file selected),
 "pos", "entries": [{"index", "name", "kind"}]}`, `index` as `recselect`
 numbers it (from 1), `name` without the brackets of directories, `kind`
 `parent`, `dir`, `wav`, `scene`, `snippet`, `show`, `effect`, `routing`,
-`channel`, `prefs`, `volume` or `file`. The player's state is in the
+`channel`, `monitor` (AES50/DP48 presets, `.mon`), `prefs`, `volume` or
+`file`. The player's state is in the
 mirror, pushed by the console: `/-stat/tape` (`state`, `file`, `etime`,
 `rtime` in seconds), `/config/tape/autoplay` (play the folder). The
 entries `/-usb/dir/001`…`999` are lazy nodes: not read when connecting.

@@ -2367,6 +2367,11 @@ button.iem-pan:disabled {
 .transport .check {
   margin-left: auto;
 }
+.transport .btn.lit {
+  background: #1f6f3a;
+  border-color: var(--ok);
+  color: #eaffef;
+}
 pre.skipped {
   max-height: 12em;
   overflow: auto;

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -210,10 +211,58 @@ func TestUSBPlayer(t *testing.T) {
 	p.send("/-stat/tape/state", osc.Int(tapePlay)) // from the start again
 	eventually(t, p, "/-stat/tape/state", tapePlay)
 
-	p.send("/-stat/tape/state", osc.Int(5)) // fast forward
+	if len(s.Unhandled.List()) > 0 {
+		t.Errorf("unhandled: %+v", s.Unhandled.List())
+	}
+}
+
+// TestUSBWind winds the player forward and back: windStep seconds a second
+// of playback, until play, pause or stop, or an end of the file.
+func TestUSBWind(t *testing.T) {
+	dir := t.TempDir()
+	writeWAV(t, filepath.Join(dir, "Long.wav"), 1000)
+	writeWAV(t, filepath.Join(dir, "Short.wav"), 25)
+	s, p := startUSB(t, dir)
+	p.send("/-stat/tape/state", osc.Int(tapeFF)) // nothing in the player
+	eventually(t, p, "/-stat/tape/state", tapeStop)
+
+	p.send("/-action/recselect", osc.Int(1))
 	eventually(t, p, "/-stat/tape/state", tapePlay)
-	if !unhandled(s, "/-stat/tape/state", ReasonUnimplemented) {
-		t.Errorf("fast forward not reported as not emulated: %+v", s.Unhandled.List())
+	p.send("/-stat/tape/state", osc.Int(tapeFF))
+	eventually(t, p, "/-stat/tape/state", tapeFF)
+	for deadline := time.Now().Add(2 * time.Second); p.int("/-stat/tape/etime") < 5*windStep && time.Now().Before(deadline); {
+		time.Sleep(5 * time.Millisecond)
+	}
+	p.send("/-stat/tape/state", osc.Int(tapePause))
+	eventually(t, p, "/-stat/tape/state", tapePause)
+	e, r := p.int("/-stat/tape/etime"), p.int("/-stat/tape/rtime")
+	if e < 5*windStep || e+r != 1000 {
+		t.Errorf("paused after winding forward at %d s, %d s left", e, r)
+	}
+
+	p.send("/-stat/tape/state", osc.Int(tapeRew)) // from pause, back to the start: stopped there
+	eventually(t, p, "/-stat/tape/state", tapeRew)
+	eventually(t, p, "/-stat/tape/state", tapeStop)
+	if e, f := p.int("/-stat/tape/etime"), p.str("/-stat/tape/file"); e != 0 || f != "/Long.wav" {
+		t.Errorf("rewound to %d s, file %q", e, f)
+	}
+
+	p.send("/-action/recselect", osc.Int(2)) // forward to the end of a short file: as played to its end
+	eventually(t, p, "/-stat/tape/state", tapePlay)
+	p.send("/-stat/tape/state", osc.Int(tapeFF))
+	eventually(t, p, "/-stat/tape/state", tapeStop)
+	if e, f := p.int("/-stat/tape/etime"), p.str("/-stat/tape/file"); e != 0 || f != "/Short.wav" {
+		t.Errorf("wound to the end: %d s, file %q", e, f)
+	}
+	p.send("/-stat/tape/state", osc.Int(tapeRecord)) // no winding while recording
+	eventually(t, p, "/-stat/tape/state", tapeRecord)
+	p.send("/-stat/tape/state", osc.Int(tapeRew))
+	time.Sleep(30 * time.Millisecond)
+	if got := p.int("/-stat/tape/state"); got != tapeRecord {
+		t.Errorf("rewind while recording: state %d", got)
+	}
+	if len(s.Unhandled.List()) > 0 {
+		t.Errorf("unhandled: %+v", s.Unhandled.List())
 	}
 }
 
@@ -319,7 +368,7 @@ func TestUSBLoadFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	mkfile(t, filepath.Join(dir, "Demo.scn"), string(data))
-	mkfile(t, filepath.Join(dir, "Show.shw"), "")
+	mkfile(t, filepath.Join(dir, "Prefs.prf"), "")
 	s, p := startUSB(t, dir)
 
 	p.send("/-action/recselect", osc.Int(1))
@@ -335,8 +384,95 @@ func TestUSBLoadFiles(t *testing.T) {
 	p.send("/-action/recselect", osc.Int(9))
 	eventually(t, p, "/-action/recselect", 0)
 	if !unhandled(s, "/-action/recselect", ReasonUnimplemented) || !unhandled(s, "/-action/recselect", ReasonRejected) {
-		t.Errorf("show file or missing entry not reported: %+v", s.Unhandled.List())
+		t.Errorf("preferences file or missing entry not reported: %+v", s.Unhandled.List())
 	}
+}
+
+// TestUSBLoadPresets loads presets as M32-Edit writes them, and a show with
+// its scenes and snippets next to it.
+func TestUSBLoadPresets(t *testing.T) {
+	dir := t.TempDir()
+	mkfile(t, filepath.Join(dir, "Bass.chn"), `#2.0# 61 "BBM Bass 2" 0 %0011111100010100 1
+/config "BASS" 1 MG
+/eq/2 PEQ 677.7 -9.00 2.0
+/nowhere 1 2 3
+`)
+	mkfile(t, filepath.Join(dir, "Hall.efx"), `#2.0# 78 "Sound Stage" 1 5 1
+type HALL
+`)
+	mkfile(t, filepath.Join(dir, "Local.rou"), `#2.0# 1 "Local IO" 2 %0000000000000000 1
+/config/routing/IN AN1-8 AN9-16 AN17-24 AN25-32 AUX1-4
+`)
+	mkfile(t, filepath.Join(dir, "Empty.chn"), "#2.0# 1 \"Nothing\" 0 %0 1\n/nowhere 1\n")
+	show := `showfile/show "Gig" 0 0 0 0 0 0 0 0 0 0 "M32-Edit 4.00"
+showfile/cue/000 100 "Intro" 0 1 -1 0 1 0 0
+showfile/cue/499 0 "" 0 -1 -1 0 1 0 0
+showfile/scene/000 "" "" %000000000 0
+showfile/scene/001 "Set 1" "first set" %000000000 1
+showfile/scene/002 "Set 2" "" %000000000 1
+showfile/snippet/004 "Solo" 0 0 0 0 1
+`
+	mkfile(t, filepath.Join(dir, "Shows", "Gig.shw"), show)
+	mkfile(t, filepath.Join(dir, "Shows", "gig.001.scn"), "#4.0# \"Set 1\" \"\" %000000000 1\n/ch/05/config \"Keys\" 1 YE 5\n")
+	mkfile(t, filepath.Join(dir, "Shows", "Gig.004.snp"), "#4.0# \"Solo\"\n/ch/06/mix ON -10.0 ON +0 OFF -oo\n")
+	s, p := startUSB(t, dir)
+	// [Shows], Bass.chn, Empty.chn, Hall.efx, Local.rou
+
+	p.send("/-stat/selidx", osc.Int(2)) // Ch03
+	p.send("/-action/recselect", osc.Int(2))
+	eventuallyStr(t, p, "/ch/03/config/name", "BASS")
+	if got := p.node("ch/03/eq/2"); !strings.Contains(got, "PEQ 677.7 -9.00") {
+		t.Errorf("channel preset EQ: %q", got)
+	}
+
+	p.send("/-stat/screen/FX/page", osc.Int(3)) // FX3
+	p.send("/-action/recselect", osc.Int(4))
+	eventuallyNode(t, p, "fx/3", "/fx/3 HALL")
+
+	p.send("/config/routing/IN/1-8", osc.Int(3))
+	p.send("/-action/recselect", osc.Int(5))
+	eventually(t, p, "/config/routing/IN/1-8", 0)
+
+	p.send("/-action/recselect", osc.Int(3)) // nothing of it applies
+	eventually(t, p, "/-action/recselect", 0)
+	if !unhandled(s, "/-action/recselect", ReasonRejected) {
+		t.Errorf("an empty preset not reported: %+v", s.Unhandled.List())
+	}
+
+	p.send("/-action/recselect", osc.Int(1)) // [Shows]
+	eventuallyStr(t, p, "/-usb/path", "Shows")
+	p.send("/-action/recselect", osc.Int(4)) // [..], gig.001.scn, Gig.004.snp, Gig.shw
+	eventuallyStr(t, p, "/-show/showfile/show/name", "Gig")
+	if got := p.str("/-show/showfile/cue/000/name"); got != "Intro" {
+		t.Errorf("cue 0: %q", got)
+	}
+	if got := p.int("/-show/showfile/scene/001/hasdata"); got != 1 {
+		t.Errorf("scene 1 has no data")
+	}
+	if got := p.int("/-show/showfile/scene/002/hasdata"); got != 0 {
+		t.Errorf("scene 2, without its file, is listed with data")
+	}
+	if !unhandled(s, "/-action/recselect", ReasonRejected) {
+		t.Errorf("a scene of the show missing on the stick not reported")
+	}
+	p.send("/-action/goscene", osc.Int(1))
+	eventuallyStr(t, p, "/ch/05/config/name", "Keys")
+	s.lib.mu.Lock()
+	snip := s.lib.items["snippet"][4]
+	s.lib.mu.Unlock()
+	if snip == nil || snip.Name != "Solo" || len(snip.Lines) != 1 || p.int("/-show/showfile/snippet/004/hasdata") != 1 {
+		t.Errorf("snippet 4: %+v", snip)
+	}
+}
+
+func eventuallyNode(t *testing.T, p *peer, path, want string) {
+	t.Helper()
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+		if strings.Contains(p.node(path), want) {
+			return
+		}
+	}
+	t.Errorf("%s never held %q (last %q)", path, want, p.node(path))
 }
 
 func TestUSBUnmount(t *testing.T) {

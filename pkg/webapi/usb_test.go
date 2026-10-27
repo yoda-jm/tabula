@@ -18,7 +18,7 @@ func TestUSBKind(t *testing.T) {
 	for name, want := range map[string][2]string{
 		"[..]": {"parent", ".."}, "[Songs]": {"dir", "Songs"}, "[System Volume Information]": {"volume", "System Volume Information"},
 		"Intro.WAV": {"wav", "Intro.WAV"}, "GVO.scn": {"scene", "GVO.scn"}, "a.snp": {"snippet", "a.snp"},
-		"notes.txt": {"file", "notes.txt"},
+		"Wedges.mon": {"monitor", "Wedges.mon"}, "Gig.shw": {"show", "Gig.shw"}, "notes.txt": {"file", "notes.txt"},
 	} {
 		if kind, shown := usbKind(name); kind != want[0] || shown != want[1] {
 			t.Errorf("%q: %s %q", name, kind, shown)
@@ -143,6 +143,10 @@ func TestUSB(t *testing.T) {
 	}
 	post(t, ts.URL+"/api/usb", `{"op":"next"}`)
 	tape(`PLAY "/03 Encore.wav"`)
+	post(t, ts.URL+"/api/usb", `{"op":"ff"}`)
+	tape(`FF "/03 Encore.wav"`)
+	post(t, ts.URL+"/api/usb", `{"op":"pause"}`)
+	tape(`PPAUSE "/03 Encore.wav"`)
 	post(t, ts.URL+"/api/usb", `{"op":"stop"}`)
 	tape("STOP")
 	if code := post(t, ts.URL+"/api/usb", `{"op":"eject"}`); code != http.StatusBadRequest {

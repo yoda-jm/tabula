@@ -46,7 +46,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Effect parameters (`/fx/N/par/NN`): fields follow the effect type (switching effect loads its defaults); all 61 effects modelled, with ranges, steps, formats and defaults matching M32-Edit's built-in tables; 57 of 61 real parameter lines round-trip byte for byte, the other 4 (older firmware spellings) load and are written in today's form.
 - [x] Scenes/snippets/presets library: `/save`, `/load`, `/copy`, `/delete`, `/rename`, `/add` (cues), `/showdump`, with listings in `/-show` and `/-libs`, optionally kept in a directory (`-library`). Scene safes and snippet filters are not applied yet.
 - [x] Side effects of `/-action/*` (go scene/snippet/cue, clear solo, undo checkpoint and undo, init) and computed status (`/-insert`, `/-ha/NN/index` from sources and input routing, `/-stat/solo`).
-- [x] USB stick from a folder (`-usb`): directory listing, `/-action/recselect` (enter a directory, play a WAV file, load a scene or snippet), player state and time (`/-stat/tape`), previous/next (`/-action/playtrack`), folder mode, unmount, recording (named and timed, nothing written); no sound (`docs/emulator.md`).
+- [x] USB stick from a folder (`-usb`): directory listing, `/-action/recselect` (enter a directory, play a WAV file, load a scene, snippet, channel/effect/routing/AES50 preset or show with its scenes), player state and time (`/-stat/tape`), fast forward and rewind, previous/next (`/-action/playtrack`), folder mode, unmount, recording (named and timed, nothing written); no sound, preference files refused (`docs/emulator.md`).
 - [x] Factory presets: `-presets` imports M32-Edit's library (channel, effect and routing presets).
 - [x] RTA of the source chosen with `/-action/setrtasrc` (channels, buses, graphic EQs, pre/post EQ), shaped by low cut, EQ and graphic EQ.
 - [x] Linked strips (channels, aux, FX returns, buses, matrices) kept in step, following `/config/linkcfg`, with the rules of M32-Edit's offline logic (see `docs/emulator.md`).
@@ -64,7 +64,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] FX pages: overview of the 8 slots, per-slot editor, graphic EQ with the RTA (also behind the channel EQ curve).
 - [x] Scenes, snippets and presets: list, recall, save, rename, copy, delete (`POST /api/library`).
 - [x] Scene files kept on the laptop (`-scenes`): load into the console line by line, save the console as one, open from the browser (`/api/scenefiles`).
-- [x] The console's USB stick and player: browse, play WAV files, transport, load scenes from the stick (`/api/usb`). Not yet tried on the real M32.
+- [x] The console's USB stick and player: browse, play WAV files, transport (rewind and fast forward too), load scenes, presets and shows from the stick (`/api/usb`). Not yet tried on the real M32.
 - [x] Linked pairs shown as stereo strips in the mixer.
 - [x] Solo and Clear solo on the mixer, the six mute groups, strips silenced by a mute group or a muted DCA; Monitor page: solo modes, monitor, talkback A/B, oscillator (asks before its tone).
 
