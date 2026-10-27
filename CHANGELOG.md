@@ -54,6 +54,17 @@
   (*Fader & pan of Ch 9-12*), and so does **Save snippet**. The recall
   confirmations say what the safes keep, or what the snippet changes, and
   that a backup is saved first.
+- Record page: **Take it home** in a session's details takes the whole
+  session folder home in one go, without writing anything on the laptop's
+  disk (#25): **⤓ Download as a zip** (made while it downloads), or copy it
+  to a USB disk plugged into the laptop, its tracks as recorded (WAV) or in
+  FLAC, lossless and about half the size (converted by ffmpeg on the way).
+  The copy checks the disk has room first and says what it takes; it goes
+  into `tabula/<session>` on the disk through a `(copying)` folder renamed
+  once complete, shows its progress, can be cancelled, and leaves nothing
+  when it does not complete (`GET /api/sessions/{name}/zip`, `GET
+  /api/disks`, `POST /api/sessions/{name}/copy`, `GET /api/copy`, `POST
+  /api/copy/stop`).
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,
