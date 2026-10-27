@@ -94,6 +94,29 @@ of the bus, matrix or main behind it. A track without a name is
 `Track 11.wav`. *Name the files “Track 01”…* (`-audio-plain-names`) turns
 this off, for a device that is not the console's card.
 
+## Markers and the setlist
+
+A marker is a moment of the show with a label: the start of a song, an
+incident. While recording, **⚑** in the top bar (on every page of the
+engineer) or the M key adds one; the markers are in the session's details,
+and in its exports for Reaper (project markers), Audacity (labels) and
+the CSV, at their place in the audio.
+
+Type the **setlist** before the show, on the Record page, one song per line.
+Then one tap on ⚑ (or M) marks the next song with its name, *3. Song
+name*, and moves on to the one after it: after the show, every song is
+found at once in the recording. A song played out of order is marked from
+the menu (▾), and the setlist goes on from it; the menu also goes back one
+song, skips one, or adds a marker with a label of yours (*Break*,
+*Encore*). When every song is marked, ⚑ adds timed markers.
+
+tabula keeps the setlist in `setlist.json`, in the sessions folder, with
+the next song to mark: it is still there after a restart, and every
+engineer device shows the same next song (two devices marking at the same
+time never mark the same song twice). A session keeps the setlist it was
+recorded with (`setlist.json` in its folder), and its details list the
+songs with the time each was marked.
+
 ## Replaying a session
 
 Every change in `events.jsonl` keeps its time, in seconds after the start

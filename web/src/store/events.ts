@@ -1,5 +1,5 @@
 // The Server-Sent Events stream (/api/events): status, change, resync,
-// record, scenefile, access, online, undo, meters and ping. The stream is reopened with a backoff if
+// record, scenefile, access, online, undo, setlist, meters and ping. The stream is reopened with a backoff if
 // it drops, and the whole state is reloaded after each (re)open, as changes
 // may have been missed in between. A stream that drops because the access
 // was deleted is not reopened. The server pings every 5 s: a stream silent
@@ -15,6 +15,7 @@ import type { Status } from "../lib/api";
 import { api } from "../lib/api";
 import { editApi } from "../lib/api";
 import { sessionApi } from "../lib/session";
+import { setlistApi } from "../lib/setlist";
 import type { Store } from "./store";
 
 /** Meter groups asked for: 0 (inputs, aux, FX returns, buses, matrices) and 2 (buses, matrices, mains). */
@@ -27,7 +28,7 @@ export const SWAP_DELAY = 150;
 export const QUIET = 15000;
 
 /** The events of the stream: any of them shows it is alive. */
-const EVENTS = ["status", "change", "resync", "record", "scenefile", "access", "online", "undo", "meters", "ping"];
+const EVENTS = ["status", "change", "resync", "record", "scenefile", "access", "online", "undo", "setlist", "meters", "ping"];
 
 export function startEvents(store: Store, meters = METER_GROUPS): () => void {
   let es: EventSource | null = null; // the stream in use
@@ -47,11 +48,16 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
       (r) => store.setRecord(r),
       () => store.setRecord(null), // a tabula without recording support
     );
-  const refreshUndo = () => {
+  /** refreshEngineer loads what only the engineer's pages show: Undo, the setlist. */
+  const refreshEngineer = () => {
     if (store.access?.role !== "engineer") return;
     editApi.undoStatus().then(
       (u) => store.setUndo(u),
       () => store.setUndo(null),
+    );
+    setlistApi.get().then(
+      (s) => store.setSetlist(s),
+      () => store.setSetlist(null),
     );
   };
 
@@ -121,7 +127,7 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
         fresh = false;
         if (!store.schema) void store.loadSchema(); // tabula was not reachable when the page opened
         void refreshRecord();
-        refreshUndo();
+        refreshEngineer();
         if (s.connected && !s.connecting) void store.reloadState();
       }
     });
@@ -131,7 +137,7 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
     src.addEventListener("resync", () => {
       if (!live()) return;
       void store.reloadState();
-      refreshUndo(); // another connection: its own steps
+      refreshEngineer(); // another connection: its own undo steps
     });
     src.addEventListener("record", (e) => {
       if (live()) store.setRecord(JSON.parse((e as MessageEvent).data));
@@ -147,6 +153,9 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
     });
     src.addEventListener("undo", (e) => {
       if (live()) store.setUndo(JSON.parse((e as MessageEvent).data));
+    });
+    src.addEventListener("setlist", (e) => {
+      if (live()) store.setSetlist(JSON.parse((e as MessageEvent).data));
     });
     src.addEventListener("meters", (e) => {
       if (!live()) return;

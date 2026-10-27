@@ -13,6 +13,7 @@ import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Status, Whoami } from "../lib/api";
+import { MarkerButton } from "../components/Marker";
 import { UpdateBanner } from "../components/shell";
 import { ALL_STRIPS } from "../lib/strips";
 import { store } from "../store/store";
@@ -30,6 +31,7 @@ import { PlayRoutingNote, RecordPage } from "./RecordPage";
 import { RoutingPage } from "./RoutingPage";
 import { SceneSafes, SnippetFilters } from "./Safes";
 import { SceneFiles } from "./SceneFiles";
+import { SetlistCard } from "./Setlist";
 import { TakeHome } from "./TakeHome";
 import { ScenesPage } from "./ScenesPage";
 import { UsbPage } from "./UsbPage";
@@ -167,6 +169,26 @@ describe("pages", () => {
     expect(record).toContain("USB stick");
     expect(render(<ConnectPage />)).toContain("tabula-emu");
     render(<AccessPage />);
+  });
+
+  it("the setlist, and the marker button while recording", () => {
+    const rec = store.record;
+    store.setSetlist({ songs: ["Opening", "Second song", "Encore"], next: 1 });
+    try {
+      const page = render(<SetlistCard />);
+      expect(page).toContain("3 songs");
+      expect(page).toContain("2. Second song");
+      expect(render(<MarkerButton />)).toBe(""); // not recording
+      store.setRecord({ ...rec!, recording: true, name: "2026-10-27_203000" });
+      const button = render(<MarkerButton />);
+      expect(button).toContain("Second song");
+      expect(button).toContain("Mark 2. Second song");
+      store.setSetlist({ songs: [], next: 0 });
+      expect(render(<MarkerButton />)).toContain("Add a marker");
+    } finally {
+      store.setRecord(rec);
+      store.setSetlist(null);
+    }
   });
 
   it("taking a session home", () => {

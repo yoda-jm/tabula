@@ -218,7 +218,8 @@ func (h *hub) publishOnlineLocked() {
 // (an array of changed parameters), "resync" (reload the state), "record",
 // "access" (the musicians' write permission changed), "online" (which
 // devices have a page open, for engineers only), "undo" (what Undo would
-// undo, for engineers only), "meters" for the groups
+// undo, for engineers only), "setlist" (the songs and the next one, for
+// engineers only), "meters" for the groups
 // named in ?meters=, and "ping" every 5 s.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)

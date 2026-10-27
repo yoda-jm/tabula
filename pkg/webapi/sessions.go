@@ -214,9 +214,15 @@ func (s *Server) recordStop(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.recordStatus())
 }
 
+// recordMark adds a marker: {"label": "Song 2"}, or the next song of the
+// setlist ({"next": true}) or one of its songs ({"song": 2}, from 0); with
+// none of them, a timed marker (setlist.go). It answers the record status
+// and the marker added.
 func (s *Server) recordMark(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Label string `json:"label"`
+		Next  bool   `json:"next"`
+		Song  *int   `json:"song"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	s.mu.Lock()
@@ -226,12 +232,16 @@ func (s *Server) recordMark(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, errors.New("not recording"))
 		return
 	}
-	if req.Label == "" {
-		req.Label = "Marker " + rec.Elapsed().Round(time.Second).String()
+	m, err := s.addMarker(rec, strings.TrimSpace(req.Label), req.Next, req.Song)
+	if err != nil {
+		httpError(w, http.StatusBadRequest, err)
+		return
 	}
-	rec.Mark(req.Label)
 	s.publishRecord()
-	writeJSON(w, http.StatusOK, s.recordStatus())
+	writeJSON(w, http.StatusOK, struct {
+		recordView
+		Marked markView `json:"marked"`
+	}{s.recordStatus(), m})
 }
 
 func (s *Server) getRecord(w http.ResponseWriter, r *http.Request) {
@@ -253,6 +263,8 @@ type sessionView struct {
 	// takes with its tracks in FLAC (takehome.go), when it has WAV tracks.
 	Size     int64 `json:"size,omitempty"`
 	FLACSize int64 `json:"flac_size,omitempty"`
+	// Setlist is the songs the session was recorded with (setlist.go)
+	Setlist []string `json:"setlist,omitempty"`
 }
 
 // openSession opens a session, logging the lines of its change log that
@@ -309,7 +321,7 @@ func (s *Server) getSession(w http.ResponseWriter, r *http.Request) {
 	}
 	_, err = os.Stat(filepath.Join(dir, "start.scn"))
 	v := sessionView{Name: filepath.Base(dir), Meta: ses.Meta, Markers: ses.Markers(),
-		Snapshot: len(ses.Start), Scene: err == nil, Damaged: ses.Damaged}
+		Snapshot: len(ses.Start), Scene: err == nil, Damaged: ses.Damaged, Setlist: sessionSetlist(dir)}
 	if files, err := ses.HomeFiles(false); err == nil {
 		v.Size, _ = session.HomeSize(files)
 	}

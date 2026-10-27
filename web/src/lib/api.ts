@@ -202,7 +202,7 @@ export const LONG = 60_000;
 export const SLOW = 30_000;
 
 /** call sends a request; it fails after timeout ms without an answer (0: it waits as long as it takes). */
-export async function call<T>(method: "GET" | "POST" | "DELETE", url: string, body?: unknown, timeout = TIMEOUT): Promise<T> {
+export async function call<T>(method: "GET" | "POST" | "PUT" | "DELETE", url: string, body?: unknown, timeout = TIMEOUT): Promise<T> {
   const ctl = timeout > 0 ? new AbortController() : null;
   const timer = ctl ? setTimeout(() => ctl.abort(), timeout) : undefined;
   try {

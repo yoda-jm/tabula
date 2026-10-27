@@ -78,6 +78,8 @@ export interface SessionDetail extends SessionSummary {
   /** bytes of the session's folder; about what it takes with its tracks in FLAC (lib/takehome.ts) */
   size?: number;
   flac_size?: number;
+  /** the songs of the setlist the session was recorded with */
+  setlist?: string[];
 }
 
 export const sessionApi = {

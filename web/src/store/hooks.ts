@@ -17,6 +17,7 @@ export const useStream = () => useKey("stream", () => store.stream);
 export const useRecord = () => useKey("record", () => store.record);
 export const useSceneLoad = () => useKey("scenefile", () => store.sceneLoad);
 export const useUndo = () => useKey("undo", () => store.undo);
+export const useSetlist = () => useKey("setlist", () => store.setlist);
 export const useOnline = () => useKey("online", () => store.online);
 export const useToasts = () => useKey("toasts", () => store.toasts);
 export const useSchema = () => useKey("schema", () => store.schema); // loads notify every key

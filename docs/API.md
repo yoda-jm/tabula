@@ -206,6 +206,7 @@ entries `/-usb/dir/001`…`999` are lazy nodes: not read when connecting.
 - `record`: a `Record` (recording, replay, audio);
 - `scenefile`: a `SceneProgress` while a scene file is sent to the console;
 - `undo`: an `UndoView` when what Undo would undo changed, to engineers only;
+- `setlist`: the `Setlist` when it changed (saved, a song marked, moved), to engineers only;
 - `meters`: `{"id": "1", "values": [...]}` for the meter groups named when
   opening the stream, e.g. `/api/events?meters=1,2,6:12` (`N` is
   `/meters/N`, `N:a:b` adds its parameters: `5:0:0` channels 1-16 + DCAs,
@@ -297,17 +298,28 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 |---|---|---|---|
 | GET | `/api/record` | | `Record` |
 | POST | `/api/record/start` | `{"note": "set 1"}` | `Record` (409 if not connected or already recording). With audio, it answers once the audio delivers samples or has failed (3 s at most), so `audio.state` says whether it runs |
-| POST | `/api/record/mark` | `{"label": "Song 2"}` (default: `Marker 12m34s`, the time since the start) | `Record` |
+| POST | `/api/record/mark` | `{"label": "Song 2"}`, or `{"next": true}` (the next song of the setlist, then the next one moves on), or `{"song": 2}` (that song of the setlist, from 0; the next one is the one after it); with none of them, or when no song is left: `Marker 12m34s`, the time since the start | `Record` and `"marked": {"label", "t"}`, the marker added (`t`: seconds after the start); 409 when not recording, 400 for a song not in the setlist |
 | POST | `/api/record/stop` | | `Record` |
 | POST | `/api/record/usb` | `{"on": true}` | `Record`: turns the backup on the console's USB stick on or off for the next recordings (kept in `audio.json` as `usb_backup`, which `POST /api/audio/config` leaves as it is); turned on during a recording, it starts now |
 | GET | `/api/sessions` | | `[{"name", "meta"}]`, newest first |
-| GET | `/api/sessions/{name}` | | `{"name", "meta", "markers": [Event], "snapshot", "scene", "size", "flac_size"?}`: `snapshot` counts the node lines of the console at the start (`start.scn` and `start.nodes`), `scene` says whether `start.scn` is there; `size` is the bytes of the session's folder, `flac_size` about what it takes with its WAV tracks in FLAC (see [Taking a show home](#taking-a-show-home)) |
+| GET | `/api/sessions/{name}` | | `{"name", "meta", "markers": [Event], "snapshot", "scene", "size", "flac_size"?, "setlist"?}` (`setlist`: the songs the session was recorded with): `snapshot` counts the node lines of the console at the start (`start.scn` and `start.nodes`), `scene` says whether `start.scn` is there; `size` is the bytes of the session's folder, `flac_size` about what it takes with its WAV tracks in FLAC (see [Taking a show home](#taking-a-show-home)) |
 | DELETE | `/api/sessions/{name}` | | 204: the session folder is removed, audio included (not `audio.json`); 409 while it is recorded or replayed |
 | POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1, "audio"?: true, "routing"?: true}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console). With `audio`, a virtual soundcheck (below): 409 for a session without audio tracks, while recording, while the input is tested, or when no player can be run; 400 for a speed other than 1; with `routing` too, 502 when the routing cannot be switched |
 | POST | `/api/replay/stop` | | `Record` |
 | GET | `/api/undo` | | `UndoView`: `{"count", "what"?, "at"?}`, what Undo takes back (the engineer's last change made from tabula) |
 | POST | `/api/undo` | | `UndoView` after undoing the last step: the values it overwrote are sent back to the console; 403 unless writes are armed; 409 when there is nothing to undo; 502 when the console does not answer (a step not started stays) |
 | POST | `/api/strips/copy` | `{"from": "/ch/01", "to": ["/ch/02"], "sections": ["eq", "dyn"]}` | `{"nodes"}`: the sections' nodes (`preamp`, `delay`, `gate`, `dyn`, `insert`, `eq`, `sends`: `mix/01`…, `main`: `mix`) sent to each target with the `/` command; one undo step. Strips of the same kind only (`ch`, `auxin`, `fxrtn`, `bus`, `mtx`); 400 otherwise or when none has the sections; 403 unless armed |
+
+**Setlist** (engineer only): the show's songs and the next one to mark,
+kept in `setlist.json` in the sessions folder. `Setlist`: `{"songs":
+[...], "next", "updated"}`, `next` from 0, `songs.length` once all are
+marked. It is sent as `setlist` events to the engineers when it changes.
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/api/setlist` | | `Setlist` |
+| PUT | `/api/setlist` | `{"songs": [...], "next"?: n}` | `Setlist`: the songs replaced (spaces tidied, empty ones dropped; 200 songs of 80 characters at most, else 400); without `next`, the next song stays the same song wherever it moved |
+| POST | `/api/setlist/next` | `{"next": n}` | `Setlist`: song `n` is the next one (back one song, skip one) |
 
 `Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", "audio"?, "usb_backup"?, …}, "replaying", "replay_of"?, "replay_at"?, "replay_audio"?, "error"?, "waiting"?, "audio"?, "usb"}`; `waiting` counts the console changes waiting for a slow disk for more than 2 s.
 `usb` is the backup on the console's USB stick: `{"on" (the setting),

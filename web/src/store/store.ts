@@ -20,6 +20,7 @@ import { KeyedThrottle } from "../lib/throttle";
 import { formatValue, isFloatKind, quantize, sameValue } from "../lib/values";
 import type { Record as RecordStatus } from "../lib/session";
 import type { SceneProgress } from "../lib/scenefiles";
+import type { Setlist } from "../lib/setlist";
 
 export interface Val {
   value: RawValue;
@@ -75,6 +76,8 @@ export class Store {
   online: Online | null = null;
   /** what Undo would undo (engineers only) */
   undo: UndoView | null = null;
+  /** the setlist and its next song (engineers only) */
+  setlist: Setlist | null = null;
   toasts: Toast[] = [];
   /** bumped when the whole state is (re)loaded or cleared */
   stateVersion = 0;
@@ -373,6 +376,11 @@ export class Store {
   setUndo(u: UndoView | null) {
     this.undo = u;
     this.notify(["undo"]);
+  }
+
+  setSetlist(s: Setlist | null) {
+    this.setlist = s;
+    this.notify(["setlist"]);
   }
 
   /** recordElapsed is the recording's elapsed time: the server's duration plus the time since it was sent. */

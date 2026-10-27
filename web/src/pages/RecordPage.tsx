@@ -4,18 +4,21 @@
 // audio card is on, the sound of the console's USB card; the console can
 // keep a stereo backup on its own USB stick (UsbBackup.tsx).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { placeMarker } from "../components/Marker";
 import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { AudioView } from "../lib/audio";
 import type { Record as RecordStatus, SessionDetail, SessionSummary } from "../lib/session";
 import { audioApi, audioPlan, audioSummary, exportUrl, formatBytes, plural } from "../lib/audio";
-import { addsMarker, damagedText, formatDuration, parseTime, sessionApi } from "../lib/session";
+import { damagedText, formatDuration, parseTime, sessionApi } from "../lib/session";
+import { nextSong, setlistApi, songTimes } from "../lib/setlist";
 import { PLAY_BLOCKS, ROUTSWITCH, playRouting, playableTracks } from "../lib/soundcheck";
-import { useCanWrite, useRecord, useStatus, useValue } from "../store/hooks";
+import { useCanWrite, useRecord, useSetlist, useStatus, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import type { Audio } from "./AudioPanel";
 import { AudioPanel, CheckProblems, SessionAudio, saveDraft, useAudio, useUnsaved } from "./AudioPanel";
+import { SetlistCard } from "./Setlist";
 import { TakeHome } from "./TakeHome";
 import { UsbBackupCard } from "./UsbBackup";
 
@@ -60,6 +63,7 @@ export function RecordPage() {
   return (
     <div className="page record">
       <Recorder rec={rec} audio={audio} onRetry={restartAudio} onRestart={() => void load()} />
+      <SetlistCard />
       <AudioPanel rec={rec} audio={audio} onRetry={saveAndRestart} />
       <UsbBackupCard rec={rec} />
       <section className="card">
@@ -231,6 +235,7 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
   const [busy, setBusy] = useState(false);
   const [stopping, setStopping] = useState(false); // asking before the show stops being recorded
   const recording = !!rec?.recording;
+  const nextLabel = nextSong(useSetlist());
   const unsaved = useUnsaved(audio);
   useTick(recording, 250);
 
@@ -247,34 +252,10 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
       setBusy(false);
     }
   };
-  const mark = useCallback(
-    async (text: string) => {
-      try {
-        store.setRecord(await sessionApi.mark(text.trim()));
-        store.toast(text.trim() ? `Marker “${text.trim()}”` : "Marker added");
-        setLabel("");
-      } catch (e) {
-        setError((e as Error).message);
-      }
-    },
-    [],
-  );
-
-  // M adds a marker while recording (unless typing in a field)
-  const labelRef = useRef(label);
-  labelRef.current = label;
-  useEffect(() => {
-    if (!recording) return;
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (!addsMarker(e)) return; // M held down: one marker, not one per key repeat
-      if (t.closest("input, textarea, select, [contenteditable]")) return;
-      e.preventDefault();
-      void mark(labelRef.current);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [recording, mark]);
+  // a label typed, or the next song of the setlist (the M key, on every page, is the top bar's)
+  const mark = async (text: string) => {
+    if (await placeMarker(text.trim() ? () => setlistApi.markLabel(text.trim()) : setlistApi.markNext)) setLabel("");
+  };
 
   if (!rec) return null;
   const err = error || rec.error;
@@ -335,8 +316,8 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
             }}
           >
             <label className="grow">
-              <span className="field-label">Marker label (optional; press M anywhere on this page)</span>
-              <input className="input" type="text" value={label} placeholder="Song 2" onChange={(e) => setLabel(e.target.value)} />
+              <span className="field-label">Marker label (empty: the next song of the setlist; M on any page marks it too)</span>
+              <input className="input" type="text" value={label} placeholder={nextLabel ?? "Song 2"} onChange={(e) => setLabel(e.target.value)} />
             </label>
             <button type="submit" className="btn big">
               Marker
@@ -523,6 +504,32 @@ function Session(props: { name: string; rec: RecordStatus | null; audio: AudioVi
           ⚠ {damagedText(detail.damaged)}
         </p>
       ) : null}
+
+      {detail?.setlist && detail.setlist.length > 0 && (
+        <>
+          <h4>Setlist</h4>
+          <ol className="setlist-times">
+            {detail.setlist.map((song, i) => {
+              const t = songTimes(detail.setlist!, detail.markers)[i];
+              return (
+                <li key={i}>
+                  <span className="marker-label">{song}</span>
+                  {t === undefined ? (
+                    <span className="muted">not marked</span>
+                  ) : (
+                    <>
+                      <code>{formatDuration(t)}</code>
+                      <button type="button" className="btn" onClick={() => setFrom(String(Math.floor(t)))}>
+                        Replay from here
+                      </button>
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
 
       {detail?.markers && detail.markers.length > 0 && (
         <>

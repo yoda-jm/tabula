@@ -463,7 +463,7 @@ Record a show as a session, which keeps two things, as the page says above
 - **Console**, always: the console's settings, not its sound. A snapshot of
   every setting when you start (a scene file that opens in M32-Edit), then
   every change, made on the console or here, with its time, and the markers
-  you add (press M; holding it adds one).
+  you add (below).
 - **Audio**, when **Audio tracks** is on: the sound of the console's USB
   card, one WAV file per track, in step with the console changes. Click
   the tracks to record in the list, named after what the console sends to
@@ -485,6 +485,24 @@ Record a show as a session, which keeps two things, as the page says above
 ![The backup on the console's USB stick, recording](img/record-usb-backup.png)
 
 ![Start recording asks about the audio settings not saved](img/audio-unsaved.png)
+
+**Markers and the setlist.** While recording, **⚑** in the top bar, on
+every page, adds a marker; so does the M key, anywhere but in a text field
+(held down, it adds one). With a **setlist**, typed on the Record page one
+song per line before the show (a number typed in front is left out:
+tabula numbers them), one tap marks the next song with its name, *3. Song
+name*, and moves on: the button shows the song it marks next (on a phone,
+its number). **▾** next to it marks another song (a song played out of
+order, then the setlist goes on from it), goes back one song or skips one,
+or adds a marker with a label of yours (*Break*, *Encore*); empty, a
+timed marker. A toast says what was marked and when. The setlist is kept
+by tabula next to the sessions (it survives a restart) and shared by the
+engineer's devices: two of them marking at once never mark the same song
+twice. On the Record page, *Next to mark* says where it is, with ◀ Back
+one, Skip one ▶ and From the first; the marker field of the recording
+marks with a label typed, or the next song when empty.
+
+![The top bar while recording: the next song to mark, and its menu](img/marker-menu.png)
 
 **Stop recording** asks first: the session and its audio end there.
 Disconnecting, or connecting to another console, asks too while a recording
@@ -508,7 +526,9 @@ the end, and says which inputs the PLAY routing takes from the card
 which player plays them (*Play the tracks to*, and *Command to play them*
 for a custom recorder). Export it for
 Reaper or Audacity to listen to the audio with the markers. The details of
-a session also show what it keeps of the console at the start, with
+a session also show the setlist it was recorded with, each song with the
+time it was marked (*Replay from here*), what it keeps of the console at
+the start, with
 **⤓ Scene (.scn)** to open it in M32-Edit, and **Delete this session…**
 removes it, audio included, after asking. **Take it home** downloads the
 whole session as one zip, or copies it to a USB disk plugged into the
