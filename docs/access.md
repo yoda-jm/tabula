@@ -44,6 +44,21 @@ Links are made of the address of this machine and a secret: when the
 laptop has several addresses (Wi-Fi and Ethernet), pick the one the phones
 use in **Links use**.
 
+**Links that survive a new IP address.** A venue's network can give the
+laptop another IP address than at the last show, and links made with the
+old one stop working. When the laptop's name answers on the network
+(`actarus.local`: avahi on Linux, Bonjour on macOS, Windows 10 and later),
+links use it instead, and keep working whatever address the laptop gets.
+tabula checks it before offering it: it asks the network for the name, the
+way phones do, and uses it only if the answer is an address of this
+machine (checked again every minute; when tabula listens on all its
+addresses, `-http :8033`). **Links use the laptop's name** switches between
+the name and the IP address: a phone that cannot open `.local` names (some
+older Android phones, a Wi-Fi that blocks them) needs the IP address. The
+choice is remembered by the browser. A phone that scanned a link once
+keeps its access (a cookie per address: a phone that used the IP link and
+then opens the name link signs in again with the link).
+
 ## The musician's page
 
 ![A musician's in-ear mix on a phone](img/in-ear-mix.png)

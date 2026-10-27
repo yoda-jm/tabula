@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Whoami } from "./api";
-import { atLeast, busLinkAddr, mayWrite, mixBuses, musicianBuses, musicianMay } from "./access";
+import { atLeast, busLinkAddr, linkBase, mayWrite, mixBuses, musicianBuses, musicianMay } from "./access";
 
 describe("access", () => {
   it("lets a musician change the sends to their buses and their bus master only", () => {
@@ -40,5 +40,16 @@ describe("access", () => {
     expect(mayWrite(who, false, "/bus/03/mix/fader", value)).toBe(true);
     links["/config/buslink/3-4"] = 0;
     expect(mayWrite({ ...who, buses: [3, 4] }, false, "/bus/03/mix/fader", value)).toBe(false);
+  });
+});
+
+describe("linkBase", () => {
+  const st = { urls: ["http://192.168.2.227:8033", "http://10.0.0.5:8033"], name_url: "http://actarus.local:8033" };
+  it("uses the name when the network answers for it, unless the engineer turns it off", () => {
+    expect(linkBase(st, true, "")).toBe("http://actarus.local:8033");
+    expect(linkBase(st, false, "")).toBe("http://192.168.2.227:8033");
+    expect(linkBase(st, false, "http://10.0.0.5:8033")).toBe("http://10.0.0.5:8033");
+    expect(linkBase({ urls: st.urls }, true, "http://10.0.0.5:8033")).toBe("http://10.0.0.5:8033");
+    expect(linkBase({ urls: [] }, true, "")).toBe("");
   });
 });

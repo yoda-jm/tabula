@@ -65,6 +65,14 @@
   when it does not complete (`GET /api/sessions/{name}/zip`, `GET
   /api/disks`, `POST /api/sessions/{name}/copy`, `GET /api/copy`, `POST
   /api/copy/stop`).
+- Access links that survive a new IP address (#20): when the laptop's name
+  answers on the network (`actarus.local`, from avahi, Bonjour or Windows),
+  links and QR codes use it, so a venue that gives the laptop another IP
+  address does not mean every musician scans again. tabula asks the network
+  for the name first (multicast DNS, as phones do) and offers it only when
+  the answer is one of its own addresses. **Links use the laptop's name**
+  on the Access page switches back to the IP address, for a phone that
+  cannot open `.local` names. `GET /api/access` gives `name_url`.
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,

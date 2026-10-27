@@ -8,9 +8,10 @@
 import { useCallback, useEffect, useState } from "react";
 import qrcode from "qrcode-generator";
 import { ConfirmDialog } from "../components/shell";
-import { ROLE_LABELS } from "../lib/access";
+import { ROLE_LABELS, linkBase } from "../lib/access";
 import type { AccessStatus, Grant, Online, Presence, Role } from "../lib/api";
 import { accessApi, api } from "../lib/api";
+import { usePersistent } from "../lib/route";
 import { ALL_STRIPS } from "../lib/strips";
 import { prettyText } from "../lib/values";
 import { useOnline, useValue } from "../store/hooks";
@@ -21,7 +22,8 @@ const BUSES = ALL_STRIPS.filter((s) => s.kind === "bus");
 export function AccessPage() {
   const [st, setSt] = useState<AccessStatus | null>(null);
   const [error, setError] = useState("");
-  const [base, setBase] = useState("");
+  const [ip, setIp] = useState(""); // the address links use when not the machine's name
+  const [byName, setByName] = usePersistent("tabula.access.byName", true);
   const [shown, setShown] = useState<string | null>(null); // grant whose QR code is open
   const [removing, setRemoving] = useState<Grant | null>(null);
   const live = useOnline();
@@ -38,9 +40,10 @@ export function AccessPage() {
   }, []);
   useEffect(refresh, [refresh]);
   useEffect(() => {
-    if (st && !st.urls.includes(base)) setBase(st.urls[0] ?? window.location.origin);
-  }, [st, base]);
+    if (st && !st.urls.includes(ip) && st.urls.length) setIp(st.urls[0]);
+  }, [st, ip]);
 
+  const base = (st && linkBase(st, byName, ip)) || (typeof window === "undefined" ? "" : window.location.origin);
   const link = (g: Grant) => `${base}/a/${g.token}`;
   const links = st?.grants.filter((g) => !g.session) ?? [];
   const sessions = st?.grants.filter((g) => g.session) ?? [];
@@ -79,10 +82,25 @@ export function AccessPage() {
             Devices without a link: {ROLE_LABELS[st.guest].toLowerCase()} (set with <code>-guest</code>).
             {online && online.guests.length > 0 && <> Open now without a link: {online.guests.join(", ")}.</>}
           </p>
-          {st.urls.length > 1 && (
+          {st.name_url && (
+            <label className="check">
+              <input type="checkbox" checked={byName} onChange={(e) => setByName(e.target.checked)} /> Links use the laptop's
+              name, <code>{new URL(st.name_url).host}</code>, instead of its IP address
+            </label>
+          )}
+          {st.reachable && (
+            <p className="muted">
+              {!st.name_url
+                ? "The laptop's name does not answer on the network (no avahi or Bonjour running on it): links use its IP address, and a venue that gives the laptop another one means scanning the links again."
+                : byName
+                  ? "Links made with the name keep working when a venue gives the laptop another IP address. A phone that cannot open it (some older Android phones, a Wi-Fi that blocks such names) needs a link with the IP address: untick to show those."
+                  : "Links use the IP address: a venue that gives the laptop another one means scanning them again."}
+            </p>
+          )}
+          {(!st.name_url || !byName) && st.urls.length > 1 && (
             <label className="form-field">
               <span className="field-label">Links use</span>
-              <select className="select" value={base} onChange={(e) => setBase(e.target.value)}>
+              <select className="select" value={ip} onChange={(e) => setIp(e.target.value)}>
                 {st.urls.map((u) => (
                   <option key={u} value={u}>
                     {u}

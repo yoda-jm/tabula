@@ -55,6 +55,7 @@ type Server struct {
 	limiter    loginLimiter // password.go
 
 	allowedHosts []string // origin.go
+	mdns         mdnsName // mdns.go
 
 	lib   libraryState // library.go
 	audio audioState   // audio.go

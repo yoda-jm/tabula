@@ -2,7 +2,7 @@
 // (pkg/webapi/access.go), so controls outside a musician's mix are shown
 // disabled instead of failing.
 
-import type { RawValue, Role, Whoami } from "./api";
+import type { AccessStatus, RawValue, Role, Whoami } from "./api";
 
 const RANK: Record<Role, number> = { none: 0, viewer: 1, musician: 2, engineer: 3 };
 
@@ -54,3 +54,13 @@ export const ROLE_LABELS: Record<Role, string> = {
   musician: "Musician (own in-ear mix)",
   engineer: "Engineer (everything)",
 };
+
+/**
+ * linkBase is where the access links point: the machine's .local name when
+ * the network answers for it and the engineer keeps it (byName), else the
+ * IP address chosen (the first one by default).
+ */
+export function linkBase(st: Pick<AccessStatus, "urls" | "name_url">, byName: boolean, ip: string): string {
+  if (byName && st.name_url) return st.name_url;
+  return st.urls.includes(ip) ? ip : (st.urls[0] ?? "");
+}

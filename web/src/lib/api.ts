@@ -168,6 +168,8 @@ export interface AccessStatus {
   guest: Role;
   /** where other devices reach this tabula */
   urls: string[];
+  /** the same with this machine's name ("http://actarus.local:8033"), when the network answers for it */
+  name_url?: string;
   /** false when tabula listens on this machine only */
   reachable: boolean;
   /** which devices have a page open */

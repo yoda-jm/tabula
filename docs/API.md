@@ -252,7 +252,7 @@ A refused request gets 403 with `{"error": "..."}`.
 | GET | `/api/whoami` | | `{"role", "name"?, "bus"?, "buses"?, "local", "link", "session", "password", "musicians_can_write"}` |
 | POST | `/api/login` | `{"password": "..."}` | signs in with the engineer password: makes a session, sets the cookie, answers the new `whoami`; 403 wrong password, 429 too many wrong ones (with `Retry-After`), 409 no password set |
 | POST | `/api/logout` | | forgets the cookie (and ends a session); answers the new `whoami` |
-| GET | `/api/access` | | `{"grants": [Grant], "musicians_can_write", "password", "current"?, "guest", "urls", "reachable", "online": Online}` |
+| GET | `/api/access` | | `{"grants": [Grant], "musicians_can_write", "password", "current"?, "guest", "urls", "name_url"?, "reachable", "online": Online}`; `name_url` (`http://actarus.local:8033`) when tabula listens on all its addresses and a multicast DNS query for this machine's `.local` name is answered with one of its addresses (checked again after a minute, 15 s after no answer) |
 | POST | `/api/access` | `{"name": "Theo", "role": "musician", "bus": 3}` | 201 + `Grant` |
 | DELETE | `/api/access/{id}` | | 204; event streams opened with it end |
 | POST | `/api/access/settings` | `{"musicians_can_write": false}` | the access status |
