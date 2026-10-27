@@ -323,9 +323,21 @@ hard to miss.
   console's card), **Test the input**, then **Start the audio**. The audio
   goes into the same session (its empty files replaced); its first sample
   is timed from the start of the session as always, so the tracks still line
-  up with the console changes. When audio was recorded before it stopped
-  (a cable pulled in the middle of the show), it stays in the session:
-  **Stop and record again** starts a new session, audio and console.
+  up with the console changes.
+- **When the audio stops in the middle of the show** (a USB cable knocked
+  out, the console rebooted, the card gone), tabula starts the recorder
+  again by itself, as long as it takes (after 1 s, then 2, 4… up to every
+  10 s), in the **same session and the same files**: silence stands for the
+  time without audio, so the tracks stay in step with the console moves and
+  with each other. Meanwhile the top bar says *REC ⚠ AUDIO LOST* and the red
+  bar *The audio stopped…*; the session gets the markers *audio lost (why)*
+  and *audio back after 4.2 s*, and its details list the gaps. A recorder
+  that hangs instead of stopping (no audio for 5 s) is stopped and started
+  again the same way. Nothing needs Stop and record again any more.
+- **Every track silent** for 30 seconds while recording (below -80 dBFS:
+  the console sends nothing to its card, its routing changed) is an alarm
+  too: *REC ⚠ SILENT* and a red bar on every page, gone as soon as one
+  track has signal again.
 
 ![The audio failed at the start: the red bar on every page, NO AUDIO in the top bar, and the error with what to do](img/audio-failed.png)
 

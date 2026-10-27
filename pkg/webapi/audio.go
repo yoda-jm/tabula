@@ -78,7 +78,10 @@ func (s *Server) SetAudioConfig(cfg audio.Config, file string) {
 // or the status of one that could not start: the recording goes on
 // without audio, saying why.
 func (s *Server) startCapture(cfg audio.Config, rec *session.Recorder, mirror *state.Store, source func() (io.ReadCloser, error)) (*audio.Capture, *audio.Status) {
-	opt := audio.Options{Ref: rec.Started(), Log: s.log, Source: source}
+	opt := audio.Options{Ref: rec.Started(), Log: s.log, Source: source, Notify: func(event string) {
+		rec.Mark(event) // "audio lost (…)", "audio back after 4.2s": the session says where the gap is
+		s.publishRecord()
+	}}
 	if mirror != nil {
 		opt.Names = audio.TrackNames(mirror)
 	}

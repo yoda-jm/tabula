@@ -17,6 +17,7 @@ import {
   formatHours,
   formatTracks,
   parseTracks,
+  plural,
   tooManyChannels,
   trackLabel,
 } from "../lib/audio";
@@ -296,6 +297,12 @@ function AudioState({ st }: { st: AudioStatus }) {
       );
     case "starting":
       return <span className="note">starting…</span>;
+    case "recovering":
+      return (
+        <span className="danger-text">
+          <strong>⚠ audio lost: starting it again</strong>
+        </span>
+      );
     case "failed":
       return (
         <span className="danger-text">
@@ -757,6 +764,19 @@ export function SessionAudio({ detail }: { detail: SessionDetail }) {
                 </dd>
               </>
             )}
+            {a.gaps?.length ? (
+              <>
+                <dt>Gaps</dt>
+                <dd>
+                  The audio stopped {plural(a.gaps.length, "time")}, the recorder started again: silence in the tracks
+                  {a.gaps.map((g, i) => (
+                    <span key={i} className="block muted">
+                      at {formatDuration(g.at)} for {g.seconds.toFixed(1)} s{g.why ? ` (${g.why})` : ""}
+                    </span>
+                  ))}
+                </dd>
+              </>
+            ) : null}
           </dl>
           {a.error && <p className="error">{a.error}</p>}
         </>

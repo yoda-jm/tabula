@@ -156,19 +156,22 @@ func TestCapture(t *testing.T) {
 	}
 }
 
-// The stream ends by itself: the capture fails, the files are kept.
+// The stream ends by itself before any audio (a wrong device): the capture
+// fails, saying why; there is nothing to start again.
 func TestCaptureStreamEnds(t *testing.T) {
 	dir := t.TempDir()
-	c, err := Start(Config{Recorder: "custom", Command: "x", Channels: 2}, dir, Options{Source: pipeSource(frames(2, 0, 1000), true)})
+	c, err := Start(Config{Recorder: "custom", Command: "x", Channels: 2}, dir, Options{Source: pipeSource(nil, true)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	<-c.Done()
 	st := c.Status()
-	if st.State != Failed || !strings.Contains(st.Error, "the recorder stopped") || st.Frames != 1000 {
+	if st.State != Failed || !strings.Contains(st.Error, "the recorder stopped") || st.Frames != 0 {
 		t.Errorf("%+v", st)
 	}
-	checkTrack(t, filepath.Join(dir, "Track 02.wav"), 2, 1000)
+	if info, err := ReadWAV(filepath.Join(dir, "Track 02.wav")); err != nil || info.Frames != 0 {
+		t.Errorf("file: %+v %v", info, err)
+	}
 }
 
 // A WAV stream is checked against the configuration.

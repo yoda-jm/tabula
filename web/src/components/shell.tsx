@@ -243,10 +243,16 @@ export function AudioBanner({ onOpen }: { onOpen?: () => void }) {
   const trouble = r?.recording ? audioTrouble(r.audio) : null;
   if (!trouble) return null;
   const failed = trouble.level === "failed";
+  const title = { failed: "⚠ The audio is NOT recorded", recovering: "⚠ The audio stopped", silent: "⚠ Every track is silent", warn: "⚠ Audio" }[
+    trouble.kind
+  ];
+  const text = /[.!?]$/.test(trouble.text) ? trouble.text : trouble.text + ".";
   return (
     <div className={"audio-banner " + trouble.level} role="alert">
-      <strong>{failed ? "⚠ The audio is NOT recorded" : "⚠ Audio"}</strong>
-      <span className="audio-banner-text">{failed ? `${/[.!?]$/.test(trouble.text) ? trouble.text : trouble.text + "."} The console still is.` : trouble.text}</span>
+      <strong>{title}</strong>
+      <span className="audio-banner-text">
+        {trouble.kind === "failed" ? `${text} The console still is.` : trouble.kind === "recovering" ? `${text} Silence stands for the gap in the tracks.` : trouble.text}
+      </span>
       {onOpen && (
         <button type="button" className="btn" onClick={onOpen}>
           {failed ? "Fix it" : "See"} on the Record page
@@ -279,7 +285,7 @@ export function RecIndicator({ onClick }: { onClick(): void }) {
         <span className="rec-dot" aria-hidden />
         REC <span className="rec-time">{formatDuration(elapsed)}</span>
         {trouble?.level === "failed" ? (
-          <span className="rec-warn">⚠ NO AUDIO</span>
+          <span className="rec-warn">{{ failed: "⚠ NO AUDIO", recovering: "⚠ AUDIO LOST", silent: "⚠ SILENT", warn: "" }[trouble.kind]}</span>
         ) : (
           trouble && <span aria-label={`audio: ${trouble.text}`}> ⚠</span>
         )}

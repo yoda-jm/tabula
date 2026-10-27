@@ -98,11 +98,18 @@ describe("audio trouble", () => {
     expect(audioTrouble(st({}))).toBeNull();
     expect(audioTrouble(st({ state: "failed", error: "Channels count non available" }))).toEqual({
       level: "failed",
+      kind: "failed",
       text: "Channels count non available",
     });
+    // the recorder being started again, every track silent: nothing usable is recorded right now
+    const lost = audioTrouble(st({ state: "recovering", warnings: ["the audio stopped 4s ago (the recorder stopped): starting the recorder again"] }));
+    expect(lost).toEqual({ level: "failed", kind: "recovering", text: "the audio stopped 4s ago (the recorder stopped): starting the recorder again" });
+    expect(audioTrouble(st({ silent: 29 }))).toBeNull();
+    expect(audioTrouble(st({ silent: 75 }))).toMatchObject({ level: "failed", kind: "silent", text: expect.stringContaining("silent for 1:15") });
     expect(audioTrouble(st({ state: "failed" }))?.text).toBe("the audio stopped");
     expect(audioTrouble(st({ warnings: ["not the console's card", "no audio for 5s"] }))).toEqual({
       level: "warn",
+      kind: "warn",
       text: "not the console's card · no audio for 5s",
     });
   });

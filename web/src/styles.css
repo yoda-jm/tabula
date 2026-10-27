@@ -3630,3 +3630,6 @@ code.wrap {
 .warn-text {
   color: var(--busy);
 }
+.block {
+  display: block;
+}

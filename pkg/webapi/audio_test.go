@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -304,30 +305,38 @@ func TestAudioFailure(t *testing.T) {
 	}
 	os.RemoveAll(ses.Dir) // the list below counts the failures
 
-	// The recorder dies in the middle of the show.
+	// The recorder dies in the middle of the show: it is started again, in
+	// the same session and files, the gap marked.
 	api.audio.source = liveSource(9600)
 	time.Sleep(time.Second) // sessions are named by the second
 	if code := post(t, ts.URL+"/api/record/start", ``); code != http.StatusOK {
 		t.Fatalf("record start: %d", code)
 	}
-	v = waitRecord(t, ts.URL, "failure", func(v recordView) bool { return v.Audio != nil && v.Audio.State == audio.Failed })
-	if !v.Recording || !strings.Contains(v.Audio.Error, "the recorder stopped") {
+	v = waitRecord(t, ts.URL, "the audio back", func(v recordView) bool {
+		return v.Audio != nil && v.Audio.State == audio.Recording && len(v.Audio.Gaps) > 0
+	})
+	if !v.Recording || v.Audio.Error != "" || !strings.Contains(v.Audio.Gaps[0].Why, "the recorder stopped") {
 		t.Errorf("mid-show: %+v %+v", v, v.Audio)
 	}
 	if code := post(t, ts.URL+"/api/audio/restart", ``); code != http.StatusConflict {
-		t.Errorf("restart after audio was recorded: %d", code)
+		t.Errorf("restart while the audio is recorded: %d", code)
 	}
 	post(t, ts.URL+"/api/record/mark", `{"label":"after"}`)
 	post(t, ts.URL+"/api/record/stop", ``)
 	var list []sessionView
 	getJSON(t, ts.URL+"/api/sessions", &list)
-	if len(list) != 2 || list[0].Meta.Markers != 1 || list[0].Meta.Audio == nil || list[0].Meta.Audio.Frames != 9600 ||
-		!strings.Contains(list[0].Meta.Audio.Error, "the recorder stopped") || !strings.Contains(list[1].Meta.Audio.Error, "device busy") {
+	if len(list) != 2 || list[0].Meta.Audio == nil || list[0].Meta.Audio.Frames <= 9600 || len(list[0].Meta.Audio.Gaps) == 0 ||
+		list[0].Meta.Audio.Error != "" || !strings.Contains(list[1].Meta.Audio.Error, "device busy") {
 		t.Errorf("sessions: %+v", list)
 	}
 	ses, err = session.Open(filepath.Join(sessions, list[0].Name))
-	if err != nil || len(ses.Markers()) != 1 {
-		t.Errorf("session: %v", err)
+	var marks []string
+	for _, m := range ses.Markers() {
+		marks = append(marks, m.Marker)
+	}
+	if err != nil || len(marks) < 3 || !strings.HasPrefix(marks[0], "audio lost (the recorder stopped") ||
+		!strings.HasPrefix(marks[1], "audio back after") || !slices.Contains(marks, "after") {
+		t.Errorf("session: %v, markers %q", err, marks)
 	}
 }
 

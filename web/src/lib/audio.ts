@@ -46,10 +46,20 @@ export interface AudioInfo {
   device?: string;
   command?: string;
   overruns?: number;
+  /** where the audio stopped and silence stands for it (the recorder started again) */
+  gaps?: AudioGap[];
   error?: string;
 }
 
-export type AudioState = "starting" | "recording" | "stopped" | "failed";
+/** AudioGap is silence in the tracks where the audio stopped, until the recorder started again. */
+export interface AudioGap {
+  /** seconds into the files */
+  at: number;
+  seconds: number;
+  why?: string;
+}
+
+export type AudioState = "starting" | "recording" | "recovering" | "stopped" | "failed";
 
 export interface AudioStatus extends AudioInfo {
   state: AudioState;
@@ -64,7 +74,12 @@ export interface AudioStatus extends AudioInfo {
   remaining: number;
   /** linear peak levels of the tracks over the last second */
   peaks?: number[];
+  /** seconds every track has been silent (below -80 dBFS) */
+  silent?: number;
 }
+
+/** SILENT_AFTER is how long every track may be silent before the alarm (silenceAfter in pkg/audio). */
+export const SILENT_AFTER = 30;
 
 export interface AudioView {
   config: AudioConfig;
@@ -167,11 +182,37 @@ export const audioApi = {
 };
 
 /** audioTrouble says what is wrong with the audio of a recording: failed (nothing recorded), a warning, or null. */
-export function audioTrouble(st: AudioStatus | undefined): { level: "failed" | "warn"; text: string } | null {
+export function audioTrouble(st: AudioStatus | undefined): AudioTrouble | null {
   if (!st) return null;
-  if (st.state === "failed") return { level: "failed", text: st.error || "the audio stopped" };
-  if (st.warnings?.length) return { level: "warn", text: st.warnings.join(" · ") };
+  if (st.state === "failed") return { level: "failed", kind: "failed", text: st.error || "the audio stopped" };
+  if (st.state === "recovering") {
+    const w = st.warnings?.find((x) => x.startsWith("the audio stopped")) ?? "the audio stopped: starting the recorder again";
+    return { level: "failed", kind: "recovering", text: w };
+  }
+  if ((st.silent ?? 0) >= SILENT_AFTER) {
+    return {
+      level: "failed",
+      kind: "silent",
+      text: `every track has been silent for ${minSec(st.silent ?? 0)}: is the console sending to the card (Routing → card outputs)?`,
+    };
+  }
+  if (st.warnings?.length) return { level: "warn", kind: "warn", text: st.warnings.join(" · ") };
   return null;
+}
+
+/** minSec writes seconds as 0:45, 12:03. */
+const minSec = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/**
+ * AudioTrouble is what goes wrong with the audio of a recording: level
+ * failed (red, every page) when nothing usable is recorded right now — it
+ * failed, it stopped and the recorder is being started again, or every
+ * track is silent — warn (amber) otherwise.
+ */
+export interface AudioTrouble {
+  level: "failed" | "warn";
+  kind: "failed" | "recovering" | "silent" | "warn";
+  text: string;
 }
 
 /** audioSummary is the audio of a session in a few words: "audio: 18 tracks", "audio failed", "no audio". */

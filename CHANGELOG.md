@@ -44,6 +44,17 @@
   marker; until then the Record page says *console: not connected yet*.
   Connecting or disconnecting does not end such a recording
   (`Record.no_console`, `Record.audio_on`, `meta.console_from`).
+- Audio that recovers by itself mid-show, and a silence alarm (#4): when
+  the audio stops in the middle of a recording (a USB cable knocked out,
+  the console rebooted), tabula starts the recorder again by itself, as
+  long as it takes, in the same session and files: silence stands for the
+  gap, so the tracks stay in step with the console moves. A recorder that
+  hangs (no audio for 5 s) is started again too. Meanwhile *REC ⚠ AUDIO
+  LOST* and a red bar on every page; the session gets the markers *audio
+  lost (why)* and *audio back after 4.2 s*, and its details list the gaps
+  (`AudioInfo.gaps`, state `recovering`). Every track silent for 30 s
+  while recording (below -80 dBFS: nothing sent to the card) is an alarm
+  too, *REC ⚠ SILENT* (`AudioStatus.silent`).
 - Disarming writes while a scene file loads no longer leaves the console
   with half a scene: the file is sent to its end, then writes disarm (the
   button says *Disarms after the load*; click again to keep them armed).

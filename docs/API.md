@@ -444,13 +444,17 @@ instead (a device as `/api/audio/devices` lists them).
 `AudioInfo` (the `audio` section of a session's `meta.json`): `{"rate",
 "bits", "channels", "tracks": [{"channel", "name"?, "file"}], "offset",
 "start", "drift_ppm"?, "frames", "device"?, "command"?, "overruns"?,
-"error"?}`. `file` is relative to the session; `offset` is the time of the
+"gaps"?: [{"at", "seconds", "why"?}], "error"?}`. `gaps` are where the audio
+stopped mid-recording and the recorder was started again: silence in the
+files from `at` (seconds into the files) for `seconds`. `file` is relative to the session; `offset` is the time of the
 first sample in seconds after the session start; a session time `t` is at
 `(t − offset) / (1 + drift_ppm·10⁻⁶)` in the files.
 
-`AudioStatus`: an `AudioInfo` plus `{"state": "starting"|"recording"|"stopped"|"failed",
+`AudioStatus`: an `AudioInfo` plus `{"state": "starting"|"recording"|"recovering"|"stopped"|"failed",
 "warnings"?, "format"?, "seconds", "bytes", "byte_rate", "free",
-"remaining", "peaks"?}`: `remaining` is the audio the disk still holds
+"remaining", "peaks"?, "silent"?}`: `recovering` while the recorder is
+started again after the audio stopped mid-recording; `silent` is how long
+every track has been below -80 dBFS (seconds; a warning from 30 s); `remaining` is the audio the disk still holds
 before the capture stops itself (seconds), `peaks` the peak level of each
 track over the last second (linear, 1 = full scale). Warnings: the device
 is not the console's card (the `check` problems, found when the capture
