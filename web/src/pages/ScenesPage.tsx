@@ -154,6 +154,16 @@ interface Actions {
 }
 
 function recallBody(k: KindInfo, slot: number, target?: string): ReactNode {
+  return (
+    <>
+      {recallWhat(k, slot, target)}
+      <p className="muted">tabula first saves the console's settings as a backup (Scene files tab), to put them back if needed.</p>
+    </>
+  );
+}
+
+/** recallWhat says what a recall or a load changes. */
+function recallWhat(k: KindInfo, slot: number, target?: string): ReactNode {
   switch (k.kind) {
     case "scene": {
       const keeps = sceneKeeps(lookup, slot);
@@ -170,7 +180,6 @@ function recallBody(k: KindInfo, slot: number, target?: string): ReactNode {
               ))}
             </ul>
           )}
-          <p className="muted">The current mix is lost unless it is saved first.</p>
         </>
       );
     }

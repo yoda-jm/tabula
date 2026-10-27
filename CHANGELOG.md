@@ -43,6 +43,17 @@
     last one); `Status.console.link`.
   - A session being recorded gets the markers *console lost* and *console
     back*.
+- Scenes page: scene safes and snippet filters, to check and choose what a
+  recall changes before the show (#16). **What every scene recall keeps**
+  lists the show's safes in words (*Input channels: Mute*, *Whole strips:
+  Ch 12, L/R*) and ticks them, as the console's PARAM SAFE and CHAN SAFE
+  pages (parts of the input channels, their sends to each mix bus, parts of
+  the mix buses and of the console's settings, whole strips with their
+  names, main levels); a scene's slot ticks its own safes (*keeps Preamps,
+  Routing* next to its name); a snippet's slot ticks what it holds
+  (*Fader & pan of Ch 9-12*), and so does **Save snippet**. The recall
+  confirmations say what the safes keep, or what the snippet changes, and
+  that a backup is saved first.
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,
@@ -217,6 +228,15 @@
   writing of its `meta.json`.
 
 ### tabula-emu
+- Scene recalls honour the safes (the scene's own, the show's parameter
+  and channel safes, safe main levels), a parameter at a time: a muted
+  channel stays muted while its fader is recalled, a safe channel keeps
+  its headamp. A snippet holds what its filters select when it is saved,
+  one parameter per line as in a .snp file, and a recall applies what they
+  still select. `-library` keeps the safes and filters in the files' first
+  line (`%000000110`, `64 3840 0 0`), written again when a client changes
+  them; a scene saved again keeps the safes of its slot (#16). Scenes and
+  snippets loaded from the emulated USB stick still apply whole.
 - The emulated USB stick (`-usb`) winds its player: fast forward and rewind
   (`/-stat/tape/state` 5 and 6, 10 s a second, a guess) until play, pause or
   stop; wound to the end, the file ends as when played to its end, rewound
