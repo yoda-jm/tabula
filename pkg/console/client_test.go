@@ -210,7 +210,7 @@ func TestReadBack(t *testing.T) {
 	}
 	mu.Unlock()
 	l := c.Status().Link
-	if l == nil || l.Caught != 2 || l.Asked == 0 || l.Lost != 0 || l.LastCaught == "" || l.RTT <= 0 {
+	if l == nil || l.Caught != 2 || l.Asked == 0 || l.Lost != 0 || l.LastCaught == "" || l.RTT < 0 { // 0 on Windows' coarse clock
 		t.Errorf("link: %+v", l)
 	}
 	// nothing was written to the console: it keeps its values

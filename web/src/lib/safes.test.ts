@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Lookup } from "./routing";
 import { CHANNEL_SAFES, PARAM_SAFES, compact, isSet, sceneKeeps, snippetChanges, snippetRows, ticked } from "./safes";
 
-const lookupOf = (values: Record<string, unknown>): Lookup => ({ text: () => undefined, value: (a) => values[a] });
+const lookupOf = (values: Record<string, string | number>): Lookup => ({ text: () => undefined, value: (a) => values[a] });
 
 describe("safes", () => {
   it("reads bit 31 of a map sent as a negative int", () => {
