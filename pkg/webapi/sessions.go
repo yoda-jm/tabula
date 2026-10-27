@@ -27,13 +27,13 @@ type recordView struct {
 	ReplayAt  float64       `json:"replay_at,omitempty"`
 	// ReplayAudio: the replay plays the session's tracks to the card too (a
 	// virtual soundcheck, soundcheck.go)
-	ReplayAudio bool          `json:"replay_audio,omitempty"`
-	Error       string        `json:"error,omitempty"`
+	ReplayAudio bool   `json:"replay_audio,omitempty"`
+	Error       string `json:"error,omitempty"`
 	// Waiting: console changes waiting for the disk for more than
 	// slowDisk (a disk that hangs: they are written once it takes them)
 	Waiting int           `json:"waiting,omitempty"`
 	Audio   *audio.Status `json:"audio,omitempty"` // the audio capture of the recording, or of the last one
-	USB         usbBackupView `json:"usb"`             // the backup on the console's USB stick (usbbackup.go)
+	USB     usbBackupView `json:"usb"`             // the backup on the console's USB stick (usbbackup.go)
 }
 
 // SetSessionsDir sets where sessions are kept.

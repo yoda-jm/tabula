@@ -26,6 +26,16 @@
   /api/setlist`, `POST /api/setlist/next`, `POST /api/record/mark` takes
   `{"next": true}` or `{"song": n}` and answers the marker added,
   `setlist` events.
+- A pre-show **Check** page (#2): what would spoil the recording or the
+  show, found before the doors open, each line green, amber, red or grey
+  with what to do: the console and the link to it, the card's mode
+  (`/-prefs/card/USBmode`) and sample rate (`/-prefs/clockrate`) against
+  the audio settings, the audio device, the disk space for the show's
+  length (and that the sessions folder can be written), mains or battery,
+  what keeps the laptop awake and what closing the lid does (Linux, macOS),
+  the console's USB stick for the backup, and whether phones reach tabula.
+  Checked again every few seconds; the Record page sums it up above Start
+  recording (`GET /api/check`).
 - Disarming writes while a scene file loads no longer leaves the console
   with half a scene: the file is sent to its end, then writes disarm (the
   button says *Disarms after the load*; click again to keep them armed).
