@@ -66,8 +66,9 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   `scene-NN.scn` fills slot NN, ready to recall from an editor or from
   tabula's Scenes page.
 - `-usb dir` puts a USB stick in the console: the folder stands for it, its
-  WAV files play (time running, previous/next, folder mode, no sound) and its
-  scenes load, as the console's USB recorder does
+  WAV files play (time running, previous/next, fast forward and rewind,
+  folder mode, no sound) and its scenes, snippets, presets and shows load,
+  as the console's USB recorder does
   ([details](emulator.md#usb-stick)); try `-usb testdata/usb`.
 - `-model` picks what `/info` reports: X32, X32RACK, X32C, X32P, X32CORE, M32, M32R, M32C;
   `-firmware` the firmware version (4.06 by default), `-name` the console's
@@ -99,8 +100,10 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   shaped by the low cut, the EQ and the graphic EQ.
 - Linked channels, aux inputs, FX returns, buses and matrices kept in step
   as the console does, following the link options.
-- The USB stick's player and file browser, from a folder (`-usb`), and its
+- The USB stick's player (winding too) and file browser, from a folder
+  (`-usb`), loading its scenes, snippets, presets and shows, and its
   recorder (timed, nothing written).
+- Scene safes and snippet filters on a recall.
 
 **[How the emulator simulates the console](emulator.md)**: audio flow,
 meters, RTA, effects, exactly what linking two strips does, and what scene
@@ -123,7 +126,8 @@ tabula -console 192.168.1.62 -http :8033
   faders, solos, mutes and pans, the mute groups and Clear solo; linked
   pairs show as one stereo strip, and a strip silenced by a mute group or a
   DCA says so; a thin bar beside each meter shows the gain reduction of the
-  strip's gate and compressor.
+  strip's gate and compressor. Your own layers of strips, and the spill of
+  a DCA.
 - **Meters**: every level of the console at once (inputs, aux ins, FX
   returns, buses, matrices, mains, DCAs) with their gain reductions and a
   clip light that stays lit until cleared.
@@ -132,7 +136,8 @@ tabula -console 192.168.1.62 -http :8033
 - **Channel**: everything about one strip — config, preamp with the headamp
   feeding it (which input, gain, phantom power), gate and dynamics with
   their level and gain reduction meters, EQ with its (approximate) response
-  curve and the RTA, sends with the bus names.
+  curve and the RTA, sends with the bus names; **Copy to…** copies its EQ,
+  dynamics, sends… to other strips in one step.
 - **Routing**: a patchbay drawing every path from the stage box inputs to the
   stage box outputs and the card tracks, to check at a glance where a
   signal goes; the input patch (which stage box input feeds which channel,
@@ -145,11 +150,15 @@ tabula -console 192.168.1.62 -http :8033
   behind a channel's EQ curve.
 - **Scenes**: the scenes, snippets and presets the console holds; recall
   (after a confirmation), save, rename, copy and delete them, load channel
-  presets onto a strip and effect presets into a slot. **Scene files**:
+  presets onto a strip and effect presets into a slot; the scene safes and
+  snippet filters, to choose what a recall leaves alone. **Scene files**:
   `.scn` files kept on the laptop (a show prepared in M32-Edit), loaded into
-  the console in one go, and the console saved as one.
+  the console in one go, and the console saved as one; before anything
+  overwrites the console's settings, they are saved as a backup to load
+  back.
 - **USB**: the console's USB stick and player: browse its folders, play a
-  WAV file (pause, stop, previous, next), load a scene from it.
+  WAV file (pause, stop, previous, next, fast forward, rewind), load a
+  scene, snippet, preset or show from it.
 - **Browser**: every parameter of the console as a tree of its paths
   (`ch` → `01` → `eq` → `1`), searchable by path or value, each with an
   editor; values can also be typed as on the console (`-6`,
@@ -158,12 +167,15 @@ tabula -console 192.168.1.62 -http :8033
   replay it onto the console or the emulator. With the console's USB card,
   the audio tracks are recorded too, one WAV file each, in sync with the
   console moves, ready for Audacity or Reaper; the console can keep a stereo
-  backup on its own USB stick. See [recording a show](recording.md).
+  backup on its own USB stick. A session goes home as one zip or onto a USB
+  disk, in WAV or FLAC, and its tracks can play back through the console
+  for a virtual soundcheck. See [recording a show](recording.md).
 - **In-ear mixes for the band**: each musician scans a QR code and gets
   their own mix on their phone, and nothing else; viewers watch without
-  touching; the Access page shows whose phone is online. An optional
-  engineer password protects full control, on the laptop too. See
-  [access](access.md).
+  touching; the Access page shows whose phone is online. Links use the
+  laptop's name (`actarus.local`) when the network answers for it, so they
+  survive a new IP address. An optional engineer password protects full
+  control, on the laptop too. See [access](access.md).
 - **Connect**: find consoles on the network or type an address.
 
 <p>
@@ -172,7 +184,11 @@ tabula -console 192.168.1.62 -http :8033
 </p>
 
 It is **read-only** until writes are armed, after a confirmation: on a real
-console, nothing moves by accident. **[Every page of the GUI](gui.md)** in
+console, nothing moves by accident; **↶ Undo** takes back the last changes
+made from tabula, and writes that can stop a show (clock, network, card,
+initialize) ask first. On a weak Wi-Fi, tabula reads the console back
+slowly to catch the changes lost on the way, and tells how the link is
+doing. **[Every page of the GUI](gui.md)** in
 detail. `-record` starts recording as soon as the console is synced (asking
 it again until it answers, when the laptop starts first), for unattended
 recording of a concert (`-audio-device hw:CARD=X32,DEV=0
