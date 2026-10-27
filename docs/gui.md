@@ -285,6 +285,10 @@ M32-Edit, saved by the console on a USB stick, or a backup of the console.
   console's scene safes do not apply. A bar follows it (about 2,100 lines,
   a few seconds over Wi-Fi); lines the console does not know (a file from
   another model or firmware) are skipped and listed. It needs armed writes.
+  Disarming while a file loads does not stop it halfway (half a scene is
+  worse than either the old one or the new one): the button says
+  *Disarms after the load*, the file is sent to its end, then writes
+  disarm; click again to keep them armed.
   To keep the scene in the console's memory too, save it in a slot from the
   Scenes tab afterwards.
 - **Save the console's settings as a file** writes the current settings as

@@ -314,6 +314,11 @@ func (s *Server) arm(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, errors.New("not connected"))
 		return
 	}
+	// a scene file being loaded is sent to its end first (scenefiles.go)
+	if s.disarmAfterLoad(!req.Armed) && !req.Armed && c.Status().Armed {
+		writeJSON(w, http.StatusAccepted, s.status())
+		return
+	}
 	c.Arm(req.Armed)
 	s.publishStatus()
 	writeJSON(w, http.StatusOK, s.status())

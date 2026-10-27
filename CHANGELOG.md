@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### tabula
+- Disarming writes while a scene file loads no longer leaves the console
+  with half a scene: the file is sent to its end, then writes disarm (the
+  button says *Disarms after the load*; click again to keep them armed).
+  `POST /api/arm` answers 202 meanwhile, and the file's progress says
+  `disarm_after` (#13).
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,

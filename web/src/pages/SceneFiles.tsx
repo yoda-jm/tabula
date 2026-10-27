@@ -161,6 +161,7 @@ function LoadProgress() {
       {!p.done ? (
         <p>
           Loading <strong>{p.file}</strong> into the console…
+          {p.disarm_after && " Writes disarm once it is fully loaded."}
         </p>
       ) : p.error ? (
         <p className="error">
@@ -168,7 +169,7 @@ function LoadProgress() {
         </p>
       ) : (
         <p>
-          <strong>{p.file}</strong> loaded: {p.sent} lines.
+          <strong>{p.file}</strong> loaded: {p.sent} lines.{p.disarm_after && " Writes are disarmed."}
         </p>
       )}
       {!p.done && (

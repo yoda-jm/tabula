@@ -14,7 +14,7 @@ client accepts it.
 | GET | `/api/discover` | | consoles answering a broadcast `/xinfo` within 1.5 s: `[{ip, name, model, firmware}]` |
 | POST | `/api/connect` | `{"addr": "192.168.1.62"}` (port 10023 by default) | 202 + `Status`; connection and sync go on in the background, follow `status` events. A console that does not answer is asked again (every 1 s, then up to every 10 s) until it does or another address is chosen: `connecting` stays true, `error` says why. A recording running ends (its files are finished in the background) |
 | POST | `/api/disconnect` | | `Status`; a recording running ends |
-| POST | `/api/arm` | `{"armed": true}` | `Status`; writes are refused (403) until armed |
+| POST | `/api/arm` | `{"armed": true}` | `Status`; writes are refused (403) until armed. Disarming while a scene file loads answers 202, still armed: the file is sent to its end, then writes disarm (its `SceneProgress` says `"disarm_after": true`); arming again before the end keeps them armed |
 
 `Status`:
 
@@ -135,7 +135,7 @@ write them. Engineer only.
 | POST | `/api/scenefiles/{file}/load` | | `SceneProgress`, once sent: the file sent to the console, line by line with the `/` command (each echoed before the next goes, as the editors' PC → Mixer). Every parameter it holds changes at once, without the console's scene safes. Lines this console's schema does not know are skipped and listed. 403 unless writes are armed; 409 when not connected, while a replay runs or another file loads; 404 |
 
 `SceneProgress`: `{"file", "sent", "total", "done", "skipped"?: [line],
-"error"?}`, also sent as `scenefile` events while a file loads (every 50
+"error"?, "disarm_after"?}`, also sent as `scenefile` events while a file loads (every 50
 lines) and when it is done. A load goes on if the browser leaves.
 
 ## USB stick

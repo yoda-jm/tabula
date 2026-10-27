@@ -23,6 +23,8 @@ export interface SceneProgress {
   /** lines this console does not know (another model or firmware) */
   skipped?: string[];
   error?: string;
+  /** writes were disarmed during the load: they disarm once it is over */
+  disarm_after?: boolean;
 }
 
 export interface SceneFiles {

@@ -46,6 +46,8 @@ type sceneProgress struct {
 	Done    bool     `json:"done"`
 	Skipped []string `json:"skipped,omitempty"` // lines this console does not know
 	Error   string   `json:"error,omitempty"`
+	// writes were disarmed during the load: they disarm once it is over
+	DisarmAfter bool `json:"disarm_after,omitempty"`
 }
 
 func (s *Server) sceneFileRoutes(mux *http.ServeMux) {
@@ -422,6 +424,10 @@ func (s *Server) loadSceneFile(w http.ResponseWriter, r *http.Request) {
 	}
 	v := *prog
 	s.scenes.mu.Unlock()
+	if v.DisarmAfter {
+		c.Arm(false)
+		s.publishStatus()
+	}
 	s.hub.publish("scenefile", v)
 	if failed != nil {
 		s.log.Warn("scene file", "file", prog.File, "err", failed)
@@ -429,4 +435,27 @@ func (s *Server) loadSceneFile(w http.ResponseWriter, r *http.Request) {
 		s.log.Info("scene file: loaded", "file", prog.File, "lines", prog.Sent, "took", time.Since(start).Round(time.Millisecond))
 	}
 	writeJSON(w, http.StatusOK, v)
+}
+
+// disarmAfterLoad makes a disarm wait for the end of the scene file being
+// loaded (on), or keeps writes armed after it (off); false when no file is
+// loading. Stopping in the middle would leave the console with half a
+// scene, worse than either the old one or the new one.
+func (s *Server) disarmAfterLoad(on bool) bool {
+	s.scenes.mu.Lock()
+	p := s.scenes.progress
+	loading := p != nil && !p.Done
+	var v sceneProgress
+	if loading {
+		p.DisarmAfter = on
+		v = *p
+	}
+	s.scenes.mu.Unlock()
+	if loading {
+		s.hub.publish("scenefile", v)
+		if on {
+			s.log.Info("writes disarm once the scene file is loaded", "file", v.File)
+		}
+	}
+	return loading
 }

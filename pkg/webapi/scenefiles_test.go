@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -161,6 +162,39 @@ func TestSceneFiles(t *testing.T) {
 	if v, _, _ := emuSrv.Store().Get("/ch/01/config/name"); v.Str == "Uploaded" {
 		t.Errorf("console after the whole scene: %q", v.Str)
 	}
+
+	// Disarming during a load: the file is sent to its end, then writes disarm.
+	done := make(chan sceneProgress, 1)
+	go func() {
+		resp, err := http.Post(ts.URL+"/api/scenefiles/Demo%20set.scn/load", "application/json", nil)
+		var p sceneProgress
+		if err == nil {
+			json.NewDecoder(resp.Body).Decode(&p)
+			resp.Body.Close()
+		}
+		done <- p
+	}()
+	for l := (struct{ Loading *sceneProgress }{}); l.Loading == nil; getJSON(t, ts.URL+"/api/scenefiles", &l) {
+		select {
+		case p := <-done:
+			t.Fatalf("loaded before it could be disarmed: %+v", p)
+		default:
+		}
+	}
+	if code := post(t, ts.URL+"/api/arm", `{"armed":false}`); code != http.StatusAccepted {
+		t.Errorf("disarm during a load: %d", code)
+	}
+	var st statusView
+	getJSON(t, ts.URL+"/api/status", &st)
+	if !st.Console.Armed {
+		t.Errorf("disarmed in the middle of the load")
+	}
+	p = <-done
+	getJSON(t, ts.URL+"/api/status", &st)
+	if !p.Done || p.Sent != p.Total || p.Error != "" || !p.DisarmAfter || st.Console.Armed {
+		t.Errorf("after the load: %+v, armed %v", p, st.Console.Armed)
+	}
+	post(t, ts.URL+"/api/arm", `{"armed":true}`)
 
 	for path, want := range map[string]int{"up.scn": http.StatusNoContent, "gone.scn": http.StatusNotFound, "x.txt": http.StatusBadRequest} {
 		req, _ := http.NewRequest("DELETE", ts.URL+"/api/scenefiles/"+path, nil)

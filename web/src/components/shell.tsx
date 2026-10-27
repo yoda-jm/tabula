@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { api } from "../lib/api";
 import { audioTrouble } from "../lib/audio";
 import { formatDuration } from "../lib/session";
-import { useRecord, useStatus, useStream, useToasts } from "../store/hooks";
+import { useRecord, useSceneLoad, useStatus, useStream, useToasts } from "../store/hooks";
 import { store } from "../store/store";
 
 export function ConfirmDialog(props: {
@@ -97,12 +97,19 @@ export function ConnectionPill({ onClick }: { onClick(): void }) {
 
 export function ArmControl() {
   const s = useStatus();
+  const load = useSceneLoad();
   const [asking, setAsking] = useState(false);
   const armed = !!s.console?.armed;
+  // disarmed while a scene file loads: tabula sends it to its end first
+  const pending = armed && !!load && !load.done && !!load.disarm_after;
   const set = async (on: boolean) => {
     setAsking(false);
     try {
-      store.setStatus(await api.arm(on));
+      const st = await api.arm(on);
+      store.setStatus(st);
+      if (!on && st.console?.armed) {
+        store.toast(`Writes disarm once ${load?.file ?? "the scene file"} is fully loaded: half a scene would be worse.`, "warn");
+      }
     } catch (e) {
       store.toast(`Arm: ${(e as Error).message}`, "error");
     }
@@ -114,11 +121,17 @@ export function ArmControl() {
         className={"arm " + (armed ? "armed" : "safe")}
         aria-pressed={armed}
         disabled={!s.connected}
-        onClick={() => (armed ? void set(false) : setAsking(true))}
-        title={armed ? "Writes go to the console. Click to go back to read-only." : "Read-only. Click to arm writes."}
+        onClick={() => (pending ? void set(true) : armed ? void set(false) : setAsking(true))}
+        title={
+          pending
+            ? "A scene file is being sent to the console: writes disarm once it is fully loaded. Click to keep them armed."
+            : armed
+              ? "Writes go to the console. Click to go back to read-only."
+              : "Read-only. Click to arm writes."
+        }
       >
         <span className="arm-state">{armed ? "WRITES ARMED" : "READ-ONLY"}</span>
-        <span className="arm-action">{armed ? "Disarm" : "Arm"}</span>
+        <span className="arm-action">{pending ? "Disarms after the load" : armed ? "Disarm" : "Arm"}</span>
       </button>
       {asking && (
         <ConfirmDialog title="Arm writes?" confirm="Arm writes" onConfirm={() => void set(true)} onCancel={() => setAsking(false)}>
