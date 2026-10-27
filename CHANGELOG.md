@@ -84,6 +84,15 @@
   - Mixer: **+ Layer** makes banks of the strips you choose (kept by the
     browser), and **SPILL** on a DCA shows the strips it controls, then the
     DCA.
+- Meters for the dynamics and the DCAs, and a meter bridge (#18): the
+  Channel page's Gate and Dynamics sections start with the strip's level
+  (a channel's input, with the threshold marked) and the gain reduction in
+  dB; Mixer strips have a thin orange bar of the gain reduction of their
+  gate and compressor beside their meter, and DCA strips a meter. The new
+  **Meters** page (viewers too) shows every input, aux in, FX return, bus,
+  matrix, main and DCA at once, with their gain reductions and a clip light
+  that stays lit until cleared. The channels' gain reductions (`/meters/1`)
+  and the DCAs (`/meters/5 0 0`) are asked for only while a page shows them.
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,
@@ -258,6 +267,9 @@
   writing of its `meta.json`.
 
 ### tabula-emu
+- A DCA's fader scales the level of its channels and its mute silences
+  them (they did not act on the meters); a DCA's meter is the loudest of
+  its channels after their faders, a guess (#18).
 - Scene recalls honour the safes (the scene's own, the show's parameter
   and channel safes, safe main levels), a parameter at a time: a muted
   channel stays muted while its fader is recalled, a safe channel keeps
