@@ -103,11 +103,8 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
   recorder (timed, nothing written).
 
 **[How the emulator simulates the console](emulator.md)**: audio flow,
-meters, RTA, effects, and exactly what linking two strips does.
-
-### Not yet
-
-Scene safes and snippet filters on recall: see the [plan](PLAN.md).
+meters, RTA, effects, exactly what linking two strips does, and what scene
+safes and snippet filters keep on a recall.
 
 ## tabula — the client
 

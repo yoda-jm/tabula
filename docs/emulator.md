@@ -52,8 +52,9 @@ This page says what is simulated, how, and what is not.
   source and the input routing), `/-stat/rtasource` (from
   `/-action/setrtasrc`).
 - Library: scenes, snippets and presets (`/save`, `/load`, `/copy`,
-  `/delete`, `/rename`, `/add`, `/showdump`). A recall applies the stored
-  values as they are; scene safes and snippet filters are not applied yet.
+  `/delete`, `/rename`, `/add`, `/showdump`). A scene recall leaves alone
+  what the safes keep, a snippet holds and changes what its filters select
+  ([below](#scene-safes-and-snippet-filters)).
 - A USB stick (`-usb dir`): browsing its folders, playing, winding and
   recording on its player, loading its scenes, snippets, presets and shows,
   as described [below](#usb-stick).
@@ -169,6 +170,56 @@ name, icon, source, pans and insert selection.
 
 Recalling a scene or a snippet applies the stored values without linking
 them.
+
+## Scene safes and snippet filters
+
+A scene recall (`/load ,si scene N`, `/-action/goscene`, a cue) leaves
+alone what is safe, a parameter at a time (a muted channel can stay muted
+while its fader is recalled):
+
+- the scene's own safes, `/-show/showfile/scene/NNN/safes` bits 1-8:
+  talkback (`/config/talk`), effects (`/fx`), mix buses (`/bus`), channels
+  (channels, aux inputs, FX returns, but their preamp), configuration (the
+  other `/config` nodes: links, mute groups, solo, DP48, oscillator, user
+  controls, USB recorder, automix), preamps (`preamp`, `delay` of the input
+  channels, and every `/headamp`), output patch (`/outputs`,
+  `/config/userrout`), routing (`/config/routing`). Scene 0 has none;
+- the parameter safes of the show, `/-show/showfile/show`: `inputs` (bits
+  0-7: preamp and delay with the headamps, config, EQ, gate and compressor,
+  insert, groups and automix, fader, pan and the L/R and M/C assigns and
+  level, mute) for the channels, aux inputs and FX returns; `mxsends` (their
+  sends to mix 1-16); `mxbuses` (bit 0 the buses' sends to the matrices,
+  then as `inputs`) for the mix buses only; `console` (configuration, solo,
+  routing, output patch, user in, user out; surface state is not in a
+  scene);
+- the channel safes, whole strips: `chan16`, `chan32`, `return` (aux 1-8,
+  FX 1L-4R), `buses`, `lrmtxdca` (matrices 1-6, L/R, M/C, DCA 1-8),
+  `effects`; a safe channel keeps the headamp feeding it (`/-ha/NN/index`);
+- `/-prefs/safe_masterlevels`: the L/R and M/C faders.
+
+A snippet's filters (`/-show/showfile/snippet/NNN/eventtyp`, `channels`,
+`auxbuses`, `maingrps`) say what it holds: the parameters of `eventtyp`
+bits 0-12 (bit 6 fader and pan, bit 11 the L/R and M/C assigns and level,
+bits 8-10 the sends to buses 1-8, 9-12, 13-16, bit 12 the sends of buses
+and main to the matrices) of the selected strips (`maingrps` bits 6 and 7:
+L/R and M/C, a guess following `lrmtxdca`), the effect slots of bits 13-20,
+and the console's configuration, solo, routing and output patch (bits
+21-24). A save keeps only that, one parameter per line as in the console's
+.snp files; a recall applies what the snippet holds and its filters still
+select. Headamps follow the channels they feed.
+
+Library directories (`-library`) keep a scene's safes in its file's first
+line (`#4.0# "name" "note" %000000110 1`) and a snippet's filters in its
+own (`#4.0# "name" 64 3840 0 0 1`, as in a .snp file); changing them from
+a client writes the file again. A scene saved again keeps the safes of its
+slot, a copy takes them along, a deleted slot loses them.
+
+The bits come from Maillot's document; which parameters each one covers is
+read from its descriptions. Guesses: what the console's own and parameter
+safes cover beyond those descriptions (the preamp set apart from the
+channels, the mix-bus parameter safes left off the matrices and main),
+`maingrps` bits 6-7, and filtering at recall as well as at save. A scene
+or snippet loaded from the USB stick applies whole.
 
 ## USB stick
 

@@ -12,11 +12,13 @@ import type { KindInfo, LibKind, LibraryRequest, Slot } from "../lib/library";
 import { KINDS, SCOPE_ALL, SCOPE_PARTS, describe, firstFree, libraryApi, readSlots, slotKey, slotLabel, slotPath } from "../lib/library";
 import { usePersistent } from "../lib/route";
 import { stripName } from "../lib/routing";
+import { SCENE_SAFES, bitsOf, sceneKeeps, sceneSafesAddr, snippetChanges, ticked } from "../lib/safes";
 import { INDEXED_STRIPS } from "../lib/strips";
 import { useCanWrite, useNodes, useValue } from "../store/hooks";
 import { lookup } from "../store/lookup";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
+import { SceneSafes, ShowSafes, SnippetFilters, SnippetHolds } from "./Safes";
 import { SceneFiles } from "./SceneFiles";
 
 /** The strips a channel preset is saved from or loaded to, by index 0-71 (DCAs excluded). */
@@ -115,11 +117,12 @@ export function ScenesPage() {
             </div>
             {k.kind === "scene" && (
               <p className="muted lib-note">
-                A recall loads the whole scene; the console applies its scene safes. A .scn file of this computer (saved
-                by M32-Edit, or on a USB stick): the Scene files tab.
+                A recall loads the whole scene but what its safes keep (in its slot, ▾) and what every recall keeps (below). A
+                .scn file of this computer (saved by M32-Edit, or on a USB stick): the Scene files tab.
               </p>
             )}
           </section>
+          {k.kind === "scene" && <ShowSafes />}
         </>
       )}
       {ask && (
@@ -150,20 +153,37 @@ interface Actions {
   run(req: LibraryRequest, name: string): Promise<boolean>;
 }
 
-function recallBody(k: KindInfo, target?: string): ReactNode {
+function recallBody(k: KindInfo, slot: number, target?: string): ReactNode {
   switch (k.kind) {
-    case "scene":
+    case "scene": {
+      const keeps = sceneKeeps(lookup, slot);
       return (
         <>
           <p>
             <strong>Every parameter of the console changes at once</strong> (faders, routing, effects…), as on the console's
-            scenes page.
+            scenes page{keeps.length ? ", except what the safes keep:" : "."}
           </p>
+          {keeps.length > 0 && (
+            <ul className="safe-list">
+              {keeps.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
           <p className="muted">The current mix is lost unless it is saved first.</p>
         </>
       );
-    case "snippet":
-      return <p>The parameters stored in the snippet change at once on the console.</p>;
+    }
+    case "snippet": {
+      const changes = snippetChanges(lookup, slot);
+      return changes ? (
+        <p>
+          Changes at once on the console: <strong>{changes}</strong>, as the snippet holds them.
+        </p>
+      ) : (
+        <p>Nothing ticked in the snippet: the recall changes nothing (its slot, ▾, tells what it holds).</p>
+      );
+    }
     case "libchan":
       return <p>The chosen sections of {target} change at once on the console.</p>;
     case "libfx":
@@ -180,7 +200,9 @@ function SlotRow(props: { k: KindInfo; s: Slot; slots: Slot[]; current: boolean;
   const [open, setOpen] = useState(false);
   const label = slotLabel(k, s.slot);
   const simpleLoad = !k.target;
-  const recall = () => actions.ask({ req: { op: "load", kind: k.kind, index: s.slot }, name: s.name, body: recallBody(k) });
+  const recall = () => actions.ask({ req: { op: "load", kind: k.kind, index: s.slot }, name: s.name, body: recallBody(k, s.slot) });
+  const keeps = k.kind === "scene" && s.used && s.slot > 0 ? ticked(bitsOf(lookup, sceneSafesAddr(s.slot)), SCENE_SAFES) : [];
+  const changes = k.kind === "snippet" && s.used ? snippetChanges(lookup, s.slot) || "changes nothing" : "";
   return (
     <div className={"slot" + (s.used ? "" : " empty") + (current ? " current" : "") + (open ? " open" : "")}>
       <div className="slot-head">
@@ -189,6 +211,8 @@ function SlotRow(props: { k: KindInfo; s: Slot; slots: Slot[]; current: boolean;
           <strong>{s.used ? s.name || "(no name)" : "empty"}</strong>
           {current && <span className="badge">current</span>}
           {s.note && <span className="muted slot-note">{s.note}</span>}
+          {keeps.length > 0 && <span className="muted slot-note">keeps {keeps.join(", ")}</span>}
+          {changes && <span className="muted slot-note">{changes}</span>}
         </button>
         {s.used && simpleLoad && (
           <button type="button" className="btn primary" disabled={!actions.can} onClick={recall}>
@@ -259,7 +283,7 @@ function SlotActions({ k, s, slots, actions }: { k: KindInfo; s: Slot; slots: Sl
               actions.ask({
                 req: { op: "load", kind: k.kind, index: s.slot, target, ...(k.kind === "libchan" ? { scope } : {}) },
                 name: s.name,
-                body: recallBody(k, targetName),
+                body: recallBody(k, s.slot, targetName),
               })
             }
           >
@@ -333,6 +357,8 @@ function SlotActions({ k, s, slots, actions }: { k: KindInfo; s: Slot; slots: Sl
           </button>
         )}
       </div>
+      {s.used && k.kind === "scene" && <SceneSafes slot={s.slot} />}
+      {s.used && k.kind === "snippet" && <SnippetFilters slot={s.slot} />}
       {!s.used && <p className="muted">Empty. Save the current settings here with the form above.</p>}
     </div>
   );
@@ -427,6 +453,7 @@ function SaveForm({ k, slots, actions }: { k: KindInfo; slots: Slot[]; actions: 
           {taken ? "Replace" : "Save"}
         </button>
       </form>
+      {k.kind === "snippet" && <SnippetHolds slot={at} />}
     </section>
   );
 }

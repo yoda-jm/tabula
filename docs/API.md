@@ -105,6 +105,14 @@ nodes, read with `/api/state` like any other:
 `N+1`). Each has a `name` and `hasdata` (1 when the slot holds something);
 scenes also have `notes`.
 
+What a recall changes is set with `/api/set` like any parameter (armed): a
+scene's `safes` (bits 1-8), a snippet's filters (`eventtyp`, `channels`,
+`auxbuses`, `maingrps`), the safes of every recall in
+`/-show/showfile/show` (`inputs`, `mxsends`, `mxbuses`, `console`,
+`chan16`, `chan32`, `return`, `buses`, `lrmtxdca`, `effects`) and
+`/-prefs/safe_masterlevels`. The bits are described in
+[emulator.md](emulator.md#scene-safes-and-snippet-filters).
+
 `POST /api/library` sends one command to the console (engineer only, writes
 armed):
 

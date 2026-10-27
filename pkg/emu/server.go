@@ -319,6 +319,7 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			}
 		} else {
 			s.link(changes)
+			s.keepFlags(changes)
 		}
 		s.send(c, m) // the console echoes "/" commands
 		return
@@ -369,7 +370,9 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			case isCommand(l.Addr):
 				s.command(l.Addr, v, origin)
 			case changed:
-				s.link([]state.Change{{Leaf: l, Value: v, Origin: origin}})
+				ch := []state.Change{{Leaf: l, Value: v, Origin: origin}}
+				s.link(ch)
+				s.keepFlags(ch)
 			}
 		default:
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, "one value expected")
@@ -389,6 +392,7 @@ func (s *Server) dispatch(m osc.Message, c *Client) {
 			s.Unhandled.Record(m, c.Addr, ReasonRejected, err.Error())
 		} else {
 			s.link(changes)
+			s.keepFlags(changes)
 		}
 		return
 	}

@@ -267,7 +267,8 @@ highlights is marked *current* (when the console shows scenes or snippets
 there).
 
 - **Recall** a scene or snippet, or **load** a routing or AES50 preset, after
-  a confirmation that says what changes.
+  a confirmation that says what changes: for a scene, what its safes keep;
+  for a snippet, what it holds.
 - **Load…** a channel preset onto a strip, choosing the sections (headamp,
   configuration, gate, compressor, EQ, sends), or an effect preset into an FX
   slot.
@@ -279,9 +280,39 @@ there).
 
 ![Scenes saved on the console](img/gui-scenes.png)
 
-Every command changes the console, so the page needs armed writes. Recalls
-apply the scene safes and snippet filters on a console; the emulator does
-not apply them yet.
+Every command changes the console, so the page needs armed writes.
+
+### Scene safes and snippet filters
+
+What a recall changes can be checked, and chosen, before the show:
+
+- **What every scene recall keeps**, under the scenes: the safes of the
+  show, as on the console's SCENES → PARAM SAFE and CHAN SAFE pages, listed
+  (*Input channels: Mute*, *Whole strips: Ch 12, L/R*), with **Choose what
+  every recall keeps** to tick them: parts of the input channels (preamp,
+  config, EQ, gate and compressor, insert, groups, fader and pan, mute),
+  their sends to each mix bus, parts of the mix buses, of the console's
+  settings (configuration, solo, routing, output patch, user in and out),
+  whole strips (channels, aux and FX returns, buses, matrices, L/R, M/C,
+  DCAs, effect slots; each shows its name), and the main levels.
+- **This scene's recall keeps**, in a scene's slot (▾): its own safes
+  (talkback, effects, mix buses, channels, configuration, preamps, output
+  patch, routing), also named next to the scene (*keeps Preamps, Routing*).
+  Scene 00 has none.
+- A snippet's slot (▾) ticks **what it holds and changes**: parameters
+  (preamp … mute, the sends by group, L/R and M/C, matrix sends), effect
+  slots and console settings, of the ticked strips. The list says it in
+  words (*Fader & pan of Ch 9-12*), and so does **Save snippet**, where the
+  ticks fold under *Holds …*: a snippet holds what was ticked when it was
+  saved, so tick before saving.
+
+![What every scene recall keeps, and the safes of one scene](img/gui-safes.png)
+
+Each tick writes the console at once (armed); the console applies them to
+every recall, made from tabula, its own screen or another editor. The bits
+are those of Maillot's protocol document; which parameters a few of them
+cover is a guess (the emulator's choices are in
+[emulator.md](emulator.md#scene-safes-and-snippet-filters)).
 
 ### Scene files
 

@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/schema"
+	"github.com/yoda-jm/tabula/pkg/state"
 )
 
 // The console's internal library: 100 scenes, 100 snippets and 100 presets
 // of each kind (channel, effect, routing, AES50/DP48), managed with /save,
 // /load, /copy, /delete, /rename and listed by /-show/showfile/… and
-// /-libs/… nodes. Snippet parameter filters and scene safes are not applied
-// yet: snippets hold and recall a whole scene.
+// /-libs/… nodes. Scene recalls honour the safes, snippets their filters
+// (safes.go).
 
 const libSlots = 100
 
@@ -37,6 +39,9 @@ var libKinds = map[string]struct{ listing, ext string }{
 type entry struct {
 	Name, Note string
 	Lines      []relLine
+	// Flags read from a library file: a scene's safes, a snippet's four
+	// filters. The listing nodes hold them while the emulator runs.
+	Flags []int32
 }
 
 type relLine struct{ Suffix, Rest string }
@@ -162,8 +167,8 @@ func (s *Server) libraryOp(m osc.Message, kind, origin string) (bool, string) {
 		case "scene":
 			e.Note, _ = strArgN(m, 3)
 			e.Lines = s.capture("")
-		case "snippet":
-			e.Lines = s.capture("")
+		case "snippet": // what its filters select
+			e.Lines = s.filterLines(s.capture(""), s.snippetFilters(idx).applies)
 		case "libchan":
 			ch, _ := intArgN(m, 3)
 			base, ok := stripPath(ch)
@@ -184,7 +189,7 @@ func (s *Server) libraryOp(m osc.Message, kind, origin string) (bool, string) {
 		}
 		slots[idx] = e
 		s.listEntry(kind, idx, e, origin)
-		lib.persist(kind, idx, e)
+		s.persist(kind, idx, e)
 		return true, ""
 
 	case "/load":
@@ -213,9 +218,17 @@ func (s *Server) libraryOp(m osc.Message, kind, origin string) (bool, string) {
 			}
 			base = fmt.Sprintf("/fx/%d", slot+1)
 		}
+		saved := e.Lines
+		switch kind {
+		case "scene":
+			k := s.sceneSafes(idx)
+			saved = s.filterLines(saved, func(c leafClass) bool { return !k.keeps(c) })
+		case "snippet":
+			saved = s.filterLines(saved, s.snippetFilters(idx).applies)
+		}
 		var lines []string
-		for _, l := range e.Lines {
-			if keep(l) && s.store.Schema().Node(base+l.Suffix) != nil {
+		for _, l := range saved {
+			if keep(l) && (s.store.Schema().Node(base+l.Suffix) != nil || s.store.Schema().Leaf(base+l.Suffix) != nil) {
 				lines = append(lines, base+l.Suffix+" "+l.Rest)
 			}
 		}
@@ -239,15 +252,16 @@ func (s *Server) libraryOp(m osc.Message, kind, origin string) (bool, string) {
 			return false, "expects a saved source and a destination in [0, 99]"
 		}
 		cp := *slots[idx]
+		cp.Flags = s.flags(kind, idx) // a copied scene keeps its safes
 		slots[dst] = &cp
 		s.listEntry(kind, dst, &cp, origin)
-		lib.persist(kind, dst, &cp)
+		s.persist(kind, dst, &cp)
 		return true, ""
 
 	case "/delete":
 		slots[idx] = nil
 		s.listEntry(kind, idx, nil, origin)
-		lib.persist(kind, idx, nil)
+		s.persist(kind, idx, nil)
 		return true, ""
 
 	case "/rename":
@@ -257,24 +271,37 @@ func (s *Server) libraryOp(m osc.Message, kind, origin string) (bool, string) {
 		}
 		slots[idx].Name = name
 		s.listEntry(kind, idx, slots[idx], origin)
-		lib.persist(kind, idx, slots[idx])
+		s.persist(kind, idx, slots[idx])
 		return true, ""
 	}
 	return false, "unknown operation"
 }
 
-// listEntry updates the /-show or /-libs listing of a slot.
+// listEntry updates the /-show or /-libs listing of a slot. A saved scene
+// keeps the safes of its slot, a snippet its filters, unless the entry
+// brings its own (read from a file, copied); a deleted one loses them.
 func (s *Server) listEntry(kind string, idx int, e *entry, origin string) {
 	name, note, has := "", "", 0
 	if e != nil {
 		name, note, has = e.Name, e.Note, 1
 	}
+	flags := s.flags(kind, idx)
+	switch {
+	case e == nil:
+		flags = make([]int32, len(flags))
+	case len(e.Flags) == len(flags):
+		flags = e.Flags
+	}
 	switch kind {
 	case "scene":
-		s.store.ApplyText(fmt.Sprintf("/-show/showfile/scene/%03d %s %s %%000000000 %d", idx, schema.Quote(name), schema.Quote(note), has), origin)
+		s.store.ApplyText(fmt.Sprintf("/-show/showfile/scene/%03d %s %s %%%09b %d", idx, schema.Quote(name), schema.Quote(note),
+			uint32(flags[0])&0x1ff, has), origin)
 	case "snippet":
 		p := fmt.Sprintf("/-show/showfile/snippet/%03d", idx)
 		s.store.Set(p+"/name", osc.String(name), origin)
+		for i, f := range snippetFlags {
+			s.store.Set(p+"/"+f, osc.Int(flags[i]), origin)
+		}
 		s.store.Set(p+"/hasdata", osc.Int(int32(has)), origin)
 	default:
 		p := fmt.Sprintf("%s/%03d", libKinds[kind].listing, idx+1)
@@ -330,10 +357,52 @@ func (s *Server) showdump(c *Client) {
 	}
 }
 
-// Library directories hold one file per saved item, e.g. scene-07.scn: a
-// header line with the name and note, then the node lines.
+// snippetFlags are a snippet's filters, in the order of its listing node and
+// of a snippet file's first line.
+var snippetFlags = []string{"eventtyp", "channels", "auxbuses", "maingrps"}
 
-func (l *library) persist(kind string, idx int, e *entry) {
+// flags returns the safes of a scene slot, the filters of a snippet slot.
+func (s *Server) flags(kind string, idx int) []int32 {
+	switch kind {
+	case "scene":
+		return []int32{s.intAt(fmt.Sprintf("/-show/showfile/scene/%03d/safes", idx))}
+	case "snippet":
+		out := make([]int32, len(snippetFlags))
+		for i, f := range snippetFlags {
+			out[i] = s.intAt(fmt.Sprintf("/-show/showfile/snippet/%03d/%s", idx, f))
+		}
+		return out
+	}
+	return nil
+}
+
+// flagAddr matches the safes of a scene and the filters of a snippet.
+var flagAddr = regexp.MustCompile(`^/-show/showfile/(scene|snippet)/(\d{3})/(safes|eventtyp|channels|auxbuses|maingrps)$`)
+
+// keepFlags writes again the library files of the items whose safes or
+// filters a client changed.
+func (s *Server) keepFlags(changes []state.Change) {
+	for _, c := range changes {
+		m := flagAddr.FindStringSubmatch(c.Leaf.Addr)
+		if m == nil {
+			continue
+		}
+		idx := atoi(m[2])
+		s.lib.mu.Lock()
+		if e := s.lib.items[m[1]][idx]; e != nil {
+			s.persist(m[1], idx, e)
+		}
+		s.lib.mu.Unlock()
+	}
+}
+
+// Library directories hold one file per saved item, e.g. scene-07.scn: a
+// header line with the name and note (and a scene's safes, a snippet's
+// filters, as in the console's files), then the node lines.
+
+// persist writes the file of a slot; lib.mu is held.
+func (s *Server) persist(kind string, idx int, e *entry) {
+	l := s.lib
 	if l.dir == "" {
 		return
 	}
@@ -343,7 +412,14 @@ func (l *library) persist(kind string, idx int, e *entry) {
 		return
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "#4.0# %s %s\n", schema.Quote(e.Name), schema.Quote(e.Note))
+	switch fl := s.flags(kind, idx); kind {
+	case "scene":
+		fmt.Fprintf(&b, "#4.0# %s %s %%%09b 1\n", schema.Quote(e.Name), schema.Quote(e.Note), uint32(fl[0])&0x1ff)
+	case "snippet":
+		fmt.Fprintf(&b, "#4.0# %s %d %d %d %d 1\n", schema.Quote(e.Name), fl[0], fl[1], fl[2], fl[3])
+	default:
+		fmt.Fprintf(&b, "#4.0# %s %s\n", schema.Quote(e.Name), schema.Quote(e.Note))
+	}
 	for _, line := range e.Lines {
 		fmt.Fprintf(&b, "%s %s\n", line.Suffix, line.Rest)
 	}
@@ -399,13 +475,7 @@ func readEntry(file string) (*entry, error) {
 		if first {
 			first = false
 			if strings.HasPrefix(line, "#") {
-				toks := schema.Tokenize(line)
-				switch {
-				case len(toks) >= 3 && strings.HasPrefix(toks[1], `"`): // ours: #4.0# "name" "note"
-					e.Name, e.Note = schema.Unquote(toks[1]), schema.Unquote(toks[2])
-				case len(toks) >= 3: // M32-Edit: #2.0# <pos> "name" <type> %flags <hasdata>
-					e.Name = schema.Unquote(toks[2])
-				}
+				readHeader(e, schema.Tokenize(line))
 				continue
 			}
 		}
@@ -413,6 +483,38 @@ func readEntry(file string) (*entry, error) {
 		e.Lines = append(e.Lines, relLine{suffix, rest})
 	}
 	return e, sc.Err()
+}
+
+// readHeader reads the first line of a library file: ours and the
+// console's, #4.0# "name" "note" (a scene: %safes 1; a snippet: "name"
+// then its four filters and 1), or M32-Edit's presets, #2.0# <pos> "name"
+// <type> %flags <hasdata>.
+func readHeader(e *entry, toks []string) {
+	switch {
+	case len(toks) >= 2 && strings.HasPrefix(toks[1], `"`):
+		e.Name, toks = schema.Unquote(toks[1]), toks[2:]
+		if len(toks) > 0 && strings.HasPrefix(toks[0], `"`) {
+			e.Note, toks = schema.Unquote(toks[0]), toks[1:]
+		}
+		switch {
+		case len(toks) >= 1 && strings.HasPrefix(toks[0], "%"):
+			if v, err := strconv.ParseUint(toks[0][1:], 2, 32); err == nil {
+				e.Flags = []int32{int32(v)}
+			}
+		case len(toks) >= 4:
+			var fl []int32
+			for _, t := range toks[:4] {
+				v, err := strconv.ParseInt(t, 10, 64)
+				if err != nil {
+					return
+				}
+				fl = append(fl, int32(v))
+			}
+			e.Flags = fl
+		}
+	case len(toks) >= 3:
+		e.Name = schema.Unquote(toks[2])
+	}
 }
 
 // ImportM32EditPresets loads the preset files of M32-Edit's library

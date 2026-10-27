@@ -27,6 +27,7 @@ import { MonitorPage } from "./MonitorPage";
 import { NoAccess } from "./NoAccess";
 import { RecordPage } from "./RecordPage";
 import { RoutingPage } from "./RoutingPage";
+import { SceneSafes, SnippetFilters } from "./Safes";
 import { SceneFiles } from "./SceneFiles";
 import { ScenesPage } from "./ScenesPage";
 import { UsbPage } from "./UsbPage";
@@ -127,7 +128,9 @@ describe("pages", () => {
   });
 
   it("scenes, scene files, USB stick", () => {
-    render(<ScenesPage />);
+    expect(render(<ScenesPage />)).toContain("What every scene recall keeps");
+    expect(render(<SceneSafes slot={1} />)).toContain("Routing");
+    expect(render(<SnippetFilters slot={0} />)).toContain("Vx Theo"); // strips show their names
     render(<SceneFiles />);
     render(<UsbPage />);
   });
