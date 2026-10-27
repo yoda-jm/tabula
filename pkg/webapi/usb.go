@@ -67,7 +67,7 @@ func usbKind(name string) (string, string) {
 
 // usbLoads are the files whose opening loads settings into the console:
 // they are backed up first (scenebackup.go).
-var usbLoads = map[string]bool{"scene": true, "snippet": true, "show": true, "effect": true, "routing": true, "channel": true, "prefs": true}
+var usbLoads = map[string]bool{"scene": true, "snippet": true, "show": true, "effect": true, "routing": true, "channel": true, "monitor": true, "prefs": true}
 
 // usbState keeps one USB command at a time: the listing read after one
 // belongs to it.

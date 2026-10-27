@@ -23,6 +23,11 @@
 - In-ear page: a swipe across the pans of a stereo mix scrolls the desk
   instead of moving them; a tap on a pan opens a wide slider to change it
   (dragged sideways with a mouse, as before) (#15).
+- USB page: ◀◀ rewind and ▶▶ fast forward in the player (lit while the
+  player winds; pressed again, it goes back to playing or to its pause;
+  `POST /api/usb` ops `ff`, `rew`), and **Load…** for shows and AES50/DP48
+  presets (`.mon`, kind `monitor`) too; the confirmation says what the file
+  changes (the whole mix, the selected strip, the routing, the show…) (#28).
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,
@@ -197,6 +202,17 @@
   writing of its `meta.json`.
 
 ### tabula-emu
+- The emulated USB stick (`-usb`) winds its player: fast forward and rewind
+  (`/-stat/tape/state` 5 and 6, 10 s a second, a guess) until play, pause or
+  stop; wound to the end, the file ends as when played to its end, rewound
+  to its start, the player stops. They were logged as unhandled (#28).
+- It loads channel, effect, routing and AES50/DP48 presets (`.chn`, `.efx`,
+  `.rou`, `.mon`, as M32-Edit writes them): a channel preset to the strip
+  selected on the console, an effect preset to the slot shown on its
+  Effects screen (both guesses); and shows (`.shw`), with the scenes and
+  snippets saved next to them as M32-Edit names them (`Gig.001.scn`). A
+  scene listed without its file is listed empty and logged. Preference
+  files (`.prf`) stay refused: their format is not known.
 - On ARM, levels on a tie between two tenths of a dB no longer read one
   tenth off (`-0.2` for `-0.3`) in node text and saved scenes. The list of
   clients on the debug page keeps a stable order.
