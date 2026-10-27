@@ -13,6 +13,7 @@ import { ChannelPage } from "./pages/ChannelPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { FxPage } from "./pages/FxPage";
 import { MixPage, MusicianApp } from "./pages/MixPage";
+import { MetersPage } from "./pages/MetersPage";
 import { MixerPage } from "./pages/MixerPage";
 import { MonitorPage } from "./pages/MonitorPage";
 import { NoAccess } from "./pages/NoAccess";
@@ -27,6 +28,7 @@ import { store } from "./store/store";
 const NAV: { page: Page; label: string; role: Role }[] = [
   { page: "mixer", label: "Mixer", role: "viewer" },
   { page: "channel", label: "Channel", role: "viewer" },
+  { page: "meters", label: "Meters", role: "viewer" },
   { page: "monitor", label: "Monitor", role: "engineer" },
   { page: "routing", label: "Routing", role: "engineer" },
   { page: "fx", label: "FX", role: "engineer" },
@@ -115,6 +117,8 @@ function ConsoleApp({ role }: { role: Role }) {
           <MixerPage selected={strip.path} onSelect={select} />
         ) : page === "channel" ? (
           <ChannelPage path={route?.strip ?? strip.path} onSelect={select} />
+        ) : page === "meters" ? (
+          <MetersPage />
         ) : page === "monitor" && engineer ? (
           <MonitorPage />
         ) : page === "routing" && engineer ? (

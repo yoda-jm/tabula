@@ -10,7 +10,10 @@ import (
 
 // Synthetic meters: every input channel carries a slowly breathing signal;
 // levels then follow the mix as set on the emulator (gate, compressor, fader,
-// mute, sends, buses, mains, matrices), so meters react to what a client does.
+// mute, DCAs, sends, buses, mains, matrices), so meters react to what a
+// client does. The gate and compressor gains come from their threshold,
+// range and ratio (no attack nor release); a DCA's meter is the loudest of
+// its members after their faders (a guess).
 
 // signal is the input level (linear, 1.0 = 0 dBFS) of channel i at t seconds.
 func signal(i int, t float64) float64 {
@@ -102,6 +105,15 @@ func (s *Server) levels(now time.Time) *mixLevels {
 		strips = append(strips, fmt.Sprintf("/fxrtn/%02d", i))
 	}
 
+	// A DCA scales its members' faders, and mutes them when off.
+	var dcaGain [8]float64
+	for d := range dcaGain {
+		p := fmt.Sprintf("/dca/%d", d+1)
+		if r.on(p + "/on") {
+			dcaGain[d] = r.gain(p + "/fader")
+		}
+	}
+
 	// Channels feed buses and mains; FX returns follow the FX send buses.
 	pass := func(lo, hi int) {
 		for i := lo; i < hi; i++ {
@@ -117,8 +129,14 @@ func (s *Server) levels(now time.Time) *mixLevels {
 				lv.gateGR[i], lv.dynGR[i] = r.dynamics(p, lv.in[i])
 			}
 			pre := lv.in[i] * lv.gateGR[i] * lv.dynGR[i]
+			grp := r.int(p + "/grp/dca")
 			if r.on(p + "/mix/on") {
 				lv.post[i] = pre * r.gain(p+"/mix/fader")
+				for d := range dcaGain {
+					if grp&(1<<d) != 0 {
+						lv.post[i] *= dcaGain[d]
+					}
+				}
 			}
 			if r.on(p + "/mix/st") {
 				mainPow += lv.post[i] * lv.post[i]
@@ -139,7 +157,6 @@ func (s *Server) levels(now time.Time) *mixLevels {
 				x := src * r.gain(sp+"/level")
 				busPow[b] += x * x
 			}
-			grp := r.int(p + "/grp/dca")
 			for d := 0; d < 8; d++ {
 				if grp&(1<<d) != 0 {
 					lv.dca[d] = math.Max(lv.dca[d], lv.post[i])

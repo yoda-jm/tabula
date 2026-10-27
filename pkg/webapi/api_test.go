@@ -235,19 +235,22 @@ func TestRecordAndReplay(t *testing.T) {
 }
 
 func TestMeters(t *testing.T) {
-	_, emuAddr := startEmu(t)
+	emuSrv, emuAddr := startEmu(t)
+	emuSrv.Store().ApplyText("/ch/01/mix/fader 0", "test") // in DCA 1: its meter shows it
 	api := New(quiet)
 	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
 	defer ts.Close()
 	post(t, ts.URL+"/api/connect", `{"addr":"`+emuAddr+`"}`)
 	connected(t, ts.URL)
 
-	resp, err := http.Get(ts.URL + "/api/events?meters=1")
+	// gain reductions of the channels (/meters/1), DCA levels (/meters/5 0 0)
+	resp, err := http.Get(ts.URL + "/api/events?meters=1,5:0:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 	got := make(chan []float64, 1)
+	dcas := make(chan []float64, 1)
 	go func() {
 		sc := bufio.NewScanner(resp.Body)
 		sc.Buffer(make([]byte, 1<<16), 1<<20)
@@ -264,9 +267,17 @@ func TestMeters(t *testing.T) {
 					Values []float64 `json:"values"`
 				}
 				json.Unmarshal([]byte(line[6:]), &m)
-				if m.ID == "1" {
-					got <- m.Values
-					return
+				switch m.ID {
+				case "1":
+					select {
+					case got <- m.Values:
+					default:
+					}
+				case "5:0:0":
+					select {
+					case dcas <- m.Values:
+					default:
+					}
 				}
 			}
 			meters = false
@@ -280,7 +291,18 @@ func TestMeters(t *testing.T) {
 		if v[11] <= 0 { // channel 12 has a source and a signal
 			t.Errorf("channel 12 input level %v", v[11])
 		}
+		if v[32+11] != 1 || v[64+11] > 1 { // no gate on ch 12, a compressor: a gain of 1 at most
+			t.Errorf("channel 12 gate gain %v, compressor gain %v", v[32+11], v[64+11])
+		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("no meters event")
+	}
+	select {
+	case v := <-dcas:
+		if len(v) != 27 || v[16] <= 0 { // DCA 1 (Percus) is up, ch 1 has a signal
+			t.Errorf("/meters/5 0 0: %d values, DCA 1 %v", len(v), v[16])
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("no DCA meters")
 	}
 }

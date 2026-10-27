@@ -953,6 +953,151 @@ div.scribble {
 .meter-peak.clip {
   background: var(--danger);
 }
+/* gain reduction: a bar growing down from the top */
+.meter.gr {
+  width: 3px;
+}
+.gr-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #f0883e;
+}
+.dyn-meter {
+  display: grid;
+  grid-template-columns: auto 1fr 4.2em;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+}
+.dyn-meter.idle {
+  opacity: 0.5;
+}
+.dm-label {
+  color: var(--muted);
+}
+.dm-value {
+  font-family: var(--mono);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.hbar {
+  position: relative;
+  height: 8px;
+  border-radius: 2px;
+  background: #07080b;
+  overflow: hidden;
+}
+.hbar-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, #2ea043 0, #2ea043 70%, #d6b23b 70%, #d6b23b 90%, #f2554f 90%);
+}
+.hbar-thr {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+.hbar-gr {
+  /* from the right: the more reduction, the longer */
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background: #f0883e;
+}
+
+/* the meter bridge */
+.meters-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+.meters-head p {
+  flex: 1 1 320px;
+  margin: 0;
+}
+.meter-bridge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.mb-group {
+  min-width: 0;
+  max-width: 100%;
+  padding: 8px 10px;
+}
+.mb-group h3 {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+}
+.mb-row {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.mb-col {
+  flex: none;
+  width: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.mb-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2a1214;
+}
+.mb-led.lit {
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger);
+}
+.mb-bars {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  height: clamp(120px, calc(100vh - 520px), 220px);
+}
+.mb-num {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.mb-name {
+  /* the strip's name, written up the column in its colour */
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  height: 64px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.68rem;
+  color: var(--sc, var(--muted));
+}
+.mb-name.c-OFF {
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .mb-bars {
+    height: 150px;
+  }
+  .mb-name {
+    height: 56px;
+  }
+}
 .fader-wrap {
   flex: 1;
   min-width: 0;

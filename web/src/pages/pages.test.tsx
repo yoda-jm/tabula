@@ -22,6 +22,7 @@ import { ChannelPage } from "./ChannelPage";
 import { ConnectPage } from "./ConnectPage";
 import { FxPage } from "./FxPage";
 import { MixerPage } from "./MixerPage";
+import { MetersPage } from "./MetersPage";
 import { MixPage, MusicianApp } from "./MixPage";
 import { MonitorPage } from "./MonitorPage";
 import { NoAccess } from "./NoAccess";
@@ -112,6 +113,26 @@ describe("pages", () => {
     }
     expect(render(<ChannelPage path="/ch/14" onSelect={noop} />)).toContain("eq-handle");
   }, 60_000);
+
+  it("meter bridge, gain reductions and DCA meters", () => {
+    // meters as the console sends them: levels, gate and compressor gains (1 = none), DCA levels
+    store.setMeters("0", Array.from({ length: 70 }, (_, i) => (i === 11 ? 1.2 : 0.1)));
+    store.setMeters("1", [...Array(32).fill(0.1), ...Array(32).fill(1), ...Array(32).fill(0.5)]);
+    store.setMeters("5:0:0", Array(27).fill(0.2));
+    try {
+      const html = render(<MetersPage />);
+      for (const title of ["Inputs", "Aux ins", "FX returns", "Mix buses", "Matrices", "Main", "DCAs"]) expect(html).toContain(title);
+      expect(html).toContain("Vx Theo");
+      expect(html).toContain("Gain reduction 6.0 dB"); // the channels' compressors at a gain of 0.5
+      expect(html).toContain("Ch 12 clipped"); // above 0 dBFS: its clip light is lit
+      const channel = render(<ChannelPage path="/ch/12" onSelect={noop} />);
+      expect(channel).toContain("dyn-meter");
+      expect(channel).toContain("6.0 dB");
+      expect(render(<MixerPage selected="/ch/01" onSelect={noop} />)).toContain("meter gr");
+    } finally {
+      for (const id of ["0", "1", "5:0:0"]) store.setMeters(id, []);
+    }
+  });
 
   it("monitor", () => {
     const html = render(<MonitorPage />);

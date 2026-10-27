@@ -44,16 +44,19 @@ the console's name in the top bar is followed by what goes wrong
 
 **Who sees what.** The machine running `tabula` is the engineer and sees
 every page (once signed in, when an engineer password is set). Other
-devices get a role from an access link: viewers see the
-Mixer, Channel and Browser pages read-only; musicians only get their in-ear
-mix. Monitor, Routing, FX, Scenes, USB, In-ears, Record, Access and Connect
-are engineer pages. See [access](access.md).
+devices get a role from an access link: viewers see the Mixer, Channel,
+Meters and Browser pages read-only; musicians only get their in-ear mix.
+Monitor, Routing, FX, Scenes, USB, In-ears, Record, Access and Connect are
+engineer pages. See [access](access.md).
 
 ## Mixer
 
 Banks of strips, as on the console: inputs 1-16 and 17-32, aux inputs and
 FX returns, buses, matrices and mains, DCAs. Each strip has its scribble
-strip (name and colour), meter, fader, solo, mute and pan. Tap a scribble
+strip (name and colour), meter, fader, solo, mute and pan. Next to the
+meter of a channel, bus, matrix or main, a thin orange bar growing down
+from the top is the gain reduction of its gate and compressor together; a
+DCA's meter is the one the console sends for it. Tap a scribble
 strip to select it for the Channel page. Names of two words take two lines
 (`Guitare Elec`), so the 12 characters the console allows show in full.
 
@@ -135,6 +138,12 @@ drawn behind the EQ curve. Two buttons under the curve point the RTA at this
 strip, before or after its EQ (writes must be armed: it changes the console's
 RTA source, `/-action/setrtasrc`).
 
+**Gate and dynamics meters.** The Gate and Dynamics sections start with
+two bars: the strip's level (for a channel, its input, what the gate and
+the compressor see, with the threshold marked) and the gain reduction,
+growing from the right, with its value in dB. They help set a threshold
+and a ratio while the band plays.
+
 **Headamp.** For a channel (or an aux input) fed by a preamp, the Preamp
 section starts with that preamp: which input it is (`AES50 A 12`: input 12
 of the stage box on AES50 A), its gain and its +48 V phantom power. The
@@ -148,6 +157,24 @@ The Source row of the Config section also shows the physical input
 (`In 12 · AES50 A 12`).
 
 ![The Preamp section of a bass DI: AES50 A 7, gain, phantom on](img/gui-headamp.png)
+
+## Meters
+
+The meter bridge: every level at once, as the console meters it (dBFS from
+−60 to 0, with a peak hold), grouped as on the console: inputs, aux inputs,
+FX returns, mix buses, matrices, main L/R and M/C, DCAs, each with its
+number and its name in its colour. A strip with a gate or a compressor has
+the orange bar of its gain reduction beside its meter. A red light above a
+meter stays lit once it has clipped (from −0.5 dBFS), to spot a channel
+that clipped while you looked elsewhere; **Clear the clip lights** puts
+them out. On a phone, each group scrolls sideways. Viewers see it too.
+
+![The meter bridge of a show](img/gui-meters.png)
+
+The meters the page needs are asked for while it is open only: the
+channels' gain reductions (`/meters/1`) and the DCAs (`/meters/5`) come on
+top of the levels every page gets, so a phone on the Wi-Fi is not sent
+them for nothing.
 
 ## Monitor
 

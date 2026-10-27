@@ -520,3 +520,61 @@ func TestIdleClientsForgotten(t *testing.T) {
 		t.Errorf("clients %v, want %s", got, want)
 	}
 }
+
+// Gain reductions follow the gate and compressor settings, and DCAs scale
+// and mute their members; /meters/1, /meters/2 and /meters/5 carry them.
+func TestMeterGainReductionsAndDCAs(t *testing.T) {
+	s := offline()
+	apply(t, s,
+		"/ch/01/mix ON 0.0 OFF +0 OFF -oo",
+		"/ch/01/grp %00000001 %000000",
+		"/ch/01/gate ON GATE 0.0 40.0 10 10 100 0", // threshold 0 dB: always closed, 40 dB down
+		"/ch/02/mix ON 0.0 OFF +0 OFF -oo",
+		"/ch/02/dyn ON COMP RMS LOG -60.0 4.0 1 0.00 10 10.0 100 POST 0 100 OFF", // always compressing
+		"/bus/01/mix ON 0.0 OFF +0 OFF -oo",
+		"/ch/02/mix/01 ON 0.0 +0 PRE 0",
+		"/bus/01/dyn ON COMP PEAK LOG -60.0 10 0 0.00 0 10.0 49 POST 0 100 OFF",
+		"/dca/1 ON 0.0",
+	)
+	now := time.Now()
+	lv := s.levels(now)
+	if g := lv.gateGR[0]; math.Abs(g-0.01) > 1e-6 {
+		t.Errorf("gate gain %v, want 0.01 (40 dB)", g)
+	}
+	if lv.dynGR[0] != 1 || lv.dynGR[1] >= 1 || lv.dynGR[1] <= 0 || lv.gateGR[1] != 1 {
+		t.Errorf("ch 1 dyn %v, ch 2 gate %v dyn %v", lv.dynGR[0], lv.gateGR[1], lv.dynGR[1])
+	}
+	if lv.busGR[0] >= 1 {
+		t.Errorf("bus 1 gain reduction %v", lv.busGR[0])
+	}
+	if lv.dca[0] <= 0 || lv.dca[0] != lv.post[0] || lv.dca[1] != 0 {
+		t.Errorf("DCA meters %v, ch 1 %v", lv.dca, lv.post[0])
+	}
+	words := func(id int, params ...int32) []float64 {
+		var out []float64
+		for _, w := range s.meterValues(id, params, lv, now) {
+			out = append(out, float64(math.Float32frombits(w)))
+		}
+		return out
+	}
+	if m := words(1); len(m) != 96 || float32(m[32]) != float32(lv.gateGR[0]) || float32(m[65]) != float32(lv.dynGR[1]) {
+		t.Errorf("/meters/1: %d values, gate 1 %v, dyn 2 %v", len(m), m[32], m[65])
+	}
+	if m := words(2); len(m) != 49 || float32(m[25]) != float32(lv.busGR[0]) {
+		t.Errorf("/meters/2: %d values, bus 1 gain %v", len(m), m[25])
+	}
+	if m := words(5, 0, 0); len(m) != 27 || float32(m[16]) != float32(lv.dca[0]) {
+		t.Errorf("/meters/5 0 0: %d values, DCA 1 %v", len(m), m[16])
+	}
+
+	// the DCA's fader scales its members, its mute silences them
+	full := lv.post[0]
+	apply(t, s, "/dca/1 ON -20.0")
+	if lv := s.levels(now); math.Abs(lv.post[0]/full-0.1) > 0.01 {
+		t.Errorf("DCA at -20 dB: ch 1 at %v of its level", lv.post[0]/full)
+	}
+	apply(t, s, "/dca/1 OFF 0.0")
+	if lv := s.levels(now); lv.post[0] != 0 || lv.dca[0] != 0 || lv.in[0] <= 0 {
+		t.Errorf("DCA off: ch 1 %v, DCA %v", lv.post[0], lv.dca[0])
+	}
+}

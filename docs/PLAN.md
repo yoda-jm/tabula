@@ -66,6 +66,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Scene files kept on the laptop (`-scenes`): load into the console line by line, save the console as one, open from the browser (`/api/scenefiles`).
 - [x] The console's USB stick and player: browse, play WAV files, transport (rewind and fast forward too), load scenes, presets and shows from the stick (`/api/usb`). Not yet tried on the real M32.
 - [x] Linked pairs shown as stereo strips in the mixer.
+- [x] Gain reduction of the gates and compressors (Channel page, Mixer strips), DCA meters, and a Meters page with every level at once and latching clip lights.
 - [x] Solo and Clear solo on the mixer, the six mute groups, strips silenced by a mute group or a muted DCA; Monitor page: solo modes, monitor, talkback A/B, oscillator (asks before its tone).
 
 ### 4. Recording and replay *(in progress)*

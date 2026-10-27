@@ -122,12 +122,17 @@ tabula -console 192.168.1.62 -http :8033
   and mains, DCAs) with scribble strips in the console colours, meters,
   faders, solos, mutes and pans, the mute groups and Clear solo; linked
   pairs show as one stereo strip, and a strip silenced by a mute group or a
-  DCA says so.
+  DCA says so; a thin bar beside each meter shows the gain reduction of the
+  strip's gate and compressor.
+- **Meters**: every level of the console at once (inputs, aux ins, FX
+  returns, buses, matrices, mains, DCAs) with their gain reductions and a
+  clip light that stays lit until cleared.
 - **Monitor**: what is soloed and how (PFL/AFL, exclusive), the monitor's
   level, source and dim, talkback A and B, and the oscillator.
 - **Channel**: everything about one strip — config, preamp with the headamp
-  feeding it (which input, gain, phantom power), gate, dynamics, EQ with its
-  (approximate) response curve and the RTA, sends with the bus names.
+  feeding it (which input, gain, phantom power), gate and dynamics with
+  their level and gain reduction meters, EQ with its (approximate) response
+  curve and the RTA, sends with the bus names.
 - **Routing**: a patchbay drawing every path from the stage box inputs to the
   stage box outputs and the card tracks, to check at a glance where a
   signal goes; the input patch (which stage box input feeds which channel,

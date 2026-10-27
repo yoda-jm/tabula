@@ -69,7 +69,10 @@ meter subscriptions served at the same moment:
    carry no signal. Headamp gain and trim do not change it.
 2. **Channel strip.** The gate attenuates by its range while the signal is
    under the threshold; the compressor applies its threshold and ratio (no
-   knee, attack or release). Then mute and fader.
+   knee, attack or release). Their gains are the gain reductions of
+   `/meters/1` and `/meters/6` (1.0 for none). Then mute, fader and the
+   DCAs the channel is assigned to: a DCA's fader scales it, a DCA off
+   mutes it.
 3. **Sends.** Each bus send applies its on switch and level, taken after the
    fader when its tap is POST, before it otherwise.
 4. **Buses.** Sends add up in power; then bus dynamics, mute and fader. A bus
@@ -83,13 +86,14 @@ meter subscriptions served at the same moment:
    mono bus through their mono level; then dynamics, mute and fader.
 7. **Matrices.** Fed by their sends from L/R, mono and the buses; then
    dynamics, mute and fader.
-8. **DCAs** show the loudest of their channels. **Outputs** show the level
-   of the source patched to them.
+8. **DCAs** (`/meters/5 x 0`) show the loudest of their channels after
+   their faders (a guess: the document only says the group meters hold
+   the DCAs). **Outputs** show the level of the source patched to them.
 
 Not simulated: pan and balance (left and right always carry the same level),
 delay, polarity, the EQ (it only shapes the RTA, below), insert effects,
-mute groups and DCA faders/mutes acting on the sound, solo and the monitor
-bus, talkback, oscillator, automix, USB/card playback.
+mute groups acting on the sound, solo and the monitor bus, talkback,
+oscillator, automix, USB/card playback.
 
 The meter blobs have the sizes the editors expect (M32-Edit drops a blob of
 the wrong size): `/meters/0` 70 values, 1: 96, 2: 49, 3: 22, 4: 82, 5: 27,

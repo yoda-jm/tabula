@@ -4,6 +4,7 @@ import { useState } from "react";
 import { EqCurve } from "../components/EqCurve";
 import { useRtaWindow } from "../components/Geq";
 import { Headamp } from "../components/Headamp";
+import { DynMeter } from "../components/Meter";
 import { ParamControl } from "../components/controls";
 import { Scribble } from "../components/Scribble";
 import { inputSource, portLabel } from "../lib/routing";
@@ -83,6 +84,7 @@ export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: 
         {sections.includes("eq") && <EqSection strip={strip} />}
         {sections.includes("gate") && (
           <Section title="Gate" on={`${p}/gate/on`}>
+            <DynMeter strip={strip} which="gate" />
             <Fields path={`${p}/gate`} skip={["on"]} />
             {schema.byPath.has(`${p}/gate/filter`) && (
               <>
@@ -94,6 +96,7 @@ export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: 
         )}
         {sections.includes("dyn") && (
           <Section title="Dynamics" on={`${p}/dyn/on`}>
+            <DynMeter strip={strip} which="dyn" />
             <Fields path={`${p}/dyn`} skip={["on"]} />
             {schema.byPath.has(`${p}/dyn/filter`) && (
               <>

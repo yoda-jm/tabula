@@ -13,6 +13,7 @@ describe("routes", () => {
   it("keeps the other pages", () => {
     expect(parseRoute("#/channel/ch/12")).toEqual({ page: "channel", strip: "/ch/12" });
     expect(parseRoute("#/routing")).toEqual({ page: "routing" });
+    expect(parseRoute("#/meters")).toEqual({ page: "meters" });
     expect(parseRoute("#/nowhere")).toBeNull();
   });
 });

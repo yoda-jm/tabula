@@ -248,7 +248,7 @@ function StripView({ m, selected, onSelect, onSpill }: { m: MixerStrip; selected
         <div className="pan-slot" />
       )}
       <div className="strip-fader">
-        <StripMeter strip={strip} partner={partner} />
+        <StripMeter strip={strip} partner={partner} gr />
         {a.fader && <StripFader addr={a.fader} label={shown.label} disabled={!can} />}
       </div>
       <div className="strip-buttons">

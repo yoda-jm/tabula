@@ -216,7 +216,9 @@ entries `/-usb/dir/001`…`999` are lazy nodes: not read when connecting.
   GUI does so, missing no change). About 20 updates per second per group;
   see the protocol document for what each group holds (e.g. 1: 32 inputs,
   32 gate and 32 compressor gains; 2: 16 buses, 6 matrices, main L/R, mono,
-  then their compressor gains).
+  then their compressor gains). Every page gets 0 and 2; the GUI adds 1
+  (the channels' gain reductions) and `5:0:0` (the DCAs) while a page
+  shows them, 15 for the RTA.
 - `ping`: `{}` every 5 s, so a browser can tell a stream gone silent (a
   connection cut without a word, as when a phone changes Wi-Fi) and open
   it again; the GUI does so after 15 s without any event.
