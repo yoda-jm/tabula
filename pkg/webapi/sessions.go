@@ -25,9 +25,12 @@ type recordView struct {
 	Replaying bool          `json:"replaying"`
 	ReplayOf  string        `json:"replay_of,omitempty"`
 	ReplayAt  float64       `json:"replay_at,omitempty"`
-	Error     string        `json:"error,omitempty"`
-	Audio     *audio.Status `json:"audio,omitempty"` // the audio capture of the recording, or of the last one
-	USB       usbBackupView `json:"usb"`             // the backup on the console's USB stick (usbbackup.go)
+	// ReplayAudio: the replay plays the session's tracks to the card too (a
+	// virtual soundcheck, soundcheck.go)
+	ReplayAudio bool          `json:"replay_audio,omitempty"`
+	Error       string        `json:"error,omitempty"`
+	Audio       *audio.Status `json:"audio,omitempty"` // the audio capture of the recording, or of the last one
+	USB         usbBackupView `json:"usb"`             // the backup on the console's USB stick (usbbackup.go)
 }
 
 // SetSessionsDir sets where sessions are kept.
@@ -40,8 +43,8 @@ func (s *Server) SetSessionsDir(dir string) {
 func (s *Server) recordStatus() recordView {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v := recordView{Replaying: s.replayCancel != nil, ReplayOf: s.replayOf, ReplayAt: s.replayAt, Error: s.recordErr,
-		Audio: publicAudio(s.audioStatusLocked()), USB: s.backup.view}
+	v := recordView{Replaying: s.replayCancel != nil, ReplayOf: s.replayOf, ReplayAt: s.replayAt, ReplayAudio: s.sc.on,
+		Error: s.recordErr, Audio: publicAudio(s.audioStatusLocked()), USB: s.backup.view}
 	v.USB.On = s.audio.cfg.USBBackup
 	if s.rec != nil {
 		m := s.rec.Meta()
@@ -297,12 +300,17 @@ func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
 }
 
 // replayStart replays a session onto the connected console (writes must be
-// armed): {"session": "2026-10-17_203000", "from": 0, "speed": 1}.
+// armed): {"session": "2026-10-17_203000", "from": 0, "speed": 1}. With
+// "audio", its tracks play to the card too, a virtual soundcheck
+// (soundcheck.go); with "routing" as well, the console's inputs are
+// switched to the card for the time of it.
 func (s *Server) replayStart(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Session string  `json:"session"`
 		From    float64 `json:"from"`
 		Speed   float64 `json:"speed"`
+		Audio   bool    `json:"audio"`
+		Routing bool    `json:"routing"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, http.StatusBadRequest, err)
@@ -333,7 +341,21 @@ func (s *Server) replayStart(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusConflict, errors.New("already replaying"))
 		return
 	}
+	var sc *soundcheck
+	if req.Audio {
+		var code int
+		if sc, code, err = s.newSoundcheck(c, ses, req.Speed); err != nil {
+			httpError(w, code, err)
+			return
+		}
+	}
 	s.backupBefore("replaying " + req.Session)
+	if sc != nil && req.Routing {
+		if err := sc.toCard(); err != nil {
+			httpError(w, http.StatusBadGateway, err)
+			return
+		}
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s.mu.Lock()
 	s.replayCancel, s.replayOf, s.replayAt, s.recordErr = cancel, req.Session, req.From, ""
@@ -348,8 +370,15 @@ func (s *Server) replayStart(w http.ResponseWriter, r *http.Request) {
 			s.publishRecord()
 		}
 	}}
+	if sc != nil {
+		sc.from, sc.cancel = req.From, cancel
+		p.Skip, p.OnReady = routingSwitch, sc.start
+	}
 	go func() {
 		err := p.Play(ctx, s.model, req.From)
+		if sc != nil {
+			err = sc.finish(ctx, err)
+		}
 		s.mu.Lock()
 		s.replayCancel, s.replayOf = nil, ""
 		if err != nil && !errors.Is(err, context.Canceled) {

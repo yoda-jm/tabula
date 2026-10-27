@@ -26,7 +26,7 @@ import { MetersPage } from "./MetersPage";
 import { MixPage, MusicianApp } from "./MixPage";
 import { MonitorPage } from "./MonitorPage";
 import { NoAccess } from "./NoAccess";
-import { RecordPage } from "./RecordPage";
+import { PlayRoutingNote, RecordPage } from "./RecordPage";
 import { RoutingPage } from "./RoutingPage";
 import { SceneSafes, SnippetFilters } from "./Safes";
 import { SceneFiles } from "./SceneFiles";
@@ -181,6 +181,12 @@ describe("pages", () => {
     expect(html).toContain("Download as a zip");
     expect(html.replace(/<!-- -->/g, "")).toContain("FLAC · about 8.6 GB");
     expect(render(<TakeHome detail={detail} recording={true} recordingThis={true} />)).toContain("still being recorded");
+  });
+
+  it("says whether a virtual soundcheck is heard", () => {
+    // the demo show: inputs on the stage, the PLAY routing on the card as from the factory
+    expect(render(<PlayRoutingNote toCard={true} />).replace(/<!-- -->/g, "")).toContain("takes the card on inputs 1-8 ← CARD1-8");
+    expect(render(<PlayRoutingNote toCard={false} />)).toContain("they will not hear the tracks");
   });
 
   it("every in-ear mix", () => {

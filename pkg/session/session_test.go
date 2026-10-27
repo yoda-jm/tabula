@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -179,6 +180,44 @@ func TestReplayTiming(t *testing.T) {
 	}
 	if fmt.Sprint(progress) != "[1.3 1.6 2.2 3.1]" {
 		t.Errorf("progress %v", progress)
+	}
+}
+
+// sentLines keeps every line a replay sends.
+type sentLines struct{ sent []string }
+
+func (l *sentLines) ApplyText(line string) error {
+	l.sent = append(l.sent, line)
+	return nil
+}
+
+// A virtual soundcheck keeps the console's inputs on the card: the routing
+// switch is neither restored nor replayed, and the tracks start once the
+// state is on the console, before the first timed change.
+func TestReplaySkipAndReady(t *testing.T) {
+	s := &Session{Events: []Event{
+		{T: 0.5, Addr: "/config/routing/routswitch", Text: "REC"},
+		{T: 0.6, Addr: "/ch/01/mix/fader", Text: "-5.0"},
+	}}
+	l := &sentLines{}
+	ready := -1
+	p := &Player{S: s, Target: l, Speed: 50,
+		Skip:    func(path string) bool { return path == "/config/routing" || path == "/config/routing/routswitch" },
+		OnReady: func() error { ready = len(l.sent); return nil }}
+	if err := p.Play(context.Background(), "M32C", 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range l.sent {
+		if strings.HasPrefix(line, "/config/routing ") || strings.HasPrefix(line, "/config/routing/routswitch") {
+			t.Errorf("sent %q", line)
+		}
+	}
+	if ready < 1000 || ready != len(l.sent)-1 || l.sent[ready] != "/ch/01/mix/fader -5.0" {
+		t.Errorf("ready after %d of %d lines", ready, len(l.sent))
+	}
+	p.OnReady = func() error { return errors.New("no player") }
+	if err := p.Play(context.Background(), "M32C", 0); err == nil || err.Error() != "no player" {
+		t.Errorf("failed start: %v", err)
 	}
 }
 

@@ -29,6 +29,14 @@ type Player struct {
 	Speed  float64 // 1 = real time
 	// OnProgress, if set, is called with the replay position after each event.
 	OnProgress func(t float64)
+	// Skip, if set, leaves out the nodes and parameters it names (a node
+	// path, or a parameter's address): a virtual soundcheck keeps the
+	// console's inputs on the card.
+	Skip func(path string) bool
+	// OnReady, if set, is called once the state at from is on the target,
+	// as the timed changes start (the tracks of a virtual soundcheck start
+	// playing then); an error ends the replay.
+	OnReady func() error
 }
 
 // Play sends the state at from (snapshot plus changes so far) as node lines,
@@ -36,8 +44,12 @@ type Player struct {
 func (p *Player) Play(ctx context.Context, model schema.Model, from float64) error {
 	scratch := state.New(schema.Build(model))
 	p.S.StateAt(scratch, from)
+	skip := p.Skip
+	if skip == nil {
+		skip = func(string) bool { return false }
+	}
 	for _, n := range scratch.Schema().Nodes {
-		if !n.InScene && !isPlayable(n.Path) {
+		if !n.InScene && !isPlayable(n.Path) || skip(n.Path) {
 			continue
 		}
 		if err := p.Target.ApplyText(scratch.NodeLine(n)); err != nil {
@@ -51,9 +63,14 @@ func (p *Player) Play(ctx context.Context, model schema.Model, from float64) err
 	if speed <= 0 {
 		speed = 1
 	}
+	if p.OnReady != nil {
+		if err := p.OnReady(); err != nil {
+			return err
+		}
+	}
 	wall := time.Now()
 	for _, e := range p.S.Events {
-		if e.T <= from || e.Addr == "" {
+		if e.T <= from || e.Addr == "" || skip(e.Addr) {
 			continue
 		}
 		due := wall.Add(time.Duration((e.T - from) / speed * float64(time.Second)))

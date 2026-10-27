@@ -303,13 +303,13 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | GET | `/api/sessions` | | `[{"name", "meta"}]`, newest first |
 | GET | `/api/sessions/{name}` | | `{"name", "meta", "markers": [Event], "snapshot", "scene", "size", "flac_size"?}`: `snapshot` counts the node lines of the console at the start (`start.scn` and `start.nodes`), `scene` says whether `start.scn` is there; `size` is the bytes of the session's folder, `flac_size` about what it takes with its WAV tracks in FLAC (see [Taking a show home](#taking-a-show-home)) |
 | DELETE | `/api/sessions/{name}` | | 204: the session folder is removed, audio included (not `audio.json`); 409 while it is recorded or replayed |
-| POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console) |
+| POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1, "audio"?: true, "routing"?: true}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console). With `audio`, a virtual soundcheck (below): 409 for a session without audio tracks, while recording, while the input is tested, or when no player can be run; 400 for a speed other than 1; with `routing` too, 502 when the routing cannot be switched |
 | POST | `/api/replay/stop` | | `Record` |
 | GET | `/api/undo` | | `UndoView`: `{"count", "what"?, "at"?}`, what Undo takes back (the engineer's last change made from tabula) |
 | POST | `/api/undo` | | `UndoView` after undoing the last step: the values it overwrote are sent back to the console; 403 unless writes are armed; 409 when there is nothing to undo; 502 when the console does not answer (a step not started stays) |
 | POST | `/api/strips/copy` | `{"from": "/ch/01", "to": ["/ch/02"], "sections": ["eq", "dyn"]}` | `{"nodes"}`: the sections' nodes (`preamp`, `delay`, `gate`, `dyn`, `insert`, `eq`, `sends`: `mix/01`…, `main`: `mix`) sent to each target with the `/` command; one undo step. Strips of the same kind only (`ch`, `auxin`, `fxrtn`, `bus`, `mtx`); 400 otherwise or when none has the sections; 403 unless armed |
 
-`Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", "audio"?, "usb_backup"?, …}, "replaying", "replay_of"?, "replay_at"?, "error"?, "audio"?, "usb"}`.
+`Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", "audio"?, "usb_backup"?, …}, "replaying", "replay_of"?, "replay_at"?, "replay_audio"?, "error"?, "audio"?, "usb"}`.
 `usb` is the backup on the console's USB stick: `{"on" (the setting),
 "starting"?, "file"?, "already"?, "error"?}` for the recording, or the last
 one — the file the console records (`/R_20261026-203512.wav`), `already`
@@ -328,6 +328,18 @@ record status); `meta.audio` the audio section of the session (see Audio).
 A replay first sends the state at `from` (snapshot plus the changes up to
 then), then each later change at its time divided by `speed` (any value
 above 0; 1 is real time), counted from the start of the replay.
+
+A **virtual soundcheck** (`"audio": true`) also plays the session's tracks
+to the card, at 1×: they start with the timed changes, from where `from`
+falls in the audio (silence before its first sample), each on its recorded
+channel, streamed to the player of the audio settings
+(`AudioView.play_command`), and play to their end unless stopped;
+`replay_audio` is true meanwhile, and `replay_at` moves with the audio. The
+replay leaves `/config/routing/routswitch` alone; with `"routing": true`,
+tabula sets it to PLAY (1) before and back to what it was after (even
+unarmed), so the inputs hear the card through `/config/routing/PLAY`. A
+player that fails ends the replay with its message in `error`. A backup of
+the console's settings is saved first, as before every replay.
 
 Events: `record` carries a `Record` (every second while recording, and on
 every replay progress).
@@ -384,15 +396,21 @@ starts it again once fixed. Engineer only.
 
 `AudioConfig`: `{"enabled", "recorder": "arecord"|"parecord"|"ffmpeg"|"custom",
 "device", "channels": 32, "rate": 48000, "tracks"?: "1-16", "bits": 24,
-"plain_names"?, "command"?, "input"?}` — `command` is the custom
-recorder's command line (`{device}`, `{channels}`, `{rate}` replaced),
-writing raw samples in the `input` format (`s16le`, `s24le`, `s24-32le`,
-`s32le`, `f32le`) or a WAV stream.
+"plain_names"?, "command"?, "input"?, "play_to"?, "play_command"?}` —
+`command` is the custom recorder's command line (`{device}`, `{channels}`,
+`{rate}` replaced), writing raw samples in the `input` format (`s16le`,
+`s24le`, `s24-32le`, `s32le`, `f32le`) or a WAV stream. `play_to` is where
+a virtual soundcheck plays the tracks (default: the device recorded from),
+`play_command` a player replacing the recorder's (reading raw `s32le` on
+its standard input); a new `play_command` is refused (403) unless chosen on
+the machine running tabula, as a custom recorder.
 
 `AudioView`: `{"config", "command"? (what the configuration runs), "error"?
 (what is wrong with it), "templates": {recorder: command}, "byte_rate",
 "dir", "free", "remaining", "status"?: AudioStatus, "testing", "names"?,
-"check"?}` — `free`
+"check"?, "play_command"?, "play_error"?, "play_device"?}` — `play_command`
+is how a virtual soundcheck plays the tracks (or `play_error` why it
+cannot), `play_device` where they go; `free`
 is the free space in the sessions directory (bytes, -1 unknown),
 `remaining` how many seconds of audio it holds at `byte_rate` (the chosen
 tracks only), `names` what the console's routing sends to each of the 32

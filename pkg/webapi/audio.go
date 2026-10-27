@@ -359,6 +359,12 @@ type audioView struct {
 	// Check says whether the device configured is there and is the
 	// console's card, when audio is on.
 	Check *audio.Check `json:"check,omitempty"`
+	// PlayCommand is how a virtual soundcheck plays the tracks to the card
+	// (for the configured channels and rate), PlayError why it cannot;
+	// PlayDevice is where they go.
+	PlayCommand string `json:"play_command,omitempty"`
+	PlayError   string `json:"play_error,omitempty"`
+	PlayDevice  string `json:"play_device,omitempty"`
 }
 
 func (s *Server) audioView() audioView {
@@ -383,6 +389,12 @@ func (s *Server) audioView() audioView {
 		v.Error = err.Error()
 	} else {
 		v.Command = audio.QuoteArgs(args)
+	}
+	v.PlayDevice = cfg.PlayDevice()
+	if args, err := cfg.PlayCommandLine(cfg.Channels, cfg.Rate); err != nil {
+		v.PlayError = err.Error()
+	} else {
+		v.PlayCommand = audio.QuoteArgs(args)
 	}
 	if free, err := freeSpace(dir); err == nil {
 		v.Free = int64(free)
@@ -420,24 +432,26 @@ func (s *Server) getAudio(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.audioView())
 }
 
-// checkCustom refuses a new custom recorder command unless the engineer is on
-// the machine running tabula itself (signed in there when a password is
-// set): an engineer link or session from another device must not be a way
-// to run programs on that machine. Keeping the current command is fine.
+// checkCustom refuses a new custom recorder command, or a new command to
+// play the tracks (PlayCommand), unless the engineer is on the machine
+// running tabula itself (signed in there when a password is set): an
+// engineer link or session from another device must not be a way to run
+// programs on that machine. Keeping the current command is fine.
 func (s *Server) checkCustom(r *http.Request, cfg audio.Config) error {
-	if cfg.Recorder != "custom" {
-		return nil
-	}
 	if c := callerFrom(r); c.Local && c.Role == RoleEngineer {
 		return nil
 	}
 	s.mu.Lock()
 	cur := s.audio.cfg
 	s.mu.Unlock()
-	if cur.Recorder == "custom" && strings.TrimSpace(cur.Command) == strings.TrimSpace(cfg.Command) {
-		return nil
+	same := func(a, b string) bool { return strings.TrimSpace(a) == strings.TrimSpace(b) }
+	if cfg.Recorder == "custom" && !(cur.Recorder == "custom" && same(cur.Command, cfg.Command)) {
+		return errors.New("a custom recorder command can only be chosen on the machine running tabula")
 	}
-	return errors.New("a custom recorder command can only be chosen on the machine running tabula")
+	if cfg.PlayCommand != "" && !same(cur.PlayCommand, cfg.PlayCommand) {
+		return errors.New("a command to play the tracks can only be chosen on the machine running tabula")
+	}
+	return nil
 }
 
 // setAudioConfig replaces the configuration, used from the next recording.

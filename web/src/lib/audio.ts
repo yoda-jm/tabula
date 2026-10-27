@@ -19,6 +19,10 @@ export interface AudioConfig {
   plain_names?: boolean;
   command?: string;
   input?: string;
+  /** where a virtual soundcheck plays the tracks; empty: the device recorded from */
+  play_to?: string;
+  /** replaces the player matching the recorder ({device}, {channels}, {rate}); reads raw s32le */
+  play_command?: string;
 }
 
 export interface AudioTrack {
@@ -77,6 +81,10 @@ export interface AudioView {
   names?: string[];
   /** when audio is on: why the device configured would not record the console's tracks */
   check?: AudioCheck;
+  /** how a virtual soundcheck plays the tracks to the card, or why it cannot; where they go */
+  play_command?: string;
+  play_error?: string;
+  play_device?: string;
 }
 
 /** What the machine says of the device configured (docs/API.md, "Audio"). */

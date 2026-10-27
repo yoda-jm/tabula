@@ -7,10 +7,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
+import type { AudioView } from "../lib/audio";
 import type { Record as RecordStatus, SessionDetail, SessionSummary } from "../lib/session";
 import { audioApi, audioPlan, audioSummary, exportUrl, formatBytes, plural } from "../lib/audio";
 import { addsMarker, damagedText, formatDuration, parseTime, sessionApi } from "../lib/session";
-import { useCanWrite, useRecord, useStatus } from "../store/hooks";
+import { PLAY_BLOCKS, ROUTSWITCH, playRouting, playableTracks } from "../lib/soundcheck";
+import { useCanWrite, useRecord, useStatus, useValue } from "../store/hooks";
 import { store } from "../store/store";
 import type { Audio } from "./AudioPanel";
 import { AudioPanel, CheckProblems, SessionAudio, saveDraft, useAudio, useUnsaved } from "./AudioPanel";
@@ -101,6 +103,7 @@ export function RecordPage() {
           key={selected}
           name={selected}
           rec={rec}
+          audio={audio.view}
           onDeleted={() => {
             store.toast(`Session ${selected} deleted`);
             setSelected(null);
@@ -393,12 +396,17 @@ function Recorder(props: { rec: RecordStatus | null; audio: Audio; onRetry(): Pr
   );
 }
 
-function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | null; onDeleted(): void }) {
+function Session(props: { name: string; rec: RecordStatus | null; audio: AudioView | null; onDeleted(): void }) {
+  const { name, rec, onDeleted } = props;
   const can = useCanWrite();
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [error, setError] = useState("");
   const [from, setFrom] = useState("0");
-  const [speed, setSpeed] = useState(1);
+  const [speedChosen, setSpeed] = useState(1);
+  // a virtual soundcheck: the tracks play to the card with the replay, at 1×
+  const [withTracks, setWithTracks] = useState(false);
+  const [toCard, setToCard] = useState(true);
+  const speed = withTracks ? 1 : speedChosen;
   const [asking, setAsking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const recordingThis = !!rec?.recording && rec.name === name;
@@ -417,7 +425,7 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
     setAsking(false);
     setError("");
     try {
-      store.setRecord(await sessionApi.replay(name, fromSeconds, speed));
+      store.setRecord(await sessionApi.replay(name, fromSeconds, speed, withTracks ? { audio: true, routing: toCard } : undefined));
     } catch (e) {
       const msg = e instanceof ApiError && e.status === 403 ? `Refused: ${e.message}. Arm writes first.` : (e as Error).message;
       setError(msg);
@@ -442,6 +450,8 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
   };
   const audio = detail?.meta.audio;
   const audioBytes = audio ? audio.frames * (audio.tracks?.length ?? 0) * (audio.bits / 8) : 0;
+  const tracks = playableTracks(audio);
+  const soundcheck = withTracks && tracks > 0;
 
   return (
     <section className="card">
@@ -530,8 +540,10 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
 
       <h4>Replay onto the console</h4>
       <p className="muted">
-        A replay moves the console as it was recorded: its settings, faders and mutes. It plays no sound; open the audio in Reaper or
-        Audacity with the exports above.
+        A replay moves the console as it was recorded: its settings, faders and mutes.
+        {tracks > 0
+          ? " With the virtual soundcheck, the recorded tracks play to the console's card too, in step: the show can be mixed again without the band."
+          : " It plays no sound; open the audio in Reaper or Audacity with the exports above."}
       </p>
       {!can && (
         <p className="warn-box">
@@ -567,7 +579,13 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
         )}
         <label>
           <span className="field-label">Speed</span>
-          <select className="select" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
+          <select
+            className="select"
+            value={speed}
+            disabled={soundcheck}
+            title={soundcheck ? "A virtual soundcheck plays at 1×: the tracks are not sped up" : undefined}
+            onChange={(e) => setSpeed(Number(e.target.value))}
+          >
             {SPEEDS.map((s) => (
               <option key={s} value={s}>
                 {s}×
@@ -577,19 +595,46 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
         </label>
         {replayingThis ? (
           <button type="button" className="btn big danger" onClick={() => void stop()}>
-            ■ Stop replay
+            {rec?.replay_audio ? "■ Stop the soundcheck" : "■ Stop replay"}
           </button>
         ) : (
           <button
             type="button"
             className="btn big primary"
-            disabled={!can || Number.isNaN(fromSeconds) || replayingOther || recordingThis}
+            disabled={!can || Number.isNaN(fromSeconds) || replayingOther || recordingThis || (soundcheck && !!rec?.recording)}
             onClick={() => setAsking(true)}
           >
-            ▶ Replay
+            {soundcheck ? "▶ Start the soundcheck" : "▶ Replay"}
           </button>
         )}
       </div>
+      {tracks > 0 && (
+        <div className="soundcheck">
+          <label className="check">
+            <input type="checkbox" checked={withTracks} disabled={replayingThis} onChange={(e) => setWithTracks(e.target.checked)} />
+            Virtual soundcheck: play the {plural(tracks, "recorded track")} to the console's card too (at 1×)
+          </label>
+          {soundcheck && (
+            <>
+              <label className="check">
+                <input type="checkbox" checked={toCard} disabled={replayingThis} onChange={(e) => setToCard(e.target.checked)} />
+                Switch the console's inputs to the card for the time of it (routing PLAY), and back as they were at the end
+              </label>
+              <PlayRoutingNote toCard={toCard} />
+              {props.audio?.play_error ? (
+                <p className="error">The tracks cannot be played: {props.audio.play_error} (Audio settings above).</p>
+              ) : (
+                props.audio?.play_command && (
+                  <p className="muted">
+                    Plays with <code className="wrap">{props.audio.play_command}</code>
+                  </p>
+                )
+              )}
+              {rec?.recording && <p className="warn-box">A recording is running: stop it before a virtual soundcheck.</p>}
+            </>
+          )}
+        </div>
+      )}
       {replayingThis && (
         <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={duration} aria-valuenow={rec?.replay_at ?? 0}>
           <div className="progress-bar" style={{ width: `${duration ? (100 * (rec?.replay_at ?? 0)) / duration : 0}%` }} />
@@ -624,7 +669,7 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
           <p className="muted">It cannot be undone: take it home first (above) to keep it.</p>
         </ConfirmDialog>
       )}
-      {asking && (
+      {asking && !soundcheck && (
         <ConfirmDialog title="Replay this session?" confirm="Replay" onConfirm={() => void start()} onCancel={() => setAsking(false)}>
           <p>
             <strong>Replay writes the recorded settings to the console.</strong> It first sets the state at{" "}
@@ -633,6 +678,48 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
           <p className="muted">Faders and settings on the live console will move.</p>
         </ConfirmDialog>
       )}
+      {asking && soundcheck && (
+        <ConfirmDialog
+          title="Start a virtual soundcheck?"
+          confirm="Start the soundcheck"
+          onConfirm={() => void start()}
+          onCancel={() => setAsking(false)}
+        >
+          <p>
+            <strong>The {plural(tracks, "recorded track")} play to the console's card</strong> from {formatDuration(fromSeconds)},
+            and the console moves as recorded: its settings, faders and mutes change at once, then with every recorded change.
+          </p>
+          <p>
+            {toCard
+              ? "The console's inputs switch to the card (routing PLAY): the stage is not heard until the end or Stop, when they go back as they were."
+              : "The routing is left as it is: the console's inputs hear the card only if they are switched to it (Routing page, PLAY)."}
+          </p>
+          <p className="muted">tabula first saves the console's settings as a backup (Scenes → Scene files).</p>
+        </ConfirmDialog>
+      )}
     </section>
+  );
+}
+
+/** PlayRoutingNote says whether the console's inputs will hear the card during a virtual soundcheck. */
+export function PlayRoutingNote({ toCard }: { toCard: boolean }) {
+  // a fixed list: the hooks run in the same order every time
+  const values = [ROUTSWITCH, ...PLAY_BLOCKS.map((b) => `/config/routing/PLAY/${b}`)];
+  const texts = new Map(values.map((a) => [a, useValue(a)?.text]));
+  const r = playRouting((a) => texts.get(a));
+  if (!toCard && !r.playing) {
+    return <p className="warn-box">The console's inputs are on the stage (routing REC): they will not hear the tracks.</p>;
+  }
+  if (!r.card.length) {
+    return (
+      <p className="warn-box">
+        The PLAY routing takes no input from the card: set it on the Routing page (inputs 1-8 ← CARD1-8…), or the tracks are not heard.
+      </p>
+    );
+  }
+  return (
+    <p className="muted">
+      {r.playing ? "The inputs already hear the PLAY routing" : "The PLAY routing"} takes the card on inputs {r.card.join(", ")}.
+    </p>
   );
 }

@@ -359,6 +359,17 @@ func TestCustomRecorderIsLocalOnly(t *testing.T) {
 	if w := remote(h, "POST", "/api/audio/config", `{"enabled":true,"recorder":"arecord","device":"hw:0","tracks":"1-16"}`, g.Token); w.Code != http.StatusOK {
 		t.Errorf("remote engineer, arecord: %d %s", w.Code, w.Body)
 	}
+	// nor a command to play the tracks (a virtual soundcheck)
+	play := `{"enabled":true,"recorder":"arecord","device":"hw:0","tracks":"1-16","play_command":"sh -c 'touch /tmp/owned'"}`
+	if w := remote(h, "POST", "/api/audio/config", play, g.Token); w.Code != http.StatusForbidden {
+		t.Errorf("remote engineer, play command: %d %s", w.Code, w.Body)
+	}
+	if w := local(h, "POST", "/api/audio/config", play); w.Code != http.StatusOK {
+		t.Errorf("local, play command: %d %s", w.Code, w.Body)
+	}
+	if w := remote(h, "POST", "/api/audio/config", play, g.Token); w.Code != http.StatusOK {
+		t.Errorf("remote engineer, same play command: %d %s", w.Code, w.Body)
+	}
 
 	// With a password, the engineer signs in on this machine to choose one;
 	// a session from another device cannot.

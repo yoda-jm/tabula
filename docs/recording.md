@@ -110,9 +110,65 @@ the previous change, so a long replay does not drift: the changes arrive
 within about a millisecond of their time. Start from a time (`45`, `12:30`)
 or pick a marker (*Replay from here*). The API takes any speed.
 
-A replay moves the console, it plays no sound: to hear the show with its
-console moves, open the audio tracks with the markers (below). Writes must
-be armed, since a replay writes to the console.
+A replay moves the console; it plays no sound unless it is a virtual
+soundcheck (below). To hear the show elsewhere, open the audio tracks with
+the markers (below). Writes must be armed, since a replay writes to the
+console.
+
+## Virtual soundcheck
+
+A session recorded with its audio can be played back **through the
+console**: the tracks go back to the console's USB card, each on the card
+channel it was recorded from, while the console moves as recorded. The
+channels then hear the show as the band played it, and the show can be
+mixed again, or a soundcheck rehearsed, without the band. tabula does no
+mixing or editing of its own: the console mixes, as at the show.
+
+In the session's details (Record page), tick **Virtual soundcheck: play the
+recorded tracks to the console's card too**, choose where to start (a time
+or a marker) and **▶ Start the soundcheck**:
+
+- The console's inputs must hear the card. On the X32/M32 the inputs come
+  from the stage (routing *REC*) or from the playback routing (*PLAY*),
+  which takes the card from the factory (*1-8 ← CARD1-8*…; Routing page).
+  With **Switch the console's inputs to the card** (ticked by default),
+  tabula switches to *PLAY* for the time of the soundcheck and back as it
+  was at the end, or on **Stop** (even if writes were disarmed meanwhile:
+  the stage must be heard again). The page says which inputs the PLAY
+  routing takes from the card, and warns when none. The replay leaves this
+  switch alone: the session's own *REC* is neither restored nor replayed.
+- It plays at 1× only (the tracks are not sped up), from the chosen time;
+  before the first sample of the audio, silence plays. The tracks start
+  once the console holds the state of that time, with the first timed
+  change; they play to their end, after the last change, unless stopped.
+- tabula saves the console's settings first, as before every replay (a
+  backup in the scene files).
+- Not during a recording: stop it first. Nor during a test of the input.
+
+The tracks are streamed to a player program, as raw 32-bit samples with the
+session's channels and rate, read from the WAV files as they play: nothing
+is written to the disk. The player matches the recorder:
+
+| Recorder | Player |
+|---|---|
+| arecord | `aplay -D {device} -c {channels} -r {rate} -f S32_LE -t raw --buffer-time=200000 --period-time=10000 -` |
+| parecord | `pacat --playback --raw --format=s32le --rate={rate} --channels={channels} --no-remix --no-remap --latency-msec=50 -d {device}` |
+| ffmpeg (Linux) | `ffmpeg … -f s32le -ar {rate} -ac {channels} -i - -f alsa {device}` |
+| ffmpeg (macOS) | `ffmpeg … -f s32le -ar {rate} -ac {channels} -i - -f audiotoolbox -audio_device_index {device} -` (not tried) |
+
+The device is the one recorded from (an ALSA device plays and records; for
+PipeWire/PulseAudio, the card's output matching the source recorded,
+`alsa_output.…` for `alsa_input.…`), unless *Play the tracks to* in the
+audio settings says another. On Windows, or with a custom recorder, set
+*Command to play them*: it reads the raw samples on its standard input,
+with `{device}`, `{channels}` and `{rate}` replaced; like a custom recorder,
+only the machine running tabula chooses it.
+
+The tracks and the console moves start together, within the player's
+buffer (a fifth of a second with aplay). The card plays at its own clock,
+as when it recorded, so they stay in step over a whole show. Not tried yet
+with the DN32-USB: check the routing and a few seconds of sound before
+relying on it.
 
 ## Setting up on Linux
 
@@ -485,4 +541,5 @@ See [the API](API.md#audio): the audio settings, the devices, a test of the
 input, the exports and taking a show home
 ([API](API.md#taking-a-show-home)) are engineer-only; the capture's state rides on the
 record status, and so does the backup on the console's stick (`usb`, set
-with `POST /api/record/usb`).
+with `POST /api/record/usb`). A virtual soundcheck is a replay with `"audio":
+true` ([API](API.md#recording-and-replay)).

@@ -499,7 +499,14 @@ The session list says for each one how many console changes and markers it
 holds, and whether it has audio. Replay a session onto the console or the
 emulator, from a time or a marker, in real time (1×) or faster or slower
 (0.5× to 8×; writes must be armed): it moves the console as recorded, each
-change at its recorded time, and plays no sound. Export it for
+change at its recorded time. Ticked **Virtual soundcheck**, a session with
+audio also plays its tracks to the console's card, in step, at 1×: the
+console mixes the show again without the band; tabula can switch the
+console's inputs to the card (routing PLAY) for the time of it and back at
+the end, and says which inputs the PLAY routing takes from the card
+([recording](recording.md#virtual-soundcheck)). The audio settings tell
+which player plays them (*Play the tracks to*, and *Command to play them*
+for a custom recorder). Export it for
 Reaper or Audacity to listen to the audio with the markers. The details of
 a session also show what it keeps of the console at the start, with
 **⤓ Scene (.scn)** to open it in M32-Edit, and **Delete this session…**

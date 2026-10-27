@@ -56,6 +56,13 @@ type Config struct {
 	// s16le, s24le (3 bytes), s24-32le (24 bits in 4 bytes, ALSA's S24_LE),
 	// s32le (default) or f32le.
 	Input string `json:"input,omitempty"`
+	// PlayTo is the device a virtual soundcheck plays the tracks to; empty:
+	// the device recorded from (see PlayDevice).
+	PlayTo string `json:"play_to,omitempty"`
+	// PlayCommand replaces the player matching the recorder (PlayTemplate):
+	// {device}, {channels} and {rate} are replaced; it reads raw s32le
+	// samples on its standard input. A custom recorder needs one to play.
+	PlayCommand string `json:"play_command,omitempty"`
 	// USBBackup also starts the console's own recorder on its USB stick
 	// with every recording (a stereo backup made by the console). It is
 	// set apart, with POST /api/record/usb: saving the other settings keeps
@@ -99,6 +106,8 @@ func (c Config) Normalized() Config {
 	c.Tracks = strings.TrimSpace(c.Tracks)
 	c.Command = strings.TrimSpace(c.Command)
 	c.Input = strings.TrimSpace(c.Input)
+	c.PlayTo = strings.TrimSpace(c.PlayTo)
+	c.PlayCommand = strings.TrimSpace(c.PlayCommand)
 	return c
 }
 

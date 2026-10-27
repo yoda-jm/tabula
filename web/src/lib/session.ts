@@ -43,6 +43,8 @@ export interface Record {
   replaying: boolean;
   replay_of?: string;
   replay_at?: number;
+  /** the replay plays the session's tracks to the card too: a virtual soundcheck */
+  replay_audio?: boolean;
   error?: string;
   /** the audio capture of the recording (or of the last one) */
   audio?: AudioStatus;
@@ -88,8 +90,9 @@ export const sessionApi = {
   sessions: () => call<SessionSummary[]>("GET", "/api/sessions", undefined, SLOW),
   session: (name: string) => call<SessionDetail>("GET", "/api/sessions/" + encodeURIComponent(name), undefined, LONG),
   remove: (name: string) => call<void>("DELETE", "/api/sessions/" + encodeURIComponent(name), undefined, LONG),
-  replay: (session: string, from: number, speed: number) =>
-    call<Record>("POST", "/api/replay/start", { session, from, speed }, LONG),
+  /** replay moves the console as recorded; with audio, a virtual soundcheck (routing: the inputs go to the card meanwhile) */
+  replay: (session: string, from: number, speed: number, soundcheck?: { audio: true; routing: boolean }) =>
+    call<Record>("POST", "/api/replay/start", { session, from, speed, ...soundcheck }, LONG),
   stopReplay: () => call<Record>("POST", "/api/replay/stop", {}),
 };
 

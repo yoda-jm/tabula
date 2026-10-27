@@ -57,8 +57,9 @@ type Server struct {
 	allowedHosts []string // origin.go
 	mdns         mdnsName // mdns.go
 
-	lib   libraryState // library.go
-	audio audioState   // audio.go
+	lib   libraryState    // library.go
+	audio audioState      // audio.go
+	sc    soundcheckState // soundcheck.go
 
 	scenesDir string         // scenefiles.go
 	scenes    sceneLoadState // scenefiles.go

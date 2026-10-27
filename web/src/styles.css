@@ -632,6 +632,15 @@ input[type="range"] {
   padding: 2px 10px;
   text-decoration: none;
 }
+.soundcheck {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.soundcheck p {
+  margin: 0;
+}
 .session-delete {
   justify-content: flex-end;
   margin-top: 16px;

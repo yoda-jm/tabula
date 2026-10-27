@@ -625,6 +625,30 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
           </label>
         </div>
       )}
+      <div className="row">
+        <label className="grow">
+          <span className="field-label">Play the tracks to (virtual soundcheck, Replay below)</span>
+          <input
+            className="input mono"
+            type="text"
+            value={cfg.play_to ?? ""}
+            placeholder={view.play_device || "the device recorded from"}
+            onChange={(e) => set({ play_to: e.target.value })}
+          />
+        </label>
+        {(cfg.recorder === "custom" || !!cfg.play_command) && (
+          <label className="grow">
+            <span className="field-label">Command to play them (reads raw s32le; {"{device}"}, {"{channels}"}, {"{rate}"} replaced)</span>
+            <input
+              className="input mono"
+              type="text"
+              value={cfg.play_command ?? ""}
+              placeholder="aplay -D {device} -c {channels} -r {rate} -f S32_LE -t raw -"
+              onChange={(e) => set({ play_command: e.target.value })}
+            />
+          </label>
+        )}
+      </div>
       <label className="check">
         <input type="checkbox" checked={!!cfg.plain_names} onChange={(e) => set({ plain_names: e.target.checked })} />
         Name the files “Track 01”…, not after the console's routing (a device that is not the console's card)
@@ -632,6 +656,11 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
       {!dirty && view.command && (
         <p className="muted">
           Runs <code className="wrap">{view.command}</code>
+          {view.play_command && (
+            <>
+              ; plays the tracks of a virtual soundcheck with <code className="wrap">{view.play_command}</code>
+            </>
+          )}
         </p>
       )}
       <div className="row">
