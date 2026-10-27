@@ -1801,10 +1801,64 @@ div.scribble {
   font-size: 0.7rem;
   justify-content: center;
 }
-.iem-pan input {
-  width: 100%;
-  height: 24px;
-  margin: 0;
+button.iem-pan {
+  gap: 5px;
+  padding: 4px 6px 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  cursor: ew-resize;
+}
+button.iem-pan:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.iem-pan-track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+}
+.iem-pan-track::before {
+  /* the centre */
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--muted);
+}
+.iem-pan-mark {
+  position: absolute;
+  top: -3px;
+  width: 6px;
+  height: 12px;
+  margin-left: -3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.dialog.pan-sheet {
+  border-color: var(--line);
+}
+.pan-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  font-family: var(--mono);
+}
+.pan-sheet-row input {
+  flex: 1;
+  height: 44px;
+}
+.pan-sheet-value {
+  display: block;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 1.2rem;
 }
 .iem-pan-text {
   font-family: var(--mono);

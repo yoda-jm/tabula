@@ -20,6 +20,9 @@
     editor: clock source and sample rate, network settings, the card's
     settings, initialize, undo, formatting the X-Live! card, locking or
     shutting down the console, recalls typed by hand.
+- In-ear page: a swipe across the pans of a stereo mix scrolls the desk
+  instead of moving them; a tap on a pan opens a wide slider to change it
+  (dragged sideways with a mouse, as before) (#15).
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,

@@ -148,6 +148,18 @@ describe("pages", () => {
     for (let bus = 1; bus <= 16; bus++) render(<MixPage bus={bus} />);
   }, 60_000);
 
+  it("a stereo in-ear mix has pans", () => {
+    const link = (on: number) => store.applyChanges([{ addr: "/config/buslink/7-8", text: on ? "ON" : "OFF", value: on, origin: "console" }]);
+    link(1);
+    try {
+      const html = render(<MixPage bus={7} />);
+      expect(html).toContain("Buses 7-8, stereo");
+      expect(html).toContain("iem-pan-track");
+    } finally {
+      link(0);
+    }
+  });
+
   it("a musician's phone", () => {
     store.setAccess(musician);
     render(<MusicianApp />);

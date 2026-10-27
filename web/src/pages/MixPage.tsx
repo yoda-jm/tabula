@@ -7,7 +7,7 @@
 // (#/mix/3).
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode, RefObject } from "react";
+import type { KeyboardEvent, PointerEvent, ReactNode, RefObject } from "react";
 import { Fader } from "../components/Fader";
 import { StripMeter } from "../components/Meter";
 import { Scribble } from "../components/Scribble";
@@ -15,11 +15,11 @@ import { StreamBanner, Toasts, UpdateBanner } from "../components/shell";
 import { busLinkAddr, mixBuses } from "../lib/access";
 import { api } from "../lib/api";
 import type { MixSource } from "../lib/mix";
-import { masterBuses, mixSources } from "../lib/mix";
+import { masterBuses, mixSources, panLabel } from "../lib/mix";
 import { go, usePersistent } from "../lib/route";
 import type { Strip } from "../lib/strips";
 import { ALL_STRIPS, colourOf, stripAddrs } from "../lib/strips";
-import { prettyText } from "../lib/values";
+import { clamp01, prettyText, stepSize } from "../lib/values";
 import { keepAwake, wakeLockSupported } from "../lib/wakelock";
 import { useAccess, useCanWrite, useLeaf, useNodes, useSchema, useStatus, useValue } from "../store/hooks";
 import { store } from "../store/store";
@@ -291,29 +291,119 @@ function TallFader({ addr, also = [], label, meter }: { addr: string; also?: str
   );
 }
 
+/**
+ * PanSlider is a source's pan in the musician's mix. On a phone, a swipe
+ * across it scrolls the desk like anywhere else (a slider moved with every
+ * swipe): a tap opens a wide slider to change it. With a mouse it is also
+ * dragged sideways; the arrow keys nudge it, a double click centres it.
+ */
 function PanSlider({ addr, label }: { addr: string; label: string }) {
   const val = useValue(addr);
   const can = useCanWrite(addr);
+  const [open, setOpen] = useState(false);
+  const drag = useRef<{ x: number; v: number; w: number; id: number; moved: boolean } | null>(null);
   if (!val) return <span className="iem-pan" />;
-  const text = prettyText(val.text);
-  const shown = text === "+0" || text === "0" ? "C" : text.startsWith("-") ? "L" + text.slice(1) : "R" + text.replace("+", "");
+  const v = Number(val.value);
+  const shown = panLabel(prettyText(val.text));
+  const down = (e: PointerEvent<HTMLButtonElement>) => {
+    if (!can || e.pointerType !== "mouse" || e.button !== 0) return; // a touch: the tap opens the slider
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { x: e.clientX, v, w: Math.max(40, e.currentTarget.clientWidth), id: e.pointerId, moved: false };
+  };
+  const move = (e: PointerEvent<HTMLButtonElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId || (!d.moved && Math.abs(e.clientX - d.x) < 3)) return;
+    d.moved = true;
+    store.set(addr, clamp01(d.v + (e.clientX - d.x) / d.w));
+  };
+  const up = () => {
+    if (drag.current?.moved) store.flush(addr);
+  };
+  const key = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const delta = { ArrowLeft: -0.02, ArrowRight: 0.02 }[e.key];
+    if (!can || delta === undefined) return;
+    e.preventDefault();
+    store.set(addr, clamp01(v + delta));
+    store.flush(addr);
+  };
   return (
-    <label className="iem-pan">
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={Number(val.value)}
+    <>
+      <button
+        type="button"
+        className="iem-pan"
         disabled={!can}
-        aria-label={`Pan of ${label} in my mix`}
-        aria-valuetext={shown}
-        onChange={(e) => store.set(addr, Number(e.target.value))}
-        onPointerUp={() => store.flush(addr)}
-        onDoubleClick={() => can && store.set(addr, 0.5)}
-      />
-      <span className="iem-pan-text">{shown}</span>
-    </label>
+        aria-label={`Pan of ${label} in my mix: ${shown}`}
+        title={can ? "Tap to change the pan (drag it with a mouse, double click to centre it)" : undefined}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={() => (drag.current = null)}
+        onClick={() => {
+          const dragged = drag.current?.moved;
+          drag.current = null;
+          if (!dragged) setOpen(true);
+        }}
+        onDoubleClick={() => {
+          store.set(addr, 0.5);
+          setOpen(false);
+        }}
+        onKeyDown={key}
+      >
+        <span className="iem-pan-track" aria-hidden>
+          <span className="iem-pan-mark" style={{ left: `${v * 100}%` }} />
+        </span>
+        <span className="iem-pan-text">{shown}</span>
+      </button>
+      {open && <PanSheet addr={addr} label={label} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+/** PanSheet is the wide slider a tap on a pan opens: no swipe of the desk reaches it. */
+function PanSheet({ addr, label, onClose }: { addr: string; label: string; onClose(): void }) {
+  const val = useValue(addr);
+  const leaf = useLeaf(addr);
+  const done = useRef<HTMLButtonElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    done.current?.focus();
+    const esc = (e: globalThis.KeyboardEvent) => e.key === "Escape" && close.current();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, []);
+  const shown = val ? panLabel(prettyText(val.text)) : "—";
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="dialog pan-sheet" role="dialog" aria-modal="true" aria-labelledby="pan-title" onClick={(e) => e.stopPropagation()}>
+        <h2 id="pan-title">Pan of {label}</h2>
+        <div className="pan-sheet-row">
+          <span aria-hidden>L</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={stepSize(leaf?.field.type.steps) || 0.01}
+            value={Number(val?.value ?? 0.5)}
+            aria-label={`Pan of ${label} in my mix`}
+            aria-valuetext={shown}
+            onChange={(e) => store.set(addr, Number(e.target.value))}
+            onPointerUp={() => store.flush(addr)}
+            onKeyUp={() => store.flush(addr)}
+          />
+          <span aria-hidden>R</span>
+        </div>
+        <output className="pan-sheet-value">{shown}</output>
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={() => store.set(addr, 0.5)}>
+            Centre
+          </button>
+          <button ref={done} type="button" className="btn primary" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

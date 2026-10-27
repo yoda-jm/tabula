@@ -48,3 +48,9 @@ export function mixSources(
 export function masterBuses(buses: number[], fdrmute: boolean): number[] {
   return buses.length === 2 && !fdrmute ? buses : buses.slice(0, 1);
 }
+
+/** panLabel shows a pan as on the console's scale: "-40" → "L40", "+0" → "C", "+25" → "R25". */
+export function panLabel(text: string): string {
+  if (text === "+0" || text === "0" || text === "-0") return "C";
+  return text.startsWith("-") ? "L" + text.slice(1) : "R" + text.replace("+", "");
+}

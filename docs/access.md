@@ -67,9 +67,13 @@ The page is a small desk filling the phone's screen:
 - **★** keeps a source on the left (their own voice, the bass…), remembered
   on the phone. Sources without a name are hidden (**Options → Show unnamed
   sources** shows them).
-- A stereo in-ear mix (two linked buses) has a pan slider per source; the
+- A stereo in-ear mix (two linked buses) has a pan per source; the
   musician changes the odd bus and the console moves the other one. A
-  stereo source keeps the pans set on the console. **My volume** and its
+  swipe across the pans scrolls the desk like anywhere else, without moving
+  them: **tap a pan** to open a wide slider (with **Centre**) to change it.
+  With a mouse a pan is also dragged sideways, nudged with the arrow keys,
+  centred with a double click. A stereo source keeps the pans set on the
+  console. **My volume** and its
   mute move both buses, also when the console does not link their faders
   (*Config → link fader and mute* off).
 - Linking or unlinking the musician's bus on the console is followed at

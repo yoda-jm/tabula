@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { masterBuses, mixSources } from "./mix";
+import { masterBuses, mixSources, panLabel } from "./mix";
 import { ALL_STRIPS } from "./strips";
 
 const SOURCES = ALL_STRIPS.filter((s) => s.kind === "ch").slice(0, 6);
@@ -35,5 +35,11 @@ describe("masterBuses", () => {
     expect(masterBuses([3, 4], true)).toEqual([3]);
     expect(masterBuses([3, 4], false)).toEqual([3, 4]);
     expect(masterBuses([5], false)).toEqual([5]);
+  });
+});
+
+describe("panLabel", () => {
+  it("reads like the console's pan scale", () => {
+    expect(["-100", "-40", "+0", "0", "+25", "+100"].map(panLabel)).toEqual(["L100", "L40", "C", "C", "R25", "R100"]);
   });
 });
