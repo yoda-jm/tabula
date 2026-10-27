@@ -3,11 +3,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { api } from "../lib/api";
+import { api, editApi } from "../lib/api";
 import { audioTrouble } from "../lib/audio";
 import { linkQuality } from "../lib/link";
 import { formatDuration } from "../lib/session";
-import { useRecord, useSceneLoad, useStatus, useStream, useToasts } from "../store/hooks";
+import { useRecord, useSceneLoad, useStatus, useStream, useToasts, useUndo } from "../store/hooks";
 import { store } from "../store/store";
 
 export function ConfirmDialog(props: {
@@ -148,6 +148,52 @@ export function ArmControl() {
         </ConfirmDialog>
       )}
     </>
+  );
+}
+
+/**
+ * UndoButton undoes the engineer's last change made from tabula, newest
+ * first (a fader drag is one change); Ctrl+Z (⌘Z) does it outside a text
+ * field. Recalls and loads are not undone here: their backups are.
+ */
+export function UndoButton() {
+  const u = useUndo();
+  const s = useStatus();
+  const [busy, setBusy] = useState(false);
+  const armed = !!s.console?.armed;
+  const can = armed && !!u?.count && !busy;
+  const run = useRef<() => void>(() => {});
+  run.current = async () => {
+    if (!can) return;
+    setBusy(true);
+    const what = u?.what;
+    try {
+      store.setUndo(await editApi.undo());
+      store.toast(`Undone: ${what}`);
+    } catch (e) {
+      store.toast(`Undo: ${(e as Error).message}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "z" || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return; // the field's own undo
+      e.preventDefault();
+      run.current();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+  if (!u) return null;
+  const title = !u.count ? "Nothing to undo" : `Undo ${u.what}${armed ? "" : " (arm writes first)"} · Ctrl+Z`;
+  return (
+    <button type="button" className="btn undo" disabled={!can} onClick={() => run.current()} title={title} aria-label={title}>
+      <span aria-hidden>↶</span>
+      <span className="undo-text">Undo{u.count > 1 ? ` (${u.count})` : ""}</span>
+    </button>
   );
 }
 

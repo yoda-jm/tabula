@@ -248,6 +248,24 @@ export const api = {
   login: (password: string) => call<Whoami>("POST", "/api/login", { password }),
 };
 
+/** UndoView is what Undo would undo: the engineer's last change made from tabula (GET /api/undo, "undo" events). */
+export interface UndoView {
+  count: number;
+  /** "/ch/12/mix/fader (was -10.0)", "copy of /ch/01 (eq) to /ch/02" */
+  what?: string;
+  at?: string;
+}
+
+/** The sections of a strip that can be copied to others (POST /api/strips/copy). */
+export type CopySection = "preamp" | "delay" | "gate" | "dyn" | "eq" | "insert" | "sends" | "main";
+
+export const editApi = {
+  undoStatus: () => call<UndoView>("GET", "/api/undo"),
+  undo: () => call<UndoView>("POST", "/api/undo", {}),
+  copyStrip: (from: string, to: string[], sections: CopySection[]) =>
+    call<{ nodes: number }>("POST", "/api/strips/copy", { from, to, sections }),
+};
+
 export const accessApi = {
   list: () => call<AccessStatus>("GET", "/api/access"),
   add: (name: string, role: Role, bus?: number) => call<Grant>("POST", "/api/access", { name, role, bus }),

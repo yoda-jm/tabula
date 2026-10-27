@@ -73,6 +73,17 @@
   the answer is one of its own addresses. **Links use the laptop's name**
   on the Access page switches back to the IP address, for a phone that
   cannot open `.local` names. `GET /api/access` gives `name_url`.
+- Soundcheck helpers of M32-Edit and Mixing Station (#19):
+  - **↶ Undo** in the top bar (Ctrl+Z, ⌘Z) takes back the engineer's last
+    changes made from tabula, newest first: a fader dragged is one change,
+    the last 50 are kept (`GET`/`POST /api/undo`, `undo` events). Recalls
+    and loads are not undone there: their backups are;
+  - **Copy to…** on the Channel page copies sections of a strip (preamp,
+    delay, gate, dynamics, insert, EQ, sends, main) to other strips of its
+    kind in one step, one change for Undo (`POST /api/strips/copy`);
+  - Mixer: **+ Layer** makes banks of the strips you choose (kept by the
+    browser), and **SPILL** on a DCA shows the strips it controls, then the
+    DCA.
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,

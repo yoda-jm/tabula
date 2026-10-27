@@ -14,6 +14,14 @@ made in one shows in the others.
 (top right), after a confirmation. On a real console nothing moves by
 accident. Disarm to go back to read-only.
 
+**Undo.** **↶ Undo** (top bar, next to the arm button; Ctrl+Z or ⌘Z outside
+a text field) takes back the engineer's last change made from tabula: a
+fader, a field, a strip copied to others; its tooltip says which (*/ch/12/mix/fader
+(was -10.0)*). A fader dragged is one change; the last 50 are kept, until
+tabula connects again. It undoes only what tabula changed: not a move on
+the console's surface, a musician's change of their mix, a recall or a
+scene file load (those have their [backups](#scene-files)).
+
 **On a weak network.** When the page loses `tabula` (Wi-Fi gone, laptop
 asleep), a red bar says *Connection lost — reconnecting…* on every page and
 the meters go blank rather than freeze; the page reconnects by itself and
@@ -63,6 +71,20 @@ On a phone, the banks scroll sideways:
 
 ![The mixer on a phone](img/mixer-phone.png)
 
+**Your own layers.** **+ Layer** makes a bank of the strips you choose,
+whatever their kind (the singers' channels and their in-ear buses, the
+drums…), named as you like; it shows after the console's banks, its strips
+in the console's order. **Edit layer** changes or deletes it. Layers are
+kept by the browser (each device has its own).
+
+**DCA spill.** **SPILL** on a DCA strip (DCAs bank) shows the strips that
+DCA controls, then the DCA itself, as the console's spill does: a strip
+moved in or out of the DCA (its *DCA* groups, on the Channel page or the
+console) comes or goes at once. **Close the spill** goes back to the DCAs.
+
+![The spill of DCA 1: the five percussion channels it controls, then the
+DCA](img/gui-spill.png)
+
 **Linked pairs** (`/config/chlink`, `auxlink`, `fxlink`, `buslink`,
 `mtxlink`) show as one stereo strip, `Mtx 1-2` or `FX 1`, with the meters of
 both sides, when their faders and mutes follow each other (the link option
@@ -83,6 +105,14 @@ shown. The EQ comes right after the preamp, so its curve is on screen when
 the page opens; the other sections fill balanced columns.
 
 ![A vocal channel: the EQ with the RTA after the EQ behind its curve, band 3 selected](img/channel.png)
+
+**Copy to…** (next to the strip's name, armed writes) copies sections of
+the strip to other strips of its kind in one step, as the console's copy
+does: tick what (preamp, delay, gate, dynamics, insert, EQ, sends, main:
+gate, dynamics and EQ by default; the preamp without the headamp's gain and
+48 V, which belong to the input) and to which strips (**All**, or by name).
+The copy is one change for **↶ Undo**. Channels copy to channels, buses to
+buses…; L/R, M/C and the DCAs are not copied.
 
 **EQ curve.** Each band has a numbered handle on the curve: drag it
 sideways for its frequency, up and down for its gain (the cuts and the

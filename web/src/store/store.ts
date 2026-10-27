@@ -13,7 +13,7 @@
 
 import { mayWrite } from "../lib/access";
 import { ApiError, api as realApi } from "../lib/api";
-import type { Change, Online, RawValue, StateNode, Status, Whoami } from "../lib/api";
+import type { Change, Online, RawValue, StateNode, Status, UndoView, Whoami } from "../lib/api";
 import { indexSchema, parentOf, resolveFields } from "../lib/schema";
 import type { Field, Leaf, Schema } from "../lib/schema";
 import { KeyedThrottle } from "../lib/throttle";
@@ -73,6 +73,8 @@ export class Store {
   sceneLoad: SceneProgress | null = null;
   /** which devices have a page open ("online" events, engineers only); null until one comes */
   online: Online | null = null;
+  /** what Undo would undo (engineers only) */
+  undo: UndoView | null = null;
   toasts: Toast[] = [];
   /** bumped when the whole state is (re)loaded or cleared */
   stateVersion = 0;
@@ -366,6 +368,11 @@ export class Store {
   setOnline(o: Online) {
     this.online = o;
     this.notify(["online"]);
+  }
+
+  setUndo(u: UndoView | null) {
+    this.undo = u;
+    this.notify(["undo"]);
   }
 
   /** recordElapsed is the recording's elapsed time: the server's duration plus the time since it was sent. */

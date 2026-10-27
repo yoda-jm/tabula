@@ -205,6 +205,7 @@ entries `/-usb/dir/001`…`999` are lazy nodes: not read when connecting.
   browser too slow to take them) — reload `/api/state`;
 - `record`: a `Record` (recording, replay, audio);
 - `scenefile`: a `SceneProgress` while a scene file is sent to the console;
+- `undo`: an `UndoView` when what Undo would undo changed, to engineers only;
 - `meters`: `{"id": "1", "values": [...]}` for the meter groups named when
   opening the stream, e.g. `/api/events?meters=1,2,6:12` (`N` is
   `/meters/N`, `N:a:b` adds its parameters: `5:0:0` channels 1-16 + DCAs,
@@ -302,6 +303,9 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | DELETE | `/api/sessions/{name}` | | 204: the session folder is removed, audio included (not `audio.json`); 409 while it is recorded or replayed |
 | POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console) |
 | POST | `/api/replay/stop` | | `Record` |
+| GET | `/api/undo` | | `UndoView`: `{"count", "what"?, "at"?}`, what Undo takes back (the engineer's last change made from tabula) |
+| POST | `/api/undo` | | `UndoView` after undoing the last step: the values it overwrote are sent back to the console; 403 unless writes are armed; 409 when there is nothing to undo; 502 when the console does not answer (a step not started stays) |
+| POST | `/api/strips/copy` | `{"from": "/ch/01", "to": ["/ch/02"], "sections": ["eq", "dyn"]}` | `{"nodes"}`: the sections' nodes (`preamp`, `delay`, `gate`, `dyn`, `insert`, `eq`, `sends`: `mix/01`…, `main`: `mix`) sent to each target with the `/` command; one undo step. Strips of the same kind only (`ch`, `auxin`, `fxrtn`, `bus`, `mtx`); 400 otherwise or when none has the sections; 403 unless armed |
 
 `Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", "audio"?, "usb_backup"?, …}, "replaying", "replay_of"?, "replay_at"?, "error"?, "audio"?, "usb"}`.
 `usb` is the backup on the console's USB stick: `{"on" (the setting),

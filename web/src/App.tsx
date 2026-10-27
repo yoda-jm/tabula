@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { ArmControl, AudioBanner, ConnectionPill, RecIndicator, StreamBanner, Toasts, UpdateBanner } from "./components/shell";
+import { ArmControl, AudioBanner, ConnectionPill, RecIndicator, StreamBanner, Toasts, UndoButton, UpdateBanner } from "./components/shell";
 import { atLeast } from "./lib/access";
 import type { Role } from "./lib/api";
 import { api } from "./lib/api";
@@ -87,6 +87,7 @@ function ConsoleApp({ role }: { role: Role }) {
           <ConnectionPill onClick={() => engineer && go({ page: "connect" })} />
           <span className="topbar-gap" />
           <RecIndicator onClick={() => engineer && go({ page: "record" })} />
+          {engineer && <UndoButton />}
           {engineer ? <ArmControl /> : <span className="pill readonly">read-only</span>}
           {who?.session && <SignOut />}
         </header>

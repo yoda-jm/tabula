@@ -16,6 +16,7 @@ import { useCanWrite, useLeaf, useNodes, useSchema, useValue } from "../store/ho
 import { lookup } from "../store/lookup";
 import { store } from "../store/store";
 import { FieldRow, Fields, NotConnected, Section } from "./common";
+import { CopyStripButton } from "./CopyStrip";
 
 export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: string): void }) {
   const schema = useSchema();
@@ -48,6 +49,7 @@ export function ChannelPage({ path, onSelect }: { path?: string; onSelect(path: 
           ›
         </button>
         <LinkNote strip={strip} />
+        <CopyStripButton strip={strip} />
         {a.on && (
           <span className="channel-mute">
             <ParamControl addr={a.on} mute />

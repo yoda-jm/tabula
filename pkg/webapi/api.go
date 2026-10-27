@@ -63,6 +63,7 @@ type Server struct {
 	scenesDir string         // scenefiles.go
 	scenes    sceneLoadState // scenefiles.go
 	backupErr string         // scenebackup.go
+	undo      undoState      // undo.go
 	usb       usbState       // usb.go
 	backup    usbBackupState // usbbackup.go
 	home      homeState      // takehome.go
@@ -107,6 +108,9 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("DELETE /api/sessions/{name}", s.deleteSession)
 	mux.HandleFunc("POST /api/replay/start", s.replayStart)
 	mux.HandleFunc("POST /api/replay/stop", s.replayStop)
+	mux.HandleFunc("GET /api/undo", s.getUndo)
+	mux.HandleFunc("POST /api/undo", s.postUndo)
+	mux.HandleFunc("POST /api/strips/copy", s.copyStrips)
 	s.accessRoutes(mux)
 	s.libraryRoutes(mux)
 	s.sceneFileRoutes(mux)
@@ -556,8 +560,15 @@ func (s *Server) set(w http.ResponseWriter, r *http.Request) {
 			s.backupBefore(what)
 		}
 	}
+	prev := ""
+	if l := c.Mirror().Schema().Leaf(req.Addr); l != nil && err == nil && who.Role == RoleEngineer {
+		prev = c.Mirror().LeafLine(l)
+	}
 	if err == nil {
 		err = c.SetAs(req.Addr, arg, who.origin(), unarmed)
+	}
+	if err == nil && prev != "" {
+		s.noteWrite(c.Mirror(), req.Addr, prev) // undo.go
 	}
 	switch {
 	case errors.Is(err, console.ErrReadOnly):

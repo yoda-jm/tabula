@@ -1,5 +1,5 @@
 // The Server-Sent Events stream (/api/events): status, change, resync,
-// record, scenefile, access, online, meters and ping. The stream is reopened with a backoff if
+// record, scenefile, access, online, undo, meters and ping. The stream is reopened with a backoff if
 // it drops, and the whole state is reloaded after each (re)open, as changes
 // may have been missed in between. A stream that drops because the access
 // was deleted is not reopened. The server pings every 5 s: a stream silent
@@ -13,6 +13,7 @@
 
 import type { Status } from "../lib/api";
 import { api } from "../lib/api";
+import { editApi } from "../lib/api";
 import { sessionApi } from "../lib/session";
 import type { Store } from "./store";
 
@@ -26,7 +27,7 @@ export const SWAP_DELAY = 150;
 export const QUIET = 15000;
 
 /** The events of the stream: any of them shows it is alive. */
-const EVENTS = ["status", "change", "resync", "record", "scenefile", "access", "online", "meters", "ping"];
+const EVENTS = ["status", "change", "resync", "record", "scenefile", "access", "online", "undo", "meters", "ping"];
 
 export function startEvents(store: Store, meters = METER_GROUPS): () => void {
   let es: EventSource | null = null; // the stream in use
@@ -46,6 +47,13 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
       (r) => store.setRecord(r),
       () => store.setRecord(null), // a tabula without recording support
     );
+  const refreshUndo = () => {
+    if (store.access?.role !== "engineer") return;
+    editApi.undoStatus().then(
+      (u) => store.setUndo(u),
+      () => store.setUndo(null),
+    );
+  };
 
   /** open opens a stream; with swap, it replaces the open one once it has started. */
   const open = (swap = false) => {
@@ -113,6 +121,7 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
         fresh = false;
         if (!store.schema) void store.loadSchema(); // tabula was not reachable when the page opened
         void refreshRecord();
+        refreshUndo();
         if (s.connected && !s.connecting) void store.reloadState();
       }
     });
@@ -120,7 +129,9 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
       if (live()) store.applyChanges(JSON.parse((e as MessageEvent).data));
     });
     src.addEventListener("resync", () => {
-      if (live()) void store.reloadState();
+      if (!live()) return;
+      void store.reloadState();
+      refreshUndo(); // another connection: its own steps
     });
     src.addEventListener("record", (e) => {
       if (live()) store.setRecord(JSON.parse((e as MessageEvent).data));
@@ -133,6 +144,9 @@ export function startEvents(store: Store, meters = METER_GROUPS): () => void {
     });
     src.addEventListener("online", (e) => {
       if (live()) store.setOnline(JSON.parse((e as MessageEvent).data));
+    });
+    src.addEventListener("undo", (e) => {
+      if (live()) store.setUndo(JSON.parse((e as MessageEvent).data));
     });
     src.addEventListener("meters", (e) => {
       if (!live()) return;

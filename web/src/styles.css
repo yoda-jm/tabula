@@ -144,6 +144,17 @@ h4 {
 .pill.bad .dot {
   background: var(--danger);
 }
+.btn.undo {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  gap: 6px;
+}
+@media (max-width: 640px) {
+  .undo-text {
+    display: none; /* the arrow alone on a phone's top bar */
+  }
+}
 .pill-link {
   flex: none;
   padding: 1px 7px;
@@ -3153,4 +3164,90 @@ code.wrap {
 }
 .safes-more[open] > summary {
   margin-bottom: 10px;
+}
+
+/* Channel page: Copy to… */
+.copy-dialog fieldset {
+  margin: 0 0 12px;
+  padding: 8px 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.copy-dialog legend {
+  padding: 0 6px;
+  color: var(--muted);
+}
+.copy-sections {
+  display: flex;
+  flex-direction: column;
+}
+.copy-sections .check {
+  min-height: 32px;
+}
+.copy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.copy-target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.copy-target.on {
+  background: var(--panel-3);
+}
+.copy-target .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mixer: the engineer's layers and a DCA's spill */
+.bank.own {
+  font-style: italic;
+}
+.bank.add {
+  color: var(--muted);
+  border-style: dashed;
+}
+.layer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+.btn.small {
+  min-height: 28px;
+  padding: 2px 10px;
+  font-size: 0.8rem;
+}
+.btn.spill {
+  font-size: 0.75rem;
+}
+.layer-dialog {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.dialog.layer-dialog {
+  border-color: var(--line); /* it changes nothing on the console */
+}
+.layer-dialog fieldset {
+  margin: 10px 0 0;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.layer-dialog legend {
+  padding: 0 6px;
+  color: var(--muted);
 }

@@ -94,6 +94,13 @@ func (h *hub) publish(event string, v any) {
 	h.publishLocked(event, v, nil)
 }
 
+// publishEngineers sends an event to the engineers' streams only.
+func (h *hub) publishEngineers(event string, v any) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.publishLocked(event, v, func(sb *sub) bool { return sb.engineer })
+}
+
 // publishLocked sends an event to the streams to (all of them when nil)
 // allows.
 func (h *hub) publishLocked(event string, v any, to func(*sub) bool) {
@@ -210,7 +217,8 @@ func (h *hub) publishOnlineLocked() {
 // events streams Server-Sent Events: "status" (connection state), "change"
 // (an array of changed parameters), "resync" (reload the state), "record",
 // "access" (the musicians' write permission changed), "online" (which
-// devices have a page open, for engineers only), "meters" for the groups
+// devices have a page open, for engineers only), "undo" (what Undo would
+// undo, for engineers only), "meters" for the groups
 // named in ?meters=, and "ping" every 5 s.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
