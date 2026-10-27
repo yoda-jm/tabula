@@ -64,6 +64,7 @@ type Server struct {
 	backupErr string         // scenebackup.go
 	usb       usbState       // usb.go
 	backup    usbBackupState // usbbackup.go
+	home      homeState      // takehome.go
 
 	version string    // about.go
 	logFile string    // about.go
@@ -110,6 +111,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	s.sceneFileRoutes(mux)
 	s.usbRoutes(mux)
 	s.audioRoutes(mux)
+	s.homeRoutes(mux)
 	mux.Handle("/", ui)
 	return s.protect(gzipJSON(s.guard(mux)))
 }

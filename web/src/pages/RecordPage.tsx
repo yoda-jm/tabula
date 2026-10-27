@@ -14,6 +14,7 @@ import { useCanWrite, useRecord, useStatus } from "../store/hooks";
 import { store } from "../store/store";
 import type { Audio } from "./AudioPanel";
 import { AudioPanel, CheckProblems, SessionAudio, saveDraft, useAudio, useUnsaved } from "./AudioPanel";
+import { TakeHome } from "./TakeHome";
 import { UsbBackupCard } from "./UsbBackup";
 
 const SPEEDS = [0.5, 1, 2, 3, 4, 8];
@@ -525,6 +526,7 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
       )}
 
       {detail && <SessionAudio detail={detail} />}
+      {detail && <TakeHome detail={detail} recording={!!rec?.recording} recordingThis={recordingThis} />}
 
       <h4>Replay onto the console</h4>
       <p className="muted">
@@ -619,7 +621,7 @@ function Session({ name, rec, onDeleted }: { name: string; rec: RecordStatus | n
             {plural(detail?.meta.markers ?? 0, "marker")}
             {audio ? `, and ${plural(audio.tracks?.length ?? 0, "audio file")} (${formatBytes(audioBytes)})` : ""}.
           </p>
-          <p className="muted">It cannot be undone: copy the folder first to keep it.</p>
+          <p className="muted">It cannot be undone: take it home first (above) to keep it.</p>
         </ConfirmDialog>
       )}
       {asking && (

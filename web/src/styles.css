@@ -2502,6 +2502,19 @@ pre.skipped {
 .exports {
   margin-bottom: 8px;
 }
+.copy-to {
+  margin: 12px 0 4px;
+}
+.copy-progress {
+  align-items: center;
+  margin-top: 8px;
+}
+.copy-progress .progress {
+  margin: 0;
+}
+.copy-done {
+  color: var(--ok);
+}
 a.btn {
   display: inline-flex;
   align-items: center;

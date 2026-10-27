@@ -446,7 +446,12 @@ change at its recorded time, and plays no sound. Export it for
 Reaper or Audacity to listen to the audio with the markers. The details of
 a session also show what it keeps of the console at the start, with
 **⤓ Scene (.scn)** to open it in M32-Edit, and **Delete this session…**
-removes it, audio included, after asking. When lines of its change log could
+removes it, audio included, after asking. **Take it home** downloads the
+whole session as one zip, or copies it to a USB disk plugged into the
+machine running tabula, its tracks as recorded (WAV) or in FLAC (about half
+the size), without writing anything on that machine's disk; the copy checks
+the disk has room first, shows its progress and can be cancelled
+([recording](recording.md#taking-a-show-home)). When lines of its change log could
 not be read (a recording cut short by a power cut), the details say how many
 changes are missing, and where. See [recording](recording.md#replaying-a-session) and the
 [API](API.md#recording-and-replay) for the session format.

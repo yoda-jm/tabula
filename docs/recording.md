@@ -373,6 +373,57 @@ the console writes it), `value` (raw), `origin` (`console`, `console, read back`
 for a change lost on the network and found again, `local`, or `web <name>`
 for an access link), `label` (markers).
 
+## Taking a show home
+
+After a show, a session is a folder of large WAV files on the stage laptop
+(16.6 GB an hour for 32 tracks). In its details on the Record page, **Take
+it home** sends the whole folder in one go: the console at the start, its
+changes and markers, the exports and the tracks. Nothing is written on the
+laptop's disk on the way, whatever the size: its free space stays for the
+next show.
+
+![Take it home: WAV or FLAC, a zip, or a copy to a disk plugged into the laptop](img/take-home.png)
+
+**WAV, as recorded**, or **FLAC**: lossless, about half the size. The
+tracks are converted by ffmpeg while they are sent or copied (the `ffmpeg`
+package on Linux; on macOS and Windows the ffmpeg tabula records with,
+see [below](#on-macos-and-windows)). Live tracks shrink to 50–65 %, silent
+ones to almost nothing; the page gives an estimate (70 %). 32-bit tracks
+become 24-bit FLAC files: the console's card sends 24-bit audio. The FLAC
+files say their length, but carry no MD5 checksum (they are written as they
+are made; the zip's own checksums cover the transfer). The Reaper project
+of a FLAC copy points at the FLAC files; keep the WAV version to put a
+session back into a sessions folder.
+
+**⤓ Download as a zip**: one zip of the folder (`2026-10-25_203512/…`,
+or `2026-10-25_203512 FLAC/…`), made while it downloads. The device
+downloading it needs the room. The tracks are stored as they are (audio
+does not compress), the other files compressed; the small files come
+first, so a download cut short still holds the console's part. Over Wi-Fi,
+a show of 25 GB takes a while: a USB disk on the laptop is faster.
+
+**Copy to a disk plugged into the machine running tabula** (a USB disk or
+stick on the stage laptop): choose the disk, **Copy**. The list has the
+disks mounted under `/media`, `/run/media` or `/mnt` on Linux (where
+desktops mount USB disks), in `/Volumes` on macOS, the other drives on
+Windows; not the one holding the sessions. A read-only disk shows, but
+cannot be chosen. tabula checks first that the disk has room for the
+session (or the FLAC estimate) plus 16 MB, and refuses if not, saying what
+it takes and what is free. The session goes into `tabula/2026-10-25_203512`
+on the disk (`… FLAC` for FLAC), first into a folder named
+`2026-10-25_203512 (copying)`, renamed once every file is there: a copy cut
+short (the disk unplugged, the laptop stopped) never looks complete.
+**Cancel**, a failure or a full disk remove what was copied. Each file is
+flushed to the disk before the next, and keeps its date; eject the disk
+before unplugging it. One copy at a time; a session already on the disk is
+not copied again (delete it there first). A FAT32 stick takes files up to
+4 GB: format a large disk as exFAT.
+
+The session being recorded cannot be taken home: its files are complete
+once the recording stops. Another session can, during a recording, but
+copying or downloading reads the disk the show is recorded on: the page
+says so. Better once the show is over.
+
 ## Command-line flags
 
 | Flag | Default | |
@@ -431,6 +482,7 @@ these systems, only a failure of the recorder is told.
 ## API
 
 See [the API](API.md#audio): the audio settings, the devices, a test of the
-input and the exports are engineer-only; the capture's state rides on the
+input, the exports and taking a show home
+([API](API.md#taking-a-show-home)) are engineer-only; the capture's state rides on the
 record status, and so does the backup on the console's stick (`usb`, set
 with `POST /api/record/usb`).

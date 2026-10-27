@@ -298,7 +298,7 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | POST | `/api/record/stop` | | `Record` |
 | POST | `/api/record/usb` | `{"on": true}` | `Record`: turns the backup on the console's USB stick on or off for the next recordings (kept in `audio.json` as `usb_backup`, which `POST /api/audio/config` leaves as it is); turned on during a recording, it starts now |
 | GET | `/api/sessions` | | `[{"name", "meta"}]`, newest first |
-| GET | `/api/sessions/{name}` | | `{"name", "meta", "markers": [Event], "snapshot", "scene"}`: `snapshot` counts the node lines of the console at the start (`start.scn` and `start.nodes`), `scene` says whether `start.scn` is there |
+| GET | `/api/sessions/{name}` | | `{"name", "meta", "markers": [Event], "snapshot", "scene", "size", "flac_size"?}`: `snapshot` counts the node lines of the console at the start (`start.scn` and `start.nodes`), `scene` says whether `start.scn` is there; `size` is the bytes of the session's folder, `flac_size` about what it takes with its WAV tracks in FLAC (see [Taking a show home](#taking-a-show-home)) |
 | DELETE | `/api/sessions/{name}` | | 204: the session folder is removed, audio included (not `audio.json`); 409 while it is recorded or replayed |
 | POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console) |
 | POST | `/api/replay/stop` | | `Record` |
@@ -332,6 +332,30 @@ unattended recording of a concert. `POST /api/record/start` waits (5 s at
 most) for an input test running, or a recording ended by a disconnect, to
 free the card; 409 if it does not. `Record.error` says when the console's
 changes cannot be written (a full disk): those after it are lost.
+
+## Taking a show home
+
+A whole session, downloaded as one zip or copied to a disk plugged into
+the machine running tabula (a USB disk), its WAV tracks as they are or
+converted to FLAC by ffmpeg on the way. Nothing is written on that
+machine's disk. Engineer only; the session being recorded is refused (409:
+its files are complete once it stops), and so is FLAC without ffmpeg (409).
+See [recording](recording.md#taking-a-show-home).
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/api/sessions/{name}/zip` (`?flac=1`) | | a download, `<name>.zip` (`<name> FLAC.zip`), made while it is sent: the folder's files under `<name>/` (`<name> FLAC/`), the small ones first, the tracks stored (not compressed), the others deflated. With FLAC, `audio/*.wav` become `audio/*.flac` and `<name>.rpp` points at them. A failure cuts the download (logged) |
+| GET | `/api/disks` | | `{"disks": [{"path", "name", "free", "size", "writable"}], "flac"}`: the disks a session can be copied to (Linux: mounted under `/media`, `/run/media`, `/mnt`; macOS: `/Volumes`; Windows: the other drives), not the one holding the sessions; `free` and `size` in bytes (-1 unknown); `flac` says ffmpeg is there |
+| POST | `/api/sessions/{name}/copy` | `{"disk": path, "flac": false}` | 202 + `Copy`: copies the session into `<disk>/tabula/<name>` (`<name> FLAC`), through `<name> (copying)`, renamed once complete. 400 for a disk not listed, 409 when read-only, when the session is already there, or while another copy runs; 507 when the disk has less room than the session (the FLAC estimate) plus 16 MB |
+| GET | `/api/copy` | | `Copy`, the copy running or the last one (`null` before any) |
+| POST | `/api/copy/stop` | | `Copy`: cancels the copy running; what it copied is removed |
+
+`Copy`: `{"session", "disk", "folder" (where it is once complete), "flac",
+"done", "total" (bytes read from the sessions' disk), "files", "of",
+"file"? (being copied), "state": "copying"|"done"|"failed"|"cancelled",
+"error"?, "recording"? (started while a show was being recorded),
+"started", "ended"?}`. A copy that does not end `done` leaves nothing on
+the disk.
 
 ## Audio
 

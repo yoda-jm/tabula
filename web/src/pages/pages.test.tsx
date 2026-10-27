@@ -29,6 +29,7 @@ import { RecordPage } from "./RecordPage";
 import { RoutingPage } from "./RoutingPage";
 import { SceneSafes, SnippetFilters } from "./Safes";
 import { SceneFiles } from "./SceneFiles";
+import { TakeHome } from "./TakeHome";
 import { ScenesPage } from "./ScenesPage";
 import { UsbPage } from "./UsbPage";
 
@@ -145,6 +146,20 @@ describe("pages", () => {
     expect(record).toContain("USB stick");
     expect(render(<ConnectPage />)).toContain("tabula-emu");
     render(<AccessPage />);
+  });
+
+  it("taking a session home", () => {
+    const detail = {
+      name: "2026-10-25_203512",
+      meta: { start: "2026-10-25T20:35:12Z", events: 120, markers: 3, duration: 5400,
+        audio: { rate: 48000, bits: 24, channels: 32, offset: 0.1, frames: 2.6e8, tracks: [{ channel: 1, name: "Kick", file: "audio/01 Kick.wav" }] } },
+      size: 12.3e9,
+      flac_size: 8.6e9,
+    };
+    const html = render(<TakeHome detail={detail} recording={false} recordingThis={false} />);
+    expect(html).toContain("Download as a zip");
+    expect(html.replace(/<!-- -->/g, "")).toContain("FLAC · about 8.6 GB");
+    expect(render(<TakeHome detail={detail} recording={true} recordingThis={true} />)).toContain("still being recorded");
   });
 
   it("every in-ear mix", () => {

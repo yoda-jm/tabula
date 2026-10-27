@@ -71,6 +71,9 @@ export interface SessionDetail extends SessionSummary {
   scene?: boolean;
   /** lines of the change log (events.jsonl, from 1) that could not be read: their changes are missing */
   damaged?: number[];
+  /** bytes of the session's folder; about what it takes with its tracks in FLAC (lib/takehome.ts) */
+  size?: number;
+  flac_size?: number;
 }
 
 export const sessionApi = {

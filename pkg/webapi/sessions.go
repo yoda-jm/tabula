@@ -200,6 +200,10 @@ type sessionView struct {
 	// Damaged lists the lines of the change log that could not be read:
 	// their changes are missing from the session.
 	Damaged []int `json:"damaged,omitempty"`
+	// Size is the bytes of the session's folder; FLACSize about what it
+	// takes with its tracks in FLAC (takehome.go), when it has WAV tracks.
+	Size     int64 `json:"size,omitempty"`
+	FLACSize int64 `json:"flac_size,omitempty"`
 }
 
 // openSession opens a session, logging the lines of its change log that
@@ -255,8 +259,17 @@ func (s *Server) getSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = os.Stat(filepath.Join(dir, "start.scn"))
-	writeJSON(w, http.StatusOK, sessionView{Name: filepath.Base(dir), Meta: ses.Meta, Markers: ses.Markers(),
-		Snapshot: len(ses.Start), Scene: err == nil, Damaged: ses.Damaged})
+	v := sessionView{Name: filepath.Base(dir), Meta: ses.Meta, Markers: ses.Markers(),
+		Snapshot: len(ses.Start), Scene: err == nil, Damaged: ses.Damaged}
+	if files, err := ses.HomeFiles(false); err == nil {
+		v.Size, _ = session.HomeSize(files)
+	}
+	if files, err := ses.HomeFiles(true); err == nil {
+		if size, exact := session.HomeSize(files); !exact {
+			v.FLACSize = size
+		}
+	}
+	writeJSON(w, http.StatusOK, v)
 }
 
 // deleteSession removes a session and its audio files, unless it is being

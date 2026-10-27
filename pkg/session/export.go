@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -48,7 +49,7 @@ func (s *Session) ExportFile(format string) (string, error) {
 func (s *Session) Export(w io.Writer, format string) error {
 	switch format {
 	case ExportReaper:
-		return s.writeReaper(w)
+		return s.writeReaper(w, nil)
 	case ExportAudacity:
 		return s.writeLabels(w)
 	case ExportCSV:
@@ -99,8 +100,9 @@ func (s *Session) AudioTime(t float64) float64 {
 // audio file is an item on its own track, starting when its first sample
 // was captured, and the markers are project markers at the place of the
 // audio they were set on. Paths are relative to the session directory:
-// the project opens from there.
-func (s *Session) writeReaper(w io.Writer) error {
+// the project opens from there. The tracks in flac are FLAC files instead
+// of WAV files (a session taken home converted, takehome.go).
+func (s *Session) writeReaper(w io.Writer, flac map[string]bool) error {
 	a := s.Meta.Audio
 	rate := 48000
 	offset := 0.0
@@ -123,9 +125,13 @@ func (s *Session) writeReaper(w io.Writer) error {
 			}
 			name := strings.TrimSuffix(filepath.Base(t.File), filepath.Ext(t.File))
 			fmt.Fprintf(b, "  <TRACK\n    NAME %s\n", rppString(name))
+			file, source := t.File, "WAVE"
+			if flac[t.File] {
+				file, source = flacName(t.File), "FLAC"
+			}
 			fmt.Fprintf(b, "    <ITEM\n      POSITION %s\n      LENGTH %s\n      NAME %s\n",
-				seconds(shift+offset), seconds(float64(frames)/float64(a.Rate)), rppString(filepath.Base(t.File)))
-			fmt.Fprintf(b, "      <SOURCE WAVE\n        FILE %s\n      >\n    >\n  >\n", rppString(t.File))
+				seconds(shift+offset), seconds(float64(frames)/float64(a.Rate)), rppString(path.Base(file)))
+			fmt.Fprintf(b, "      <SOURCE %s\n        FILE %s\n      >\n    >\n  >\n", source, rppString(file))
 		}
 	}
 	b.WriteString(">\n")
