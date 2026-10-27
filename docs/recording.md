@@ -8,7 +8,11 @@ title: Recording a show, with its audio
 
 - **The console** (always): its settings, not its sound. A snapshot of the
   console when the recording starts, every change made afterwards with its
-  time (who moved which fader, when), and markers.
+  time (who moved which fader, when), and markers. tabula adds the markers
+  *console lost* and *console back* when the console stops answering and
+  when it answers again (synced again), and a change lost on the Wi-Fi and
+  found again by reading the console back is kept with the origin
+  `console, read back`, at the time it was found.
 - **The audio** (when enabled): **one WAV file per track** of the console's
   USB card, recorded by the same program so that the tracks and the console
   moves line up.
@@ -365,8 +369,9 @@ Import the files as new tracks at the session start; the markers are in
 
 `time` (session seconds), `audio_time` (seconds in the files), `clock` (date
 and time), `type` (`change` or `marker`), `address`, `text` (the value as
-the console writes it), `value` (raw), `origin` (`console`, `local`, or
-`web <name>` for an access link), `label` (markers).
+the console writes it), `value` (raw), `origin` (`console`, `console, read back`
+for a change lost on the network and found again, `local`, or `web <name>`
+for an access link), `label` (markers).
 
 ## Command-line flags
 

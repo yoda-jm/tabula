@@ -26,12 +26,23 @@ client accepts it.
     "info": {"server_version": "V2.07", "server_name": "osc-server", "model": "M32C",
              "firmware": "4.06", "ip": "127.0.0.1", "name": "tabula-emu"},
     "connected": true, "synced": 3243, "total": 3243, "missing": [],
-    "armed": false, "last_seen": "2026-10-17T12:36:52Z"
+    "armed": false, "last_seen": "2026-10-17T12:36:52Z",
+    "link": {"rtt_ms": 3.4, "asked": 100, "lost": 0, "caught": 1,
+             "last_caught": "/ch/05/mix/fader  -10.2", "caught_at": "2026-10-27T21:14:05Z"}
   }
 }
 ```
 
 `connecting` stays true until the initial sync is over (`synced` reaches `total`).
+
+`link` is measured by the read-back: while connected, tabula asks the
+console for every node again, 25 a second (the mix nodes every other
+time). `rtt_ms` is the smoothed round trip, `lost` how many of the last
+`asked` (up to 100) went unanswered within a second, `caught` how many
+values were found changed since the connection: changes lost on the
+network, applied with the origin `console, read back` (in `change` events
+and in sessions) and logged. Nothing is written to the console. A `status`
+event is sent when the link's figures changed, every 5 s at most.
 
 `Status` also has `version`, tabula's version (`v0.2.0`, or `dev 9f91019`
 for a build from a git clone, `+` when it holds changes not committed): a

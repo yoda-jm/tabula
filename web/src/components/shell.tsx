@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../lib/api";
 import { audioTrouble } from "../lib/audio";
+import { linkQuality } from "../lib/link";
 import { formatDuration } from "../lib/session";
 import { useRecord, useSceneLoad, useStatus, useStream, useToasts } from "../store/hooks";
 import { store } from "../store/store";
@@ -84,10 +85,14 @@ export function ConnectionPill({ onClick }: { onClick(): void }) {
     cls = "bad";
     text = "Connection failed";
   }
+  // a weak link (Wi-Fi) shows next to the console's name
+  const link = s.connected && c?.link ? linkQuality(c.link) : null;
+  const title = [c?.addr ?? s.error ?? "", link && "Link: " + link.detail].filter(Boolean).join("\n");
   return (
-    <button type="button" className={"pill " + cls} onClick={onClick} title={c?.addr ?? s.error ?? ""}>
+    <button type="button" className={"pill " + cls} onClick={onClick} title={title}>
       <span className="dot" aria-hidden />
       <span className="pill-text">{text}</span>
+      {link && link.level !== "ok" && <span className={"pill-link " + link.level}>{link.short}</span>}
       {s.connecting && c && c.total > 0 && (
         <span className="pill-progress" style={{ width: `${(100 * c.synced) / c.total}%` }} aria-hidden />
       )}

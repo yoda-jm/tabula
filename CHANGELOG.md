@@ -28,6 +28,21 @@
   `POST /api/usb` ops `ff`, `rew`), and **Load…** for shows and AES50/DP48
   presets (`.mon`, kind `monitor`) too; the confirmation says what the file
   changes (the whole mix, the selected strip, the routing, the show…) (#28).
+- Changes lost on the Wi-Fi are found again (#10): the console sends each
+  change in one UDP packet, which a weak network can lose, and the GUI then
+  showed an old value until the next sync. While connected, tabula reads
+  the console back slowly (25 values a second: faders, mutes and sends about
+  once a minute, the whole console in about 3 minutes); a value that
+  differs is taken from the console, which is right (nothing is written to
+  it), reaches every page and the recording with the origin `console, read
+  back`, and is logged. A value tabula wrote after asking it back is not
+  undone by the older answer.
+  - The same requests measure the link: a weak one shows in the top bar
+    next to the console's name (*12% lost*, *180 ms*), and the Connect page
+    details it (round trip, requests unanswered, changes found again, the
+    last one); `Status.console.link`.
+  - A session being recorded gets the markers *console lost* and *console
+    back*.
 - The GUI opens on the mixer when tabula is already connected to a console
   (it showed the Connect page until the first status came).
 - Scribble strips show names of two words on two lines (`Guitare Elec`,

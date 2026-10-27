@@ -49,6 +49,7 @@ type Status struct {
 	Missing   []string  `json:"missing,omitempty"` // nodes the console never answered
 	Armed     bool      `json:"armed"`
 	LastSeen  time.Time `json:"last_seen"`
+	Link      *Link     `json:"link,omitempty"` // measured by the read-back (readback.go)
 }
 
 // Client is one connection to a console.
@@ -67,7 +68,11 @@ type Client struct {
 
 	libMu sync.Mutex // one library command at a time (library.go)
 
-	tick, probeAfter time.Duration // keepalive timing (shortened in tests)
+	readback map[string]time.Time // nodes being read back, since when (readback.go)
+	wrote    map[string]time.Time // nodes this client wrote, when
+	link     linkStats
+
+	tick, probeAfter, readbackEvery time.Duration // keepalive and read-back timing (shortened in tests)
 }
 
 // Dial connects to the console at addr ("host" or "host:port"), checks it
@@ -88,7 +93,8 @@ func Dial(ctx context.Context, addr string, mirror *state.Store, log *slog.Logge
 		return nil, err
 	}
 	c := &Client{addr: ua, conn: conn, mirror: mirror, log: log, waiters: map[string][]chan osc.Message{},
-		tick: 2 * time.Second, probeAfter: 6 * time.Second}
+		readback: map[string]time.Time{}, wrote: map[string]time.Time{},
+		tick: 2 * time.Second, probeAfter: 6 * time.Second, readbackEvery: readbackEvery}
 	c.status.Addr = ua.String()
 	go c.readLoop()
 
@@ -127,6 +133,7 @@ func (c *Client) Status() Status {
 	defer c.mu.Unlock()
 	s := c.status
 	s.Missing = append([]string(nil), s.Missing...)
+	s.Link = c.link.view()
 	return s
 }
 
@@ -215,11 +222,11 @@ func (c *Client) readLoop() {
 
 func (c *Client) handle(m osc.Message) {
 	key := m.Address
-	var line string
+	var line, path string
 	switch {
 	case m.Address == "node" && len(m.Args) == 1:
 		line = strings.TrimSuffix(m.Args[0].Str, "\n")
-		path, _ := schema.SplitLine(line)
+		path, _ = schema.SplitLine(line)
 		key = "node " + path
 	case m.Address == "/" && len(m.Args) == 1:
 		key = "/ " + m.Args[0].Str // echo of a "/" command
@@ -236,12 +243,21 @@ func (c *Client) handle(m osc.Message) {
 		}
 	}
 	listeners := c.listener
+	origin, apply := OriginConsole, true
+	if line != "" {
+		origin, apply = c.readbackOrigin(path)
+	}
 	c.mu.Unlock()
 
 	switch {
+	case line != "" && !apply: // read back before this client wrote it: older than the write
 	case line != "":
-		if _, err := c.mirror.ApplyText(line, OriginConsole); err != nil {
+		ch, err := c.mirror.ApplyText(line, origin)
+		if err != nil {
 			c.log.Warn("node text not understood", "line", line, "err", err)
+		}
+		if origin == OriginReadback {
+			c.caught(ch)
 		}
 	case len(m.Args) == 1 && c.mirror.Schema().Leaf(m.Address) != nil:
 		if _, err := c.mirror.Set(m.Address, m.Args[0], OriginConsole); err != nil {
@@ -344,6 +360,7 @@ const xremoteRenew = 5 * time.Second
 // console answers again (rebooted, cable back), the mirror is synced again
 // and updates resume; OnReconnect handlers run after that sync.
 func (c *Client) Run(ctx context.Context) {
+	go c.readBack(ctx)
 	c.send(osc.NewMessage("/xremote"))
 	t := time.NewTicker(c.tick)
 	defer t.Stop()
@@ -442,6 +459,7 @@ func (c *Client) SetAs(addr string, v osc.Arg, origin string, unarmed bool) erro
 	if err != nil {
 		return fmt.Errorf("%s: %w", addr, err)
 	}
+	c.touch(l.Addr)
 	if err := c.send(osc.NewMessage(l.Addr, cv)); err != nil {
 		return err
 	}
@@ -549,6 +567,8 @@ func (c *Client) ApplyText(line string) error {
 	if !armed {
 		return ErrReadOnly
 	}
+	path, _ := schema.SplitLine(strings.TrimLeft(line, " "))
+	c.touch(path)
 	// The console echoes "/" commands: waiting for the echo paces the
 	// sender so the console's UDP buffer does not overflow.
 	if _, err := c.ask(context.Background(), osc.NewMessage("/", osc.String(line)), "/ "+line, 3); err != nil {

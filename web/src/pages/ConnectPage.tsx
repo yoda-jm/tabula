@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ConfirmDialog } from "../components/shell";
 import type { About, Discovered } from "../lib/api";
 import { api } from "../lib/api";
+import { linkQuality } from "../lib/link";
 import { usePersistent } from "../lib/route";
 import type { EndsRecording } from "../lib/session";
 import { endsRecording, sinceText } from "../lib/session";
@@ -80,6 +81,12 @@ export function ConnectPage() {
             </dd>
             <dt>Writes</dt>
             <dd>{c.armed ? <strong className="danger-text">armed</strong> : "read-only"}</dd>
+            {c.link && (
+              <>
+                <dt>Link</dt>
+                <dd className={"link-" + linkQuality(c.link).level}>{linkQuality(c.link).detail}</dd>
+              </>
+            )}
           </dl>
         ) : s.connecting ? (
           <p>Connecting to {c?.addr ?? addr}…</p>

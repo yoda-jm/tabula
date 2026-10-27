@@ -18,6 +18,21 @@ export interface ConsoleStatus {
   missing?: string[];
   armed: boolean;
   last_seen: string;
+  /** the link's quality, measured by reading the console back */
+  link?: Link;
+}
+
+/** Link is the quality of the link to the console (lib/link.ts reads it). */
+export interface Link {
+  /** smoothed round trip of a request */
+  rtt_ms: number;
+  /** requests measured (the last ones, up to 100), and how many were left unanswered */
+  asked: number;
+  lost: number;
+  /** values found changed since the connection: changes lost on the network */
+  caught: number;
+  last_caught?: string;
+  caught_at?: string;
 }
 
 export interface Status {

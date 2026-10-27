@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -157,5 +158,80 @@ func TestReconnect(t *testing.T) {
 	}
 	if v, _, _ := mirror.Get("/ch/01/config/name"); v.Str != "Rebooted" || !c.Status().Connected {
 		t.Errorf("after reconnect: name %q, status %+v", v.Str, c.Status())
+	}
+}
+
+// TestReadBack loses changes on the way (the console does not push them to
+// this client) and finds them again by reading the nodes back.
+func TestReadBack(t *testing.T) {
+	srv, addr := startEmu(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	mirror := state.New(schema.Build("M32C"))
+	c, err := Dial(ctx, addr, mirror, quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if err := c.Sync(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	origins := map[string]string{}
+	mirror.Subscribe(func(ch []state.Change) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, x := range ch {
+			origins[x.Leaf.Addr] = x.Origin
+		}
+	})
+	c.readbackEvery = time.Millisecond
+	go c.Run(ctx)
+
+	// the console pushes changes to every client but the one that made them
+	lost := "udp " + c.conn.LocalAddr().String()
+	srv.Store().Set("/ch/05/mix/fader", osc.Float(0.25), lost) // a mix: read back often
+	srv.Store().Set("/ch/05/config/name", osc.String("Lost"), lost)
+	set, _, _ := srv.Store().Get("/ch/05/mix/fader")
+	for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(10 * time.Millisecond) { // a whole round
+		fader := mirror.Schema().Leaf("/ch/05/mix/fader")
+		got, want := mirror.LeafLine(fader), srv.Store().LeafLine(fader) // as node text: the console's resolution
+		n, _, _ := mirror.Get("/ch/05/config/name")
+		if got == want && n.Str == "Lost" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("not read back: %q (want %q), %q", got, want, n.Str)
+		}
+	}
+	mu.Lock()
+	if origins["/ch/05/mix/fader"] != OriginReadback || origins["/ch/05/config/name"] != OriginReadback {
+		t.Errorf("origins: %v", origins)
+	}
+	mu.Unlock()
+	l := c.Status().Link
+	if l == nil || l.Caught != 2 || l.Asked == 0 || l.Lost != 0 || l.LastCaught == "" || l.RTT <= 0 {
+		t.Errorf("link: %+v", l)
+	}
+	// nothing was written to the console: it keeps its values
+	if v, _, _ := srv.Store().Get("/ch/05/mix/fader"); !v.Equal(set) {
+		t.Errorf("console: %v", v)
+	}
+}
+
+func TestReadBackOlderThanAWrite(t *testing.T) {
+	c := &Client{readback: map[string]time.Time{}, wrote: map[string]time.Time{}}
+	t0 := time.Now()
+	if o, apply := c.readbackOrigin("/ch/01/mix"); o != OriginConsole || !apply {
+		t.Errorf("not read back: %q %v", o, apply)
+	}
+	c.readback["/ch/01/mix"], c.wrote["/ch/01/mix"] = t0, t0.Add(-time.Second)
+	if o, apply := c.readbackOrigin("/ch/01/mix"); o != OriginReadback || !apply {
+		t.Errorf("written before: %q %v", o, apply)
+	}
+	// written after it was asked back: the answer is older than the write
+	c.readback["/ch/01/mix"], c.wrote["/ch/01/mix"] = t0, t0.Add(time.Millisecond)
+	if _, apply := c.readbackOrigin("/ch/01/mix"); apply || len(c.readback) != 0 {
+		t.Errorf("written after: applied")
 	}
 }

@@ -23,6 +23,17 @@ loads the console again. A connection that went silent without breaking
 console's value, with a message: what a control shows is what the console
 has.
 
+**Changes lost on the Wi-Fi.** The console tells tabula of each change in
+one UDP packet, which a weak Wi-Fi can lose: the page would then show an
+old value. So tabula reads the console back, slowly and all the time it is
+connected (25 values a second: the faders, mutes and sends about once a
+minute, the whole console in about 3 minutes). A value that differs is
+taken from the console, which is right (nothing is written to it): it
+reaches every page, the recording, and the log (*read back: the console
+has another value*). The same requests measure the link: when it is weak,
+the console's name in the top bar is followed by what goes wrong
+(*12% lost*, *180 ms*), and the Connect page details it.
+
 **Who sees what.** The machine running `tabula` is the engineer and sees
 every page (once signed in, when an engineer password is set). Other
 devices get a role from an access link: viewers see the
@@ -427,6 +438,10 @@ console that does not answer is asked again every few seconds (the page
 says why) until it does; connecting to another address replaces it, so the
 buttons stay usable meanwhile. While a recording runs, **Disconnect** and
 every connect button ask first: they end the recording, with its audio.
+Once connected, *Link* says how the link to the console is doing: the round
+trip of a request, the requests left unanswered (of the last 100), and the
+changes lost on the network that reading the console back found again,
+with the last one.
 
 **This tabula** says which version runs (`v0.2.0`; a build from a git
 clone says its commit, `dev 9f91019`, with a `+` when it holds changes not

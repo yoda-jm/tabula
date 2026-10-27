@@ -144,6 +144,28 @@ h4 {
 .pill.bad .dot {
   background: var(--danger);
 }
+.pill-link {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  position: relative;
+}
+.pill-link.warn,
+.link-warn {
+  color: var(--busy);
+}
+.pill-link.warn {
+  border: 1px solid var(--busy);
+}
+.pill-link.bad,
+.link-bad {
+  color: var(--danger);
+}
+.pill-link.bad {
+  border: 1px solid var(--danger);
+}
 .pill-progress {
   position: absolute;
   left: 0;

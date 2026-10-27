@@ -172,7 +172,9 @@ func (s *Server) Connect(addr string) error {
 			s.publishRecord()
 		}
 		go s.runMeters(ctx, c)
+		go s.reportLink(ctx, c)
 		c.OnStatus(s.publishStatus)
+		c.OnStatus(func() { s.markLink(c) })
 		c.OnReconnect(func() {
 			s.publishStatus()
 			s.hub.publish("resync", json.RawMessage(`{}`))
@@ -606,15 +608,17 @@ func (s *Server) publishChanges(ch []state.Change) {
 		valueView
 		Origin string `json:"origin"`
 	}
+	format := func(c state.Change) string {
+		if t := mirror.TypeOf(c.Leaf); t != nil {
+			return t.Format(c.Value)
+		}
+		return ""
+	}
 	out := make([]changeView, 0, len(ch))
 	for _, c := range ch {
-		t := mirror.TypeOf(c.Leaf)
-		text := ""
-		if t != nil {
-			text = t.Format(c.Value)
-		}
-		out = append(out, changeView{valueView{c.Leaf.Addr, text, argValue(c.Value)}, c.Origin})
+		out = append(out, changeView{valueView{c.Leaf.Addr, format(c), argValue(c.Value)}, c.Origin})
 	}
+	s.logReadback(ch, format)
 	s.hub.publish("change", out)
 }
 
