@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### tabula
+- Starting a recording no longer holds tabula up while its audio starts
+  (32 WAV files created, the recorder launched: longer on a slow disk):
+  phones and pages keep their answers meanwhile, and the recording shows
+  once it runs; a second Start meanwhile is refused at once (#12).
 - Disarming writes while a scene file loads no longer leaves the console
   with half a scene: the file is sent to its end, then writes disarm (the
   button says *Disarms after the load*; click again to keep them armed).

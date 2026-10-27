@@ -18,6 +18,7 @@ import (
 
 	"github.com/yoda-jm/tabula/pkg/audio"
 	"github.com/yoda-jm/tabula/pkg/session"
+	"github.com/yoda-jm/tabula/pkg/state"
 )
 
 // Audio tracks recorded with the sessions (pkg/audio): the configuration,
@@ -46,6 +47,8 @@ type audioState struct {
 	// taken before Server.mu: a capture or a test starting meanwhile could
 	// find its card busy, so they wait for the probe to end.
 	probeMu sync.Mutex
+	// restarting: the capture of the recording is being started again (restartAudio)
+	restarting bool
 }
 
 func (s *Server) audioRoutes(mux *http.ServeMux) {
@@ -69,19 +72,15 @@ func (s *Server) SetAudioConfig(cfg audio.Config, file string) {
 	}
 }
 
-// startAudioLocked starts the audio capture of a new recording, if audio
-// is enabled. A capture that cannot start is reported; the recording goes
-// on without it.
-func (s *Server) startAudioLocked(rec *session.Recorder) {
-	a := &s.audio
-	a.last, a.saved, a.problems = nil, "", nil
-	cfg := a.cfg.Normalized()
-	if !cfg.Enabled {
-		return
-	}
-	opt := audio.Options{Ref: rec.Started(), Log: s.log, Source: a.source}
-	if s.mirror != nil {
-		opt.Names = audio.TrackNames(s.mirror)
+// startCapture starts the audio capture of a recording with cfg: it
+// creates the files and runs the recorder, so it is called without s.mu
+// (phones and pages keep their answers meanwhile). It returns the capture,
+// or the status of one that could not start: the recording goes on
+// without audio, saying why.
+func (s *Server) startCapture(cfg audio.Config, rec *session.Recorder, mirror *state.Store, source func() (io.ReadCloser, error)) (*audio.Capture, *audio.Status) {
+	opt := audio.Options{Ref: rec.Started(), Log: s.log, Source: source}
+	if mirror != nil {
+		opt.Names = audio.TrackNames(mirror)
 	}
 	c, err := audio.Start(cfg, filepath.Join(rec.Dir(), "audio"), opt)
 	if err != nil {
@@ -90,31 +89,48 @@ func (s *Server) startAudioLocked(rec *session.Recorder) {
 		if h := audio.Hint(msg); h != "" {
 			msg += ". " + h
 		}
-		st := audio.Status{State: audio.Failed, Info: audio.Info{Rate: cfg.Rate, Bits: cfg.Bits, Channels: cfg.Channels,
+		return nil, &audio.Status{State: audio.Failed, Info: audio.Info{Rate: cfg.Rate, Bits: cfg.Bits, Channels: cfg.Channels,
 			Device: cfg.Device, Error: msg}, Free: -1, Remaining: -1}
-		a.last = &st
-		rec.SetAudio(&st.Info)
+	}
+	return c, nil
+}
+
+// useCaptureLocked makes c (or the failed status) the audio of the
+// recording; afterwards, without s.mu, call noteCapture.
+func (s *Server) useCaptureLocked(c *audio.Capture, failed *audio.Status) {
+	a := &s.audio
+	a.last, a.saved, a.problems = failed, "", nil
+	if c != nil {
+		a.cap, a.saved, a.savedAt = c, audio.Starting, time.Now()
+	}
+}
+
+// noteCapture writes the audio of a recording just started in its
+// meta.json, and checks its device (one that is not the console's card
+// records, but not the show).
+func (s *Server) noteCapture(rec *session.Recorder, cfg audio.Config, c *audio.Capture, failed *audio.Status) {
+	switch {
+	case failed != nil:
+		rec.SetAudio(&failed.Info)
+		return
+	case c == nil:
 		return
 	}
-	a.cap, a.saved, a.savedAt = c, audio.Starting, time.Now()
 	info := c.Info()
 	rec.SetAudio(&info)
-	go func() { // a device that is not the console's card records, but not the show
+	go func() {
 		problems := audio.CheckDevice(cfg, s.listDevices(context.Background(), false), runtime.GOOS).Problems
 		for _, p := range problems {
 			s.log.Warn("audio device", "problem", p)
 		}
 		s.mu.Lock()
-		if a.cap == c {
-			a.problems = problems
+		if s.audio.cap == c {
+			s.audio.problems = problems
 		}
 		s.mu.Unlock()
 	}()
 }
 
-// listDevices lists the capture devices (audio.ListDevices). probe asks
-// their channels to the cards that do not tell them (audio.ProbeChannels),
-// unless the audio input is in use: recording or testing.
 func (s *Server) listDevices(ctx context.Context, probe bool) []audio.Device {
 	if probe {
 		s.audio.probeMu.Lock()
@@ -189,19 +205,22 @@ func (s *Server) restartAudio(w http.ResponseWriter, r *http.Request) {
 	if old != nil {
 		old.Stop() // over already: waits for its files to be finished
 	}
-	s.audio.probeMu.Lock()
-	s.mu.Lock()
-	defer func() {
-		s.mu.Unlock()
-		s.audio.probeMu.Unlock()
+	answer := func() {
 		s.waitAudioStart()
 		s.publishRecord()
 		writeJSON(w, http.StatusOK, s.recordStatus())
-	}()
-	if s.rec != rec || s.audio.cap != old {
-		return // stopped or restarted meanwhile: say how it is
 	}
-	s.audio.cap = nil
+	s.audio.probeMu.Lock()
+	defer s.audio.probeMu.Unlock()
+	s.mu.Lock()
+	if s.rec != rec || s.audio.cap != old || s.audio.restarting {
+		s.mu.Unlock()
+		answer() // stopped or restarted meanwhile: say how it is
+		return
+	}
+	s.audio.cap, s.audio.restarting = nil, true
+	cfg, mirror, source := s.audio.cfg.Normalized(), s.mirror, s.audio.source
+	s.mu.Unlock()
 	if st != nil {
 		for _, t := range st.Tracks { // headers without samples
 			if t.File != "" {
@@ -210,7 +229,20 @@ func (s *Server) restartAudio(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.log.Info("audio restarted", "session", rec.Dir())
-	s.startAudioLocked(rec)
+	c, failed := s.startCapture(cfg, rec, mirror, source)
+	s.mu.Lock()
+	s.audio.restarting = false
+	current := s.rec == rec
+	if current {
+		s.useCaptureLocked(c, failed)
+	}
+	s.mu.Unlock()
+	if !current && c != nil { // stopped meanwhile
+		c.Stop()
+	} else if current {
+		s.noteCapture(rec, cfg, c, failed)
+	}
+	answer()
 }
 
 // tickAudio keeps the session's meta.json up to date with the capture:

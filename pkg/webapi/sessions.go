@@ -57,41 +57,73 @@ func (s *Server) publishRecord() { s.hub.publish("record", s.recordStatus()) }
 
 // StartRecording records the connected console into a new session. It
 // waits for the card to be free first: a recording started during an
-// input test would find it busy, and be recorded without its audio.
+// input test would find it busy, and be recorded without its audio. The
+// files are created and the recorder started without s.mu: every other
+// request goes on meanwhile; the recording shows once it runs.
 func (s *Server) StartRecording(note string) error {
+	s.mu.Lock()
+	busy := s.rec != nil || s.recStarting != nil
+	s.mu.Unlock()
+	if busy { // at once, rather than after the start being made
+		return errors.New("already recording")
+	}
 	if err := s.waitAudioFree(); err != nil {
 		return err
 	}
 	s.audio.probeMu.Lock() // see audioState.probeMu
 	defer s.audio.probeMu.Unlock()
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.mirror == nil || s.connecting {
+	switch {
+	case s.mirror == nil || s.connecting:
+		s.mu.Unlock()
 		return errors.New("not connected (or still syncing)")
-	}
-	if s.rec != nil {
+	case s.rec != nil || s.recStarting != nil:
+		s.mu.Unlock()
 		return errors.New("already recording")
-	}
-	if s.audio.testing { // started again since waitAudioFree
+	case s.audio.testing: // started again since waitAudioFree
+		s.mu.Unlock()
 		return errors.New("the audio input is being tested: try again in a few seconds")
 	}
+	st := s.client.Status()
+	mirror, dir, consoleName := s.mirror, s.sessionsDir, strings.TrimSpace(st.Info.Model+" "+st.Info.Name)
+	cfg, source := s.audio.cfg.Normalized(), s.audio.source
+	starting := make(chan struct{})
+	s.recStarting = starting
+	s.mu.Unlock()
+	defer close(starting)
+
 	name := time.Now().Format("2006-01-02_150405")
 	// stopped and started again within the second: 2026-10-26_203512-2
 	for i, base := 2, name; ; i++ {
-		if _, err := os.Stat(filepath.Join(s.sessionsDir, name, "meta.json")); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, name, "meta.json")); err != nil {
 			break
 		}
 		name = base + "-" + strconv.Itoa(i)
 	}
-	st := s.client.Status()
-	rec, err := session.Start(filepath.Join(s.sessionsDir, name), s.mirror, strings.TrimSpace(st.Info.Model+" "+st.Info.Name), note)
-	if err != nil {
+	rec, err := session.Start(filepath.Join(dir, name), mirror, consoleName, note)
+	var c *audio.Capture
+	var failed *audio.Status
+	if err == nil && cfg.Enabled {
+		c, failed = s.startCapture(cfg, rec, mirror, source)
+	}
+
+	s.mu.Lock()
+	s.recStarting = nil
+	switch {
+	case err != nil:
+		s.mu.Unlock()
 		return err
+	case s.mirror != mirror: // disconnected meanwhile
+		s.mu.Unlock()
+		s.endRecording(rec, c)
+		return errors.New("disconnected while the recording started")
 	}
 	s.rec, s.recordErr = rec, ""
 	s.log.Info("recording", "session", rec.Dir())
-	s.startAudioLocked(rec)
+	s.useCaptureLocked(c, failed)
 	s.startUSBBackupLocked(rec)
+	s.mu.Unlock()
+	s.noteCapture(rec, cfg, c, failed)
 	go s.tickRecord(rec)
 	return nil
 }
@@ -123,6 +155,11 @@ func (s *Server) tickRecord(rec *session.Recorder) {
 // stopping).
 func (s *Server) StopRecording() error {
 	s.mu.Lock()
+	if starting := s.recStarting; starting != nil { // stop it once it runs
+		s.mu.Unlock()
+		<-starting
+		s.mu.Lock()
+	}
 	rec, c, ending := s.rec, s.audio.cap, s.audio.ending
 	s.rec, s.audio.cap = nil, nil
 	if rec != nil {

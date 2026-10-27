@@ -43,6 +43,7 @@ type Server struct {
 
 	sessionsDir  string
 	rec          *session.Recorder
+	recStarting  chan struct{} // a recording being started, closed once it is (sessions.go)
 	recordErr    string
 	replayCancel context.CancelFunc
 	replayOf     string
