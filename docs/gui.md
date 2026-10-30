@@ -328,6 +328,11 @@ PDF reader has: names print as typed in French and most European languages
 
 ![The PDF: 16 inputs and 16 outputs on one A4 page, the watermark behind the rows](img/patchlist-pdf.png)
 
+The demo band's patch list, as the page makes it:
+[patch-list-the-demo-band.pdf](examples/patch-list-the-demo-band.pdf)
+(16 inputs from a DL32, 16 DL32 outputs: in-ear mixes, wedges, effects,
+the delay speakers and the PA).
+
 ## FX
 
 **All** shows the 8 effect slots: the effect loaded in each, and where it
