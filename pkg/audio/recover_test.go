@@ -154,20 +154,28 @@ func TestCaptureSilence(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.Stop()
-	feed := func(sample uint32, d time.Duration) {
-		for end := time.Now().Add(d); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
-			pw.Write(make([]byte, 480*2*4)) // silence
-			if sample != 0 {
+	// feed sends silence, and a signal when asked, until ok holds (3 s at
+	// most: a slow machine processes the audio well after it is sent)
+	feed := func(signal bool, ok func(Status) bool) Status {
+		var st Status
+		for end := time.Now().Add(3 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+			pw.Write(make([]byte, 480*2*4))
+			if signal {
 				pw.Write(frames(2, 0, 480))
 			}
+			if st = c.Status(); ok(st) {
+				break
+			}
 		}
+		return st
 	}
-	feed(0, 500*time.Millisecond)
-	if st := c.Status(); st.Silent < 0.2 || !strings.Contains(strings.Join(st.Warnings, " "), "every track silent") {
+	alarm := func(st Status) bool {
+		return st.Silent >= 0.2 && strings.Contains(strings.Join(st.Warnings, " "), "every track silent")
+	}
+	if st := feed(false, alarm); !alarm(st) {
 		t.Errorf("silent: %+v", st)
 	}
-	feed(1, 200*time.Millisecond)
-	if st := c.Status(); st.Silent != 0 {
+	if st := feed(true, func(st Status) bool { return st.Silent == 0 }); st.Silent != 0 {
 		t.Errorf("signal again: silent %v", st.Silent)
 	}
 }
