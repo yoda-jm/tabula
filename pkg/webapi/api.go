@@ -67,6 +67,7 @@ type Server struct {
 	backupErr string         // scenebackup.go
 	undo      undoState      // undo.go
 	setlist   setlistState   // setlist.go
+	patchlist patchlistState // patchlist.go
 	check     checkState     // check.go
 	usb       usbState       // usb.go
 	backup    usbBackupState // usbbackup.go
@@ -120,6 +121,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	s.libraryRoutes(mux)
 	s.sceneFileRoutes(mux)
 	s.setlistRoutes(mux)
+	s.patchlistRoutes(mux)
 	s.usbRoutes(mux)
 	s.audioRoutes(mux)
 	s.homeRoutes(mux)

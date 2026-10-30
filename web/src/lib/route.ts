@@ -1,6 +1,7 @@
-// Hash routes: #/mixer, #/channel/ch/01, #/meters, #/monitor, #/routing, #/fx (#/fx/5:
-// FX slot 5), #/scenes, #/usb, #/browser, #/check, #/record, #/connect, #/mix
-// (a musician's in-ear mix; #/mix/3 shows bus 3 to the engineer), #/access.
+// Hash routes: #/mixer, #/channel/ch/01, #/meters, #/monitor, #/routing,
+// #/patchlist, #/fx (#/fx/5: FX slot 5), #/scenes, #/usb, #/browser, #/check,
+// #/record, #/connect, #/mix (a musician's in-ear mix; #/mix/3 shows bus 3 to
+// the engineer), #/access.
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -10,6 +11,7 @@ export type Page =
   | "meters"
   | "monitor"
   | "routing"
+  | "patchlist"
   | "fx"
   | "scenes"
   | "usb"
@@ -30,7 +32,7 @@ export interface Route {
   slot?: number;
 }
 
-const PAGES: Page[] = ["mixer", "channel", "meters", "monitor", "routing", "fx", "scenes", "usb", "browser", "check", "record", "connect", "mix", "access"];
+const PAGES: Page[] = ["mixer", "channel", "meters", "monitor", "routing", "patchlist", "fx", "scenes", "usb", "browser", "check", "record", "connect", "mix", "access"];
 
 export function parseRoute(hash: string): Route | null {
   const h = hash.replace(/^#\/?/, "");

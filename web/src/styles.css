@@ -3530,6 +3530,8 @@ code.wrap {
   align-items: center;
   gap: 10px;
   min-height: 36px;
+}
+
 /* The pre-show check */
 .precheck {
   max-width: 900px;
@@ -3632,4 +3634,140 @@ code.wrap {
 }
 .block {
   display: block;
+}
+
+/* The Patch list page (pages/PatchListPage.tsx) */
+.pl-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px 14px;
+  margin: 12px 0 6px;
+}
+.pl-field .input,
+.pl-field .select {
+  width: 100%;
+}
+.pl-actions {
+  align-items: center;
+  margin-top: 8px;
+}
+.pl-hint {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
+.pl-row {
+  display: grid;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.pl-in {
+  grid-template-columns: 28px 48px minmax(110px, 1.1fr) minmax(110px, 1fr) 56px minmax(170px, 2fr);
+}
+.pl-out {
+  grid-template-columns: 28px minmax(110px, 0.9fr) minmax(150px, 1.4fr) minmax(170px, 2fr);
+}
+.pl-row.head {
+  padding-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pl-row.off > :not(:first-child) {
+  opacity: 0.45;
+}
+.pl-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.pl-ch {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pl-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+}
+.pl-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--sc);
+}
+.pl-note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pl-note .input {
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 8px;
+}
+.pl-hints {
+  font-size: 0.8rem;
+}
+.pl-group {
+  padding: 14px 0 4px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+@media (max-width: 720px) {
+  .pl-row.head {
+    display: none;
+  }
+  .pl-in {
+    grid-template-columns: 28px 52px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "chk ch name ph"
+      ". . in in"
+      ". . note note";
+  }
+  .pl-in > :nth-child(1),
+  .pl-out > :nth-child(1) {
+    grid-area: chk;
+  }
+  .pl-in > :nth-child(2) {
+    grid-area: ch;
+  }
+  .pl-in > :nth-child(3) {
+    grid-area: name;
+  }
+  .pl-in > :nth-child(4) {
+    grid-area: in;
+  }
+  .pl-in > :nth-child(5) {
+    grid-area: ph;
+  }
+  .pl-in > :nth-child(6) {
+    grid-area: note;
+  }
+  .pl-out {
+    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-areas:
+      "chk out"
+      ". carries"
+      ". note";
+  }
+  .pl-out > :nth-child(2) {
+    grid-area: out;
+  }
+  .pl-out > :nth-child(3) {
+    grid-area: carries;
+  }
+  .pl-out > :nth-child(4) {
+    grid-area: note;
+  }
 }

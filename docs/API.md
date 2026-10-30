@@ -322,6 +322,22 @@ marked. It is sent as `setlist` events to the engineers when it changes.
 | PUT | `/api/setlist` | `{"songs": [...], "next"?: n}` | `Setlist`: the songs replaced (spaces tidied, empty ones dropped; 200 songs of 80 characters at most, else 400); without `next`, the next song stays the same song wherever it moved |
 | POST | `/api/setlist/next` | `{"next": n}` | `Setlist`: song `n` is the next one (back one song, skip one) |
 
+**Patch list** (engineer only): what the Patch list page prints that the
+console does not know, kept in `patchlist.json` in the scenes folder. The
+page makes the PDF itself from the console's routing. `PatchList`:
+`{"title", "details", "contact", "box_a", "box_b", "paper": "A4" | "Letter",
+"watermark", "notes": {row: note}, "rows": {row: true | false}, "updated"}`.
+`box_a` and `box_b` name the stage boxes, `""` for the one the console
+reports. `notes` holds a note per row and `rows` the rows ticked or
+unticked by hand; the others follow their default. A row is a strip
+(`/ch/01`, `/auxin/03`), a box output (`AES50A:13`), an XLR output (`OUT:5`)
+or an output node (`/outputs/p16/02`).
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| GET | `/api/patchlist` | | `PatchList`; before anything is saved: no title, A4, the watermark |
+| PUT | `/api/patchlist` | `PatchList` | `PatchList`: replaced, spaces tidied, empty notes dropped; what the body leaves out takes its first value. 400 for texts over 120 characters, notes over 80, a paper other than A4 or Letter, a row key with spaces or over 40 bytes, more than 400 notes or rows |
+
 `Record`: `{"recording", "name"?, "meta"?: {"start", "events", "markers", "duration", "audio"?, "usb_backup"?, …}, "replaying", "replay_of"?, "replay_at"?, "replay_audio"?, "error"?, "waiting"?, "audio"?, "usb"}`; `waiting` counts the console changes waiting for a slow disk for more than 2 s.
 `usb` is the backup on the console's USB stick: `{"on" (the setting),
 "starting"?, "file"?, "already"?, "error"?}` for the recording, or the last

@@ -19,6 +19,7 @@ import { MetersPage } from "./pages/MetersPage";
 import { MixerPage } from "./pages/MixerPage";
 import { MonitorPage } from "./pages/MonitorPage";
 import { NoAccess } from "./pages/NoAccess";
+import { PatchListPage } from "./pages/PatchListPage";
 import { RecordPage } from "./pages/RecordPage";
 import { RoutingPage } from "./pages/RoutingPage";
 import { ScenesPage } from "./pages/ScenesPage";
@@ -33,6 +34,7 @@ const NAV: { page: Page; label: string; role: Role }[] = [
   { page: "meters", label: "Meters", role: "viewer" },
   { page: "monitor", label: "Monitor", role: "engineer" },
   { page: "routing", label: "Routing", role: "engineer" },
+  { page: "patchlist", label: "Patch list", role: "engineer" },
   { page: "fx", label: "FX", role: "engineer" },
   { page: "scenes", label: "Scenes", role: "engineer" },
   { page: "usb", label: "USB", role: "engineer" },
@@ -127,6 +129,8 @@ function ConsoleApp({ role }: { role: Role }) {
           <MonitorPage />
         ) : page === "routing" && engineer ? (
           <RoutingPage />
+        ) : page === "patchlist" && engineer ? (
+          <PatchListPage />
         ) : page === "fx" && engineer ? (
           <FxPage slot={route?.slot} />
         ) : page === "scenes" && engineer ? (
