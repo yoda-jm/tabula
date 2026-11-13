@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Docs
+- The README and the site's front page point to the v0.3.0 release; the
+  site says what is new in it. The README no longer says X32-Edit connects
+  to the emulator (it has not been tried); the roadmap (`docs/PLAN.md`)
+  lists what was done since v0.2.0.
+
 ## v0.3.0 — show safety, the mixing pages, a patch list
 
 ### tabula

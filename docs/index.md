@@ -8,6 +8,10 @@ Tools for **Behringer X32 / Midas M32** digital consoles, written in Go.
 
 ## Download
 
+The current release is **[v0.3.0](https://github.com/yoda-jm/tabula/releases/tag/v0.3.0)**
+(13 November 2026), [new in it](#new-in-v030) below. Its page has the same
+archives as this table, built from the released code.
+
 The latest build, made from the main branch each time its tests pass:
 
 | System | Download |
@@ -43,12 +47,48 @@ test it before a show ([recording](recording.md#on-macos-and-windows)).
 Versioned releases, with their notes, are on the
 [releases page](https://github.com/yoda-jm/tabula/releases).
 
+## New in v0.3.0
+
+Show safety, the mixing pages and a patch list, three weeks after v0.2.0
+(every change in the
+[changelog](https://github.com/yoda-jm/tabula/blob/main/CHANGELOG.md)):
+
+- **Before the show**: a [Check](gui.md#check) page says what would spoil
+  it (card mode and sample rate, audio device, disk space for the show's
+  length, power and sleep, the console's USB stick, the phones), each with
+  what to do. The [Patch list](gui.md#patch-list) makes the PDF for the
+  venue's sound engineer.
+- **During the show**: audio that stops mid-show (a cable, a console
+  reboot) starts again by itself in the same files, and a recording where
+  every track is silent raises an alarm; the audio records even without
+  the console link; a backup recording on the console's USB stick; changes
+  lost on the Wi-Fi are read back from the console. Markers from any page,
+  and a setlist: one tap marks the next song.
+- **Mixing**: a patchbay of every signal path, solo, mute groups,
+  talkback and the oscillator, an EQ to drag on its curve, a Meters page
+  with gain reduction and DCAs, undo, copying a channel's settings, your
+  own layers and DCA spill, scene safes and snippet filters, scene files
+  kept on the laptop with a backup before every load, the console's USB
+  stick.
+- **After the show**: take a session home as one zip or onto a USB disk, in
+  WAV or FLAC, or play it back through the console for a virtual
+  soundcheck.
+- **For the band**: the Access page says whose phone is online, and links
+  use the laptop's name so they survive a new IP address.
+- **The emulator** applies scene safes and snippet filters, loads presets
+  and shows from its USB stick, and answers X32-Mix's fader subscriptions
+  (thanks to @mbachurin, who reported and first fixed it).
+
+Most of it has been tried against the emulator only: try it with your
+console before a show depends on it.
+
 ## tabula-emu — a console on your laptop
 
 `tabula-emu` speaks the console's OSC protocol on UDP port 10023, so remote
 apps can connect to it as if it were a console: M32-Edit and the tabula
-client are checked against it; X32-Edit and Mixing Station speak the same
-protocol but have not been tried yet. Use it to prepare a show offline, to develop and
+client are checked against it, and a user reports X32-Mix's faders
+working; X32-Edit and Mixing Station speak the same protocol but have not
+been tried yet. Use it to prepare a show offline, to develop and
 test software, or to learn the console without one.
 
 ```sh
@@ -95,7 +135,9 @@ tabula-emu -scene my-show.scn -save my-show.scn -http :8032
 - Preferences and status (`/-prefs`, `/-stat`, `/-show`, `/-libs`, `/-usb`,
   `/-urec`, `/-action`…), as the editors query them when connecting.
 - Meters (`/meters/0…16`) with synthetic levels that follow the mix, and
-  `/subscribe`, `/formatsubscribe`, `/batchsubscribe`, `/renew`, `/unsubscribe`.
+  `/subscribe`, `/formatsubscribe`, `/batchsubscribe` (meters, and strip
+  parameters such as the faders X32-Mix asks for), `/renew`,
+  `/unsubscribe`.
 - The RTA of the source an editor selects (a channel, a bus, a graphic EQ…),
   shaped by the low cut, the EQ and the graphic EQ.
 - Linked channels, aux inputs, FX returns, buses and matrices kept in step
@@ -177,9 +219,12 @@ tabula -console 192.168.1.62 -http :8033
   replay it onto the console or the emulator. With the console's USB card,
   the audio tracks are recorded too, one WAV file each, in sync with the
   console moves, ready for Audacity or Reaper; the console can keep a stereo
-  backup on its own USB stick. A session goes home as one zip or onto a USB
-  disk, in WAV or FLAC, and its tracks can play back through the console
-  for a virtual soundcheck. See [recording a show](recording.md).
+  backup on its own USB stick. Audio that stops mid-show starts again by
+  itself in the same files, a silent recording raises an alarm, and the
+  audio records even without the console link. Markers from any page, and
+  a setlist: one tap marks the next song. A session goes home as one zip or
+  onto a USB disk, in WAV or FLAC, and its tracks can play back through
+  the console for a virtual soundcheck. See [recording a show](recording.md).
 - **In-ear mixes for the band**: each musician scans a QR code and gets
   their own mix on their phone, and nothing else; viewers watch without
   touching; the Access page shows whose phone is online. Links use the

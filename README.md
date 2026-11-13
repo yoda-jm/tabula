@@ -6,14 +6,20 @@
 Tools for Behringer X32 / Midas M32 digital consoles, in Go.
 
 - **`tabula-emu`** — a console emulator speaking the console's OSC protocol
-  (UDP 10023), to develop and test without a console. X32-Edit, M32-Edit and
-  other remote apps can connect to it. A read-only HTTP page shows what it
-  stores and every request it did not understand.
+  (UDP 10023), to develop and test without a console. M32-Edit connects to
+  it, and a user reports X32-Mix's faders working; X32-Edit and Mixing
+  Station speak the same protocol but have not been tried yet. A read-only
+  HTTP page shows what it stores and every request it did not understand.
 - **`tabula`** — a client that connects to a console or to the emulator and
-  serves a web GUI: mixer, channel details with headamps, routing, effects
-  with a graphic EQ and RTA, scenes and presets, every parameter, recording
-  and replay of shows (with the audio tracks of the console's USB card, see
-  [recording](docs/recording.md)). Read-only until you arm writes.
+  serves a web GUI to the laptop at the desk and to the band's phones:
+  mixer, meters, channel details with headamps and a draggable EQ, routing
+  with a patchbay, effects with a graphic EQ and RTA, scenes, safes and
+  scene files, the console's USB stick, every parameter. For the show: a
+  pre-show check, a patch list PDF for the venue's engineer, in-ear mixes
+  on the musicians' phones, and recording and replay with the audio tracks
+  of the console's USB card, markers and a setlist, audio that recovers by
+  itself mid-show (see [recording](docs/recording.md)). Read-only until you
+  arm writes; undo takes back the last changes.
 
 See [how the emulator simulates the console](docs/emulator.md) (audio flow,
 meters, RTA, effects, linked strips), [the pages of the GUI](docs/gui.md) and
@@ -40,12 +46,17 @@ subscriptions, the requests it did not understand, and every parameter:
 
 ## Status
 
-Early development. The parameter schema covers every node of a scene file and
-round-trips real scenes byte for byte.
+Pre-release: [v0.3.0](https://github.com/yoda-jm/tabula/releases/tag/v0.3.0)
+(13 November 2026), what changed in the [changelog](CHANGELOG.md). The
+parameter schema covers every node of a scene file and round-trips real
+scenes byte for byte. Much of what tabula does to a console (writes, the
+USB card's audio, the USB stick) has been checked against the emulator more
+than against a real M32: try it before a show depends on it.
 
 ## Download
 
-Latest build of `main` (both programs, GUI included):
+The current release, [v0.3.0](https://github.com/yoda-jm/tabula/releases/tag/v0.3.0),
+has the same archives. Latest build of `main` (both programs, GUI included):
 [Linux x86-64](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-linux-amd64.tar.gz) ·
 [Linux ARM64](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-linux-arm64.tar.gz) ·
 [Linux ARM](https://github.com/yoda-jm/tabula/releases/download/latest/tabula-linux-arm.tar.gz) ·
@@ -63,7 +74,7 @@ Recording the audio tracks on macOS or Windows also needs
 go run ./cmd/tabula-emu -scene testdata/scenes/demo.scn -http :8032
 ```
 
-Then point X32-Edit / M32-Edit at this machine's IP and open
+Then point M32-Edit (or another remote app) at this machine's IP and open
 <http://localhost:8032> to see the state, the traffic and every request the
 emulator did not handle. `testdata/scenes/demo.scn` is a real show with
 made-up names. To have your own scenes in the console's scene slots, copy
