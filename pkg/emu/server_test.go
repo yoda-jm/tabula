@@ -360,6 +360,110 @@ func TestFormatSubscribeRange(t *testing.T) {
 	}
 }
 
+// A /batchsubscribe of a parameter numbers the strips as /-stat/selidx does.
+// The document's example, /mfm_a /mix/on 0 63 8, is a 276-byte packet: the
+// 64 mutes of the channels, aux ins, FX returns and buses.
+func TestBatchSubscribeParameters(t *testing.T) {
+	_, addr := start(t)
+	p := dial(t, addr)
+	off := map[int]bool{1: true, 32: true, 47: true, 63: true} // ch 02, aux 1, FX return 8, bus 16
+	for i := range 64 {
+		strip, _ := stripPath(i)
+		on := int32(1)
+		if off[i] {
+			on = 0
+		}
+		p.send(strip+"/mix/on", osc.Int(on))
+	}
+	drain(p)
+	m := p.ask("/batchsubscribe", osc.String("/mfm_a"), osc.String("/mix/on"), osc.Int(0), osc.Int(63), osc.Int(8))
+	if len(m.Bytes()) != 276 || m.Address != "/mfm_a" || len(m.Args) != 1 || m.Args[0].Tag != 'b' {
+		t.Fatalf("/mfm_a: %d bytes, %v", len(m.Bytes()), m)
+	}
+	blob := m.Args[0].Blob
+	if binary.LittleEndian.Uint32(blob) != 260 {
+		t.Fatalf("blob length %d", binary.LittleEndian.Uint32(blob))
+	}
+	for i := range 64 {
+		want := uint32(1)
+		if off[i] {
+			want = 0
+		}
+		if got := binary.LittleEndian.Uint32(blob[4+4*i:]); got != want {
+			t.Errorf("strip %d: mute %d, want %d", i, got, want)
+		}
+	}
+	p.send("/unsubscribe", osc.String("/mfm_a"))
+	drain(p)
+
+	// Two commands, strip by strip: LR and M/C (faders in the console's 1024
+	// steps).
+	p.send("/main/st/mix/fader", osc.Float(0.75))
+	p.send("/main/st/mix/on", osc.Int(1))
+	p.send("/main/m/mix/fader", osc.Float(0.25))
+	p.send("/main/m/mix/on", osc.Int(0))
+	drain(p)
+	m = p.ask("/batchsubscribe", osc.String("/mains"), osc.String("/mix/fader"), osc.String("/mix/on"), osc.Int(70), osc.Int(71), osc.Int(0))
+	blob = m.Args[0].Blob
+	f := func(i int) float32 { return math.Float32frombits(binary.LittleEndian.Uint32(blob[4+4*i:])) }
+	n := func(i int) uint32 { return binary.LittleEndian.Uint32(blob[4+4*i:]) }
+	near := func(v, want float32) bool { return math.Abs(float64(v-want)) < 0.001 }
+	if len(blob) != 20 || !near(f(0), 0.75) || n(1) != 1 || !near(f(2), 0.25) || n(3) != 0 {
+		t.Errorf("/mains: % x", blob)
+	}
+	p.send("/unsubscribe", osc.String("/mains"))
+	drain(p)
+
+	// FX returns have no preamp: 0 in their place.
+	p.send("/auxin/08/preamp/trim", osc.Float(0.5))
+	drain(p)
+	m = p.ask("/batchsubscribe", osc.String("/trims"), osc.String("/preamp/trim"), osc.Int(38), osc.Int(41), osc.Int(0))
+	if blob = m.Args[0].Blob; len(blob) != 20 || !near(f(1), 0.5) || n(2) != 0 || n(3) != 0 {
+		t.Errorf("/trims: % x", blob)
+	}
+}
+
+// What a parameter /batchsubscribe refuses.
+func TestBatchSubscribeRefused(t *testing.T) {
+	s, c := offline(), &Client{Addr: "test"}
+	req := func(args ...osc.Arg) error {
+		return s.batchSubscribe(osc.NewMessage("/batchsubscribe", args...), c)
+	}
+	str := func(v ...string) []osc.Arg {
+		var a []osc.Arg
+		for _, x := range v {
+			a = append(a, osc.String(x))
+		}
+		return a
+	}
+	ints := func(i0, i1 int32) []osc.Arg { return []osc.Arg{osc.Int(i0), osc.Int(i1), osc.Int(0)} }
+	if err := req(append(str("/b", "/mix/fader"), ints(0, 71)...)...); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range [][2]int32{{-1, 3}, {5, 4}, {0, 72}, {math.MinInt32, math.MaxInt32}} {
+		if err := req(append(str("/b", "/mix/fader"), ints(r[0], r[1])...)...); err == nil {
+			t.Errorf("strips %d to %d accepted", r[0], r[1])
+		}
+	}
+	cmds := make([]string, 15)
+	for i := range cmds {
+		cmds[i] = "/mix/fader"
+	}
+	for name, args := range map[string][]osc.Arg{
+		"no such parameter":        append(str("/b", "/mix/nope"), ints(0, 3)...),
+		"no such parameter here":   append(str("/b", "/preamp/trim"), ints(40, 47)...),
+		"a meter with a parameter": append(str("/b", "/meters/6", "/mix/on"), ints(0, 0)...),
+		"an int for a command":     {osc.String("/b"), osc.Int(1), osc.Int(0), osc.Int(3), osc.Int(0)},
+		"a float for an int":       append(str("/b", "/mix/on"), osc.Int(0), osc.Float(3), osc.Int(0)),
+		"no command":               append(str("/b"), ints(0, 3)...),
+		"1080 parameters":          append(str(append([]string{"/b"}, cmds...)...), ints(0, 71)...),
+	} {
+		if err := req(args...); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+}
+
 // /renew and /unsubscribe name a meter subscription by its address, with or
 // without the slash, as in the document's "/renew ,s meters/5".
 func TestRenewMetersByAddress(t *testing.T) {

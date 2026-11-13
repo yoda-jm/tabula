@@ -352,22 +352,7 @@ func (s *Server) formatSubscribe(m osc.Message, c *Client) error {
 	return s.subs.add(&subscription{
 		client: c, name: alias, kind: "formatsubscribe", interval: interval(ints[2]), expires: now.Add(subLease), next: now,
 		produce: func(*tick) (osc.Message, bool) {
-			body := make([]byte, 4, 4+4*len(addrs))
-			for _, a := range addrs {
-				v, _, _ := s.store.Get(a)
-				switch v.Tag {
-				case 'f':
-					body = binary.LittleEndian.AppendUint32(body, math.Float32bits(v.Float))
-				case 's':
-					str := make([]byte, 32)
-					copy(str, v.Str)
-					body = append(body, str...)
-				default:
-					body = binary.LittleEndian.AppendUint32(body, uint32(v.Int))
-				}
-			}
-			binary.LittleEndian.PutUint32(body, uint32(len(body)))
-			return osc.NewMessage(alias, osc.Blob(body)), true
+			return osc.NewMessage(alias, osc.Blob(s.paramBlob(addrs))), true
 		},
 	})
 }
@@ -381,26 +366,103 @@ func expandStars(pattern string, n int32) string {
 	return pattern[:start] + fmt.Sprintf("%0*d", end-start, n) + pattern[end:]
 }
 
-// batchSubscribe handles "/batchsubscribe ,ssiii <alias> /meters/N <a> <b> <tf>".
+// The strips a parameter /batchsubscribe numbers, as stripPath does: the
+// channels, aux ins, FX returns, buses, matrices, LR and M/C.
+const batchStrips = 72
+
+// batchSubscribe handles "/batchsubscribe ,ssiii <alias> <cmd> <i0> <i1> <tf>".
+// For a meter (/meters/N), i0 and i1 are its arguments. Any other command is
+// a parameter of a strip, such as /mix/on, asked for strips i0 to i1 as
+// stripPath numbers them: the document's "/mfm_a /mix/on 0 63 8" asks the
+// mutes of the channels, aux ins, FX returns and buses, and X32-Mix asks its
+// faders this way. The values come back as for /formatsubscribe, 0 for a
+// strip without that parameter; several commands (,sssiii) give theirs strip
+// by strip.
 func (s *Server) batchSubscribe(m osc.Message, c *Client) error {
-	if len(m.Args) != 5 || m.Args[0].Tag != 's' || m.Args[1].Tag != 's' {
-		return fmt.Errorf("expects ,ssiii")
+	if len(m.Args) < 5 {
+		return fmt.Errorf("expects an alias, commands and three ints")
 	}
-	ints, ok := intArgs(m.Args[2:])
+	ints, ok := intArgs(m.Args[len(m.Args)-3:])
 	if !ok {
-		return fmt.Errorf("expects ,ssiii")
+		return fmt.Errorf("the three last arguments must be ints")
 	}
-	alias := m.Args[0].Str
-	id, err := meterID(m.Args[1].Str)
-	if err != nil {
-		return err
+	for i, a := range m.Args[:len(m.Args)-3] {
+		if a.Tag != 's' {
+			return fmt.Errorf("argument %d must be a string", i+1)
+		}
 	}
-	params := ints[:meterArgCount[id]]
+	alias, cmds := m.Args[0].Str, m.Args[1:len(m.Args)-3]
 	now := time.Now()
-	return s.subs.add(&subscription{
-		client: c, name: alias, kind: "batchsubscribe", interval: interval(ints[2]), expires: now.Add(subLease), next: now,
-		produce: func(t *tick) (osc.Message, bool) {
+	sub := &subscription{client: c, name: alias, kind: "batchsubscribe", interval: interval(ints[2]), expires: now.Add(subLease), next: now}
+	if strings.HasPrefix(cmds[0].Str, "/meters/") {
+		if len(cmds) > 1 {
+			return fmt.Errorf("a meter is asked alone")
+		}
+		id, err := meterID(cmds[0].Str)
+		if err != nil {
+			return err
+		}
+		params := ints[:meterArgCount[id]]
+		sub.produce = func(t *tick) (osc.Message, bool) {
 			return osc.NewMessage(alias, osc.Blob(meterBlob(s.meterValues(id, params, t.levels(), t.now)))), true
-		},
-	})
+		}
+		return s.subs.add(sub)
+	}
+
+	lo, hi := int(ints[0]), int(ints[1])
+	if lo < 0 || hi < lo || hi >= batchStrips {
+		return fmt.Errorf("strips %d to %d: expects strips 0 to %d, in order", lo, hi, batchStrips-1)
+	}
+	if (hi-lo+1)*len(cmds) > maxFormatParams {
+		return fmt.Errorf("more than %d parameters", maxFormatParams)
+	}
+	addrs := make([]string, 0, (hi-lo+1)*len(cmds))
+	known := make([]bool, len(cmds))
+	for n := lo; n <= hi; n++ {
+		strip, _ := stripPath(n)
+		for i, cmd := range cmds {
+			a := strip + cmd.Str
+			if s.store.Schema().Leaf(a) == nil {
+				a = ""
+			} else {
+				known[i] = true
+			}
+			addrs = append(addrs, a)
+		}
+	}
+	for i, ok := range known {
+		if !ok {
+			return fmt.Errorf("unknown parameter %s of strips %d to %d", cmds[i].Str, lo, hi)
+		}
+	}
+	sub.produce = func(*tick) (osc.Message, bool) {
+		return osc.NewMessage(alias, osc.Blob(s.paramBlob(addrs))), true
+	}
+	return s.subs.add(sub)
+}
+
+// paramBlob is what /formatsubscribe and /batchsubscribe send: the blob's
+// length in bytes, then each value, little-endian, a string in 32 bytes; ""
+// stands for a parameter a strip does not have, sent as 0.
+func (s *Server) paramBlob(addrs []string) []byte {
+	body := make([]byte, 4, 4+4*len(addrs))
+	for _, a := range addrs {
+		if a == "" {
+			body = binary.LittleEndian.AppendUint32(body, 0)
+			continue
+		}
+		v, _, _ := s.store.Get(a)
+		switch v.Tag {
+		case 'f':
+			body = binary.LittleEndian.AppendUint32(body, math.Float32bits(v.Float))
+		case 's':
+			str := make([]byte, 32)
+			copy(str, v.Str)
+			body = append(body, str...)
+		default:
+			body = binary.LittleEndian.AppendUint32(body, uint32(v.Int))
+		}
+	}
+	binary.LittleEndian.PutUint32(body, uint32(len(body)))
+	return body
 }

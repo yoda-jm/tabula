@@ -346,6 +346,14 @@
   writing of its `meta.json`.
 
 ### tabula-emu
+- `/batchsubscribe` takes a parameter as well as a meter: X32-Mix showed
+  grey faders it could not move, since the emulator refused how it asks for
+  them. `/batchsubscribe ,ssiii <alias> /mix/fader 0 31 <tf>` sends the
+  faders of strips 0 to 31, numbered as the selected strip (0 is ch 01, 32
+  aux 1, 40 FX return 1, 48 bus 1, 64 matrix 1, 70 LR, 71 M/C), in the same
+  blob as `/formatsubscribe`; the document's example (`/mfm_a /mix/on 0 63
+  8`, the 64 mutes) comes back in its 276 bytes. Reported and first fixed
+  by @mbachurin (pull request #1 on GitHub).
 - A DCA's fader scales the level of its channels and its mute silences
   them (they did not act on the meters); a DCA's meter is the loudest of
   its channels after their faders, a guess (#18).

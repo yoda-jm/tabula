@@ -39,6 +39,19 @@ This page says what is simulated, how, and what is not.
   renews `/meters/5 3 1`). A client holds at most 64 subscriptions; a
   `/formatsubscribe` range covers at most 1000 numbers, every address it
   gives must exist, and a request returns at most 1024 parameters.
+- `/batchsubscribe` takes a meter (`/meters/6 0 0 40`, the two ints its
+  arguments) or a parameter of a strip, as X32-Mix asks its faders:
+  `/batchsubscribe ,ssiii /faders /mix/fader 0 31 0` sends the faders of
+  strips 0 to 31. Strips are numbered as the selected strip
+  (`/-stat/selidx`): 0–31 the channels, 32–39 the aux ins, 40–47 the FX
+  returns, 48–63 the buses, 64–69 the matrices, 70 LR, 71 M/C. The values
+  come in the `/formatsubscribe` blob, 0 for a strip without that
+  parameter (an FX return's `/preamp/trim`); several parameters
+  (`,sssiii`) come strip by strip. The document's `/mfm_a /mix/on 0 63 8`
+  returns the 64 mutes in a 276-byte packet, as it says. The document does
+  not give the numbering or the order of several parameters: they fit its
+  example and what made X32-Mix's faders work (pull request #1), nothing
+  more was checked against a console.
 - Requests the emulator refuses or does not know are logged as unhandled.
   It keeps up to 1000 kinds of them (the next ones are counted together as
   `<other>`), and the first 512 bytes of each packet's text. A client is
