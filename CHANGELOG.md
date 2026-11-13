@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 — show safety, the mixing pages, a patch list
 
 ### tabula
 - A **Patch list** page: a PDF of the inputs and outputs to give to the
