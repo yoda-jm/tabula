@@ -335,14 +335,25 @@ func TestPlaybackMixCrossfade(t *testing.T) {
 	}
 	stopped := make(chan struct{})
 	go func() { p.Stop(); close(stopped) }()
-	g.next <- struct{}{}
-	// the block in flight may still be B; the last one fades to silence
-	var out []byte
-	for out = range g.blocks {
-		if last(out) == 0 {
+	// the next block is let through once Stop asked for the fade: before,
+	// the stream could reach the tracks' end first and never fade out
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+		p.mu.Lock()
+		fading := p.fading
+		p.mu.Unlock()
+		if fading {
 			break
 		}
-		g.next <- struct{}{}
+		if time.Now().After(deadline) {
+			t.Fatal("Stop did not ask for the fade out")
+		}
+	}
+	g.next <- struct{}{}
+	var out []byte
+	select {
+	case out = <-g.blocks: // fades to silence
+	case <-p.Done():
+		t.Fatal("the stream ended without fading out")
 	}
 	if last(out) != 0 || left(out, 0) < (b<<8)*0.9 {
 		t.Errorf("fade out: %v … %v", left(out, 0), last(out))
