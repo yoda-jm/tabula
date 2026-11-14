@@ -313,13 +313,14 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 
 **Setlist** (engineer only): the show's songs and the next one to mark,
 kept in `setlist.json` in the sessions folder. `Setlist`: `{"songs":
-[...], "next", "updated"}`, `next` from 0, `songs.length` once all are
-marked. It is sent as `setlist` events to the engineers when it changes.
+[...], "tempos"?: [...], "next", "updated"}`, `next` from 0,
+`songs.length` once all are marked; `tempos` holds a tempo in BPM per
+song, 0 for a song without one, and is left out when no song has one. It is sent as `setlist` events to the engineers when it changes.
 
 | Method | Path | Body | Answer |
 |---|---|---|---|
 | GET | `/api/setlist` | | `Setlist` |
-| PUT | `/api/setlist` | `{"songs": [...], "next"?: n}` | `Setlist`: the songs replaced (spaces tidied, empty ones dropped; 200 songs of 80 characters at most, else 400); without `next`, the next song stays the same song wherever it moved |
+| PUT | `/api/setlist` | `{"songs": [...], "tempos"?: [...], "next"?: n}` | `Setlist`: the songs replaced (spaces tidied, empty ones dropped with their tempo; 200 songs of 80 characters at most, else 400); `tempos`, one per song (0 for none), from 20 to 300 BPM, rounded to 0.1, else 400; without `next`, the next song stays the same song wherever it moved |
 | POST | `/api/setlist/next` | `{"next": n}` | `Setlist`: song `n` is the next one (back one song, skip one) |
 
 **Patch list** (engineer only): what the Patch list page prints that the

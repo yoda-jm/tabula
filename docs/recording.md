@@ -129,6 +129,11 @@ the menu (▾), and the setlist goes on from it; the menu also goes back one
 song, skips one, or adds a marker with a label of yours (*Break*,
 *Encore*). When every song is marked, ⚑ adds timed markers.
 
+A song can have a **tempo**, typed after its name: *Opening 120 bpm*,
+*Ballad · 72.5 BPM*, *Encore (96 bpm)*. It is not part of the marker; the
+FX page sets the delays and modulations to the tempo of the song playing
+(the last one marked) or of the next one, with one tap.
+
 tabula keeps the setlist in `setlist.json`, in the sessions folder, with
 the next song to mark: it is still there after a restart, and every
 engineer device shows the same next song (two devices marking at the same

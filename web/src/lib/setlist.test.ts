@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextSong, parseSetlist, songLabel, songTimes } from "./setlist";
+import { nextSong, parseSetlist, parseSongs, setlistText, songLabel, songTempo, songTimes } from "./setlist";
 
 describe("setlist", () => {
   it("reads songs typed one per line", () => {
@@ -13,6 +13,19 @@ describe("setlist", () => {
       "2:00 AM",
     ]);
     expect(parseSetlist(" \n ")).toEqual([]);
+  });
+
+  it("reads the tempo typed after a song", () => {
+    expect(parseSongs("1. Opening 120 bpm\nBallad · 72.5 BPM\nEncore (96 bpm)\nShuffle-140bpm\nNo tempo\n128 bpm")).toEqual({
+      songs: ["Opening", "Ballad", "Encore", "Shuffle", "No tempo", "128 bpm"],
+      tempos: [120, 72.5, 96, 140, 0, 0],
+    });
+    const s = { songs: ["Opening", "Ballad"], tempos: [120, 0], next: 0 };
+    expect(setlistText(s)).toBe("Opening · 120 BPM\nBallad");
+    expect(parseSongs(setlistText(s))).toEqual({ songs: s.songs, tempos: s.tempos });
+    expect(songTempo(s, 0)).toBe(120);
+    expect(songTempo(s, 5)).toBe(0);
+    expect(songTempo({ songs: ["A"], next: 0 }, 0)).toBe(0);
   });
 
   it("labels and finds the songs", () => {

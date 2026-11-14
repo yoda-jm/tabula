@@ -3771,3 +3771,39 @@ code.wrap {
     grid-area: note;
   }
 }
+
+/* ---------- tap tempo (FX page) ---------- */
+
+.tap-row {
+  align-items: center;
+  margin-bottom: 10px;
+}
+.btn.tap-btn {
+  min-width: 96px;
+  min-height: 56px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  touch-action: manipulation;
+}
+.tap-readout {
+  min-width: 7em;
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.tap-row .input.num {
+  width: 6em;
+}
+.tap-song {
+  align-items: center;
+  margin-bottom: 8px;
+}
+.tap-targets {
+  margin-top: 6px;
+  grid-template-columns: minmax(96px, 22%) minmax(0, 1fr);
+}
+.tap-follow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

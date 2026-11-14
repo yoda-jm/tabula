@@ -1,7 +1,8 @@
 // Effects: an overview of the 8 FX slots (what is loaded, where it is used)
 // and an editor per slot, generated from the effect's parameters as the
 // server describes them, with a dedicated graphic EQ editor (GEQ, GEQ2,
-// TEQ, TEQ2) showing the RTA behind the bands.
+// TEQ, TEQ2) showing the RTA behind the bands, and a tap tempo for the
+// delays and modulations.
 
 import { useMemo, useState } from "react";
 import { GeqEditor } from "../components/Geq";
@@ -12,10 +13,12 @@ import { fxName, fxUsage, splitDual } from "../lib/fx";
 import { fieldLabel } from "../lib/labels";
 import { go } from "../lib/route";
 import { isGeq } from "../lib/rta";
+import { hasTempo } from "../lib/tempo";
 import { useCanWrite, useLeaf, useNode, useNodes, useSchema, useValue } from "../store/hooks";
 import { lookup } from "../store/lookup";
 import { store } from "../store/store";
 import { NotConnected } from "./common";
+import { TapTempo } from "./TapTempo";
 
 const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -147,7 +150,7 @@ function Uses({ uses }: { uses: Use[] }) {
 
 function SlotEditor({ slot }: { slot: number }) {
   const usage = fxUsage(lookup, slot);
-  useNode(`/fx/${slot}/par`); // new fields when the effect changes
+  const par = useNode(`/fx/${slot}/par`); // new fields when the effect changes
   return (
     <>
       <section className="card">
@@ -165,6 +168,9 @@ function SlotEditor({ slot }: { slot: number }) {
           </div>
         )}
       </section>
+      {hasTempo(usage.type) && !par?.text && (
+        <TapTempo key={`${slot} ${usage.type}`} slot={slot} type={usage.type} />
+      )}
       {isGeq(usage.type) ? (
         <section className="card">
           <GeqEditor slot={slot} type={usage.type} />

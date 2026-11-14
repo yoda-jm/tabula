@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### tabula
+- **Tap tempo** on the FX page, for the delays and the modulations: tap
+  TAP or the T key on the beat, type a tempo, or take the song's from the
+  setlist. The delay's `Time` (or a speed in Hz) is set to a note value of
+  it, 1/4 unless another is chosen (1/8., 1/4T…); the last four intervals
+  are averaged, and a pause or a tap off the beat starts a new tempo. The
+  console's own tap, a user button on an effect's `Time`, takes the last
+  interval alone.
+- The setlist takes a **tempo per song**, typed after its name (*Opening
+  120 bpm*): the FX page sets it to the effects with one tap. `Setlist`
+  has `tempos`, one per song.
+
 ### Docs
 - The README and the site's front page point to the v0.3.0 release; the
   site says what is new in it. The README no longer says X32-Edit connects

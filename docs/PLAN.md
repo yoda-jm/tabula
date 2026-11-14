@@ -63,6 +63,7 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Routing: input routing and patch, outputs, AES50 A/B, card, P16, aux, AES/EBU, user routing, with names resolved.
 - [x] Patchbay: every signal path from the stage box inputs to the stage box outputs and card tracks, lit up on demand, spelled out, with checks (PLAY routing, missing local inputs, silent recorded tracks, 48 V feeding nothing, mixes going nowhere).
 - [x] FX pages: overview of the 8 slots, per-slot editor, graphic EQ with the RTA (also behind the channel EQ curve).
+- [x] Tap tempo for the delays and modulations (TAP, T key, typed, or the setlist song's tempo), with a note value per parameter.
 - [x] Scenes, snippets and presets: list, recall, save, rename, copy, delete (`POST /api/library`).
 - [x] Scene files kept on the laptop (`-scenes`): load into the console line by line, save the console as one, open from the browser (`/api/scenefiles`).
 - [x] The console's USB stick and player: browse, play WAV files, transport (rewind and fast forward too), load scenes, presets and shows from the stick (`/api/usb`). Not yet tried on the real M32.

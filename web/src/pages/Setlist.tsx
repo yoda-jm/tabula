@@ -3,20 +3,20 @@
 // song with its name; here it can be moved back or on.
 
 import { useEffect, useState } from "react";
-import { nextSong, parseSetlist, setlistApi, songLabel } from "../lib/setlist";
+import { nextSong, parseSongs, setlistApi, setlistText, songLabel, songLine } from "../lib/setlist";
 import { useSetlist } from "../store/hooks";
 import { store } from "../store/store";
 
 export function SetlistCard() {
   const setlist = useSetlist();
-  const saved = (setlist?.songs ?? []).join("\n");
+  const saved = setlist ? setlistText(setlist) : "";
   const [text, setText] = useState<string | null>(null); // being typed; null: the saved one
   const [busy, setBusy] = useState(false);
   useEffect(() => setText(null), [saved]); // saved here or elsewhere: show it
   if (!setlist) return null;
   const shown = text ?? saved;
-  const songs = parseSetlist(shown);
-  const changed = songs.join("\n") !== saved;
+  const { songs, tempos } = parseSongs(shown);
+  const changed = songs.map((s, i) => songLine(s, tempos[i])).join("\n") !== saved;
   const next = nextSong(setlist);
   const act = async (f: () => Promise<unknown>) => {
     setBusy(true);
@@ -30,7 +30,7 @@ export function SetlistCard() {
   };
   const save = (from?: number) =>
     act(async () => {
-      store.setSetlist(await setlistApi.save(songs, from));
+      store.setSetlist(await setlistApi.save(songs, tempos, from));
       setText(null);
     });
   const moveTo = (n: number) => act(async () => store.setSetlist(await setlistApi.moveTo(n)));
@@ -42,13 +42,14 @@ export function SetlistCard() {
       </header>
       <p className="muted">
         One song per line, in the order of the show. While recording, ⚑ in the top bar (or the M key, on any page) marks the
-        next song with its name: the songs are then found at once in the recording and its exports.
+        next song with its name: the songs are then found at once in the recording and its exports. A tempo typed after a
+        name (<code>Song name 120 bpm</code>) lets the FX page set the delays to the song playing.
       </p>
       <textarea
         className="input setlist-text"
         rows={Math.min(14, Math.max(5, songs.length + 1))}
         value={shown}
-        placeholder={"Opening\nSecond song\nThird song…"}
+        placeholder={"Opening 120 bpm\nSecond song\nThird song…"}
         spellCheck={false}
         aria-label="Songs, one per line"
         onChange={(e) => setText(e.target.value)}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,11 +29,17 @@ const (
 	setlistFile  = "setlist.json"
 	maxSongs     = 200
 	maxSongChars = 80
+	minTempo     = 20 // BPM
+	maxTempo     = 300
 )
 
 // setlistView is the setlist: GET /api/setlist, "setlist" events.
 type setlistView struct {
-	Songs   []string  `json:"songs"`
+	Songs []string `json:"songs"`
+	// Tempos are the songs' tempos in BPM, one per song, 0 for a song
+	// without one; left out when no song has one. The FX page sets the
+	// delays and modulations to the tempo of the song playing.
+	Tempos  []float64 `json:"tempos,omitempty"`
 	Next    int       `json:"next"` // the next song to mark (from 0); len(songs) once all are marked
 	Updated time.Time `json:"updated,omitzero"`
 }
@@ -67,7 +74,7 @@ func (s *Server) setlistLocked() setlistView {
 		s.log.Warn("setlist: not understood, starting empty", "file", filepath.Join(dir, setlistFile), "err", err)
 		return l.data
 	}
-	if v.Songs, err = cleanSongs(v.Songs); err != nil {
+	if v.Songs, v.Tempos, err = cleanSetlist(v.Songs, v.Tempos); err != nil {
 		s.log.Warn("setlist", "err", err)
 	}
 	v.Next = min(max(v.Next, 0), len(v.Songs))
@@ -98,7 +105,8 @@ func (s *Server) sessionSetlistLocked() {
 	if rec == nil || len(s.setlist.data.Songs) == 0 {
 		return
 	}
-	if err := writeJSONFile(filepath.Join(rec.Dir(), setlistFile), setlistView{Songs: s.setlist.data.Songs}); err != nil {
+	kept := setlistView{Songs: s.setlist.data.Songs, Tempos: s.setlist.data.Tempos}
+	if err := writeJSONFile(filepath.Join(rec.Dir(), setlistFile), kept); err != nil {
 		s.log.Warn("setlist: not kept with the session", "session", rec.Dir(), "err", err)
 	}
 }
@@ -122,20 +130,42 @@ func writeJSONFile(path string, v any) error {
 
 // cleanSongs trims the songs and drops the empty ones.
 func cleanSongs(in []string) ([]string, error) {
-	out := []string{}
-	for _, song := range in {
+	out, _, err := cleanSetlist(in, nil)
+	return out, err
+}
+
+// cleanSetlist trims the songs and drops the empty ones with their tempo.
+// Tempos, one per song when given, are rounded to a tenth of a BPM; a song
+// without one has 0. The tempos are nil when no song has one.
+func cleanSetlist(songs []string, tempos []float64) ([]string, []float64, error) {
+	if tempos != nil && len(tempos) != len(songs) {
+		return []string{}, nil, fmt.Errorf("%d tempos for %d songs: one per song, 0 for none", len(tempos), len(songs))
+	}
+	out, outTempos, some := []string{}, []float64{}, false
+	for i, song := range songs {
 		song = strings.Join(strings.Fields(song), " ")
+		tempo := 0.0
+		if tempos != nil {
+			tempo = math.Round(tempos[i]*10) / 10
+		}
 		switch {
 		case song == "":
 			continue
 		case utf8.RuneCountInString(song) > maxSongChars:
-			return out, fmt.Errorf("%q: a song name takes %d characters at most", song, maxSongChars)
+			return out, nil, fmt.Errorf("%q: a song name takes %d characters at most", song, maxSongChars)
 		case len(out) == maxSongs:
-			return out, fmt.Errorf("a setlist holds %d songs at most", maxSongs)
+			return out, nil, fmt.Errorf("a setlist holds %d songs at most", maxSongs)
+		case tempo != 0 && !(tempo >= minTempo && tempo <= maxTempo):
+			return out, nil, fmt.Errorf("%q: a tempo goes from %d to %d BPM", song, minTempo, maxTempo)
 		}
 		out = append(out, song)
+		outTempos = append(outTempos, tempo)
+		some = some || tempo != 0
 	}
-	return out, nil
+	if !some {
+		outTempos = nil
+	}
+	return out, outTempos, nil
 }
 
 // songLabel is the marker of a song: "3. Song name".
@@ -154,18 +184,20 @@ func (s *Server) getSetlist(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, v)
 }
 
-// putSetlist replaces the songs: {"songs": [...], "next"?: n}; without
-// next, the next song stays the same one when it is still in the list.
+// putSetlist replaces the songs: {"songs": [...], "tempos"?: [...],
+// "next"?: n}; without next, the next song stays the same one when it is
+// still in the list.
 func (s *Server) putSetlist(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Songs []string `json:"songs"`
-		Next  *int     `json:"next"`
+		Songs  []string  `json:"songs"`
+		Tempos []float64 `json:"tempos"`
+		Next   *int      `json:"next"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, http.StatusBadRequest, errors.New(`expects {"songs": [...], "next": n}`))
+		httpError(w, http.StatusBadRequest, errors.New(`expects {"songs": [...], "tempos": [...], "next": n}`))
 		return
 	}
-	songs, err := cleanSongs(req.Songs)
+	songs, tempos, err := cleanSetlist(req.Songs, req.Tempos)
 	if err != nil {
 		httpError(w, http.StatusBadRequest, err)
 		return
@@ -187,7 +219,7 @@ func (s *Server) putSetlist(w http.ResponseWriter, r *http.Request) {
 	default:
 		next = len(songs) // all marked: stays so
 	}
-	v := setlistView{Songs: songs, Next: min(max(next, 0), len(songs))}
+	v := setlistView{Songs: songs, Tempos: tempos, Next: min(max(next, 0), len(songs))}
 	if err := s.saveSetlistLocked(v); err != nil {
 		httpError(w, http.StatusInternalServerError, err)
 		return

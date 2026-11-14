@@ -174,3 +174,38 @@ func TestSetlist(t *testing.T) {
 	}
 	third.setlist.mu.Unlock()
 }
+
+func TestSetlistTempos(t *testing.T) {
+	api := New(quiet)
+	api.SetSessionsDir(t.TempDir())
+	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
+	defer ts.Close()
+
+	// one tempo per song, 0 for none; an empty song drops its tempo with it
+	code, v := putSetlist(t, ts.URL, `{"songs":["Opening","","Ballad","Encore"],"tempos":[120.04,99,0,92.55]}`)
+	if code != http.StatusOK || strings.Join(v.Songs, "|") != "Opening|Ballad|Encore" || !slices.Equal(v.Tempos, []float64{120, 0, 92.6}) {
+		t.Fatalf("put: %d %+v", code, v)
+	}
+	var got setlistView
+	getJSON(t, ts.URL+"/api/setlist", &got)
+	if !slices.Equal(got.Tempos, v.Tempos) {
+		t.Errorf("get: %+v", got)
+	}
+	// no tempo at all: left out
+	if _, v := putSetlist(t, ts.URL, `{"songs":["Opening"],"tempos":[0]}`); v.Tempos != nil {
+		t.Errorf("no tempo: %+v", v)
+	}
+	if _, v := putSetlist(t, ts.URL, `{"songs":["Opening"]}`); v.Tempos != nil {
+		t.Errorf("without tempos: %+v", v)
+	}
+	for _, body := range []string{
+		`{"songs":["Opening","Ballad"],"tempos":[120]}`,
+		`{"songs":["Opening"],"tempos":[19]}`,
+		`{"songs":["Opening"],"tempos":[301]}`,
+		`{"songs":["Opening"],"tempos":[-120]}`,
+	} {
+		if code, _ := putSetlist(t, ts.URL, body); code != http.StatusBadRequest {
+			t.Errorf("%s: %d, want 400", body, code)
+		}
+	}
+}

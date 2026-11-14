@@ -348,6 +348,22 @@ confirmation, as the new effect starts from its defaults), its sources for
 FX 1-4, and its parameters with their names, ranges and units as the console
 has them. Dual effects show their two sides side by side.
 
+**Tempo**: delays (DLY, 3TAP, 4TAP, D/RV, D/CR, D/FL, MODD) and
+modulations (CRS, FLNG, PHAS, FILT, PAN, CR/R, FL/R) have a tap tempo. Tap
+**TAP** (or the T key) on the beat: from the second tap, the delay's
+`Time` is set to the beat, and each tap after it to the average of the
+last four intervals; a pause of 3 s, or a tap far off the beat, starts a
+new tempo. A tempo can also be typed, or taken from the setlist: a song
+with a tempo (*Song name 120 bpm*, see [recording](recording.md)) shows
+as *Playing* or *Next* with a button setting it. Each parameter has a
+note value: the delay's `Time` is a quarter note unless another is chosen
+(1/8. for a dotted eighth), and a speed in Hz makes one cycle per note.
+The `Time` of a delay follows the tempo, its modulation's speed when it is
+ticked; a modulation alone follows with its speed. The console's factors
+and patterns (Factor L 3/2, Pattern 1/4X) still apply on top of `Time`.
+A value out of a parameter's range stops at its end, with a note. The
+header shows the tempo the console holds now, from the first parameter.
+
 **Graphic EQs** (GEQ, GEQ2, TEQ, TEQ2) get a dedicated editor: 31 band
 faders and the master level, side A or B for the dual ones, with the RTA
 behind the bands. Drag a band up or down (Shift for fine moves, a touch
