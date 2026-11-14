@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { songLabel, songTempo } from "../lib/setlist";
 import type { Target } from "../lib/tempo";
 import {
+  MAX_BPM,
+  MIN_BPM,
   NOTES,
   addTap,
   beatMs,
@@ -30,9 +32,14 @@ interface Row extends Target {
 export function TapTempo({ slot, type }: { slot: number; type: string }) {
   const path = `/fx/${slot}/par`;
   useNode(path); // the values shown follow the console
-  const [rows, setRows] = useState<Row[]>(() =>
-    tempoTargets(type, store.fieldsOf(path)).map((t) => ({ ...t, note: "1/4" })),
-  );
+  // the targets come from the effect's fields as they are now (they arrive
+  // a moment after the type changes); what the user chose is kept per target
+  const [prefs, setPrefs] = useState<Record<string, { on?: boolean; note?: string }>>({});
+  const keyOf = (t: Target) => `${t.field} ${t.label}`;
+  const rows: Row[] = tempoTargets(type, store.fieldsOf(path)).map((t) => {
+    const p = prefs[keyOf(t)] ?? {};
+    return { ...t, on: p.on ?? t.on, note: p.note ?? "1/4" };
+  });
   const [taps, setTaps] = useState<number[]>([]);
   const [typed, setTyped] = useState("");
   const [clamped, setClamped] = useState<string[]>([]);
@@ -64,7 +71,7 @@ export function TapTempo({ slot, type }: { slot: number; type: string }) {
     tapsRef.current = next;
     setTaps(next);
     const ms = beatMs(next);
-    if (ms !== null) apply(bpmOf(ms));
+    if (ms !== null && bpmOf(ms) >= MIN_BPM && bpmOf(ms) <= MAX_BPM) apply(bpmOf(ms));
   };
   const tapRef = useRef(tap);
   tapRef.current = tap;
@@ -108,7 +115,10 @@ export function TapTempo({ slot, type }: { slot: number; type: string }) {
     }
   }
 
-  const setRow = (i: number, change: Partial<Row>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...change } : r)));
+  const setRow = (i: number, change: Partial<Row>) => {
+    const k = keyOf(rows[i]);
+    setPrefs({ ...prefs, [k]: { ...prefs[k], ...change } });
+  };
 
   return (
     <section className="card tap-tempo">

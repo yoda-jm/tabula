@@ -209,3 +209,19 @@ func TestSetlistTempos(t *testing.T) {
 		}
 	}
 }
+
+// A setlist.json edited by hand, tempos not matching its songs: the songs
+// stay, the tempos are left out.
+func TestSetlistTemposMismatch(t *testing.T) {
+	api := New(quiet)
+	dir := t.TempDir()
+	api.SetSessionsDir(dir)
+	os.WriteFile(filepath.Join(dir, "setlist.json"), []byte(`{"songs":["A","B"],"tempos":[120],"next":1}`), 0o644)
+	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
+	defer ts.Close()
+	var v setlistView
+	getJSON(t, ts.URL+"/api/setlist", &v)
+	if strings.Join(v.Songs, "|") != "A|B" || v.Tempos != nil || v.Next != 1 {
+		t.Errorf("loaded: %+v", v)
+	}
+}

@@ -272,6 +272,14 @@ func (s *Server) tickAudio(rec *session.Recorder) {
 // capture first, so that meta.json ends with the final audio section. With
 // audio, the Reaper project and the label track are written in the session.
 func (s *Server) endRecording(rec *session.Recorder, c *audio.Capture) (*audio.Status, error) {
+	s.mu.Lock()
+	s.finishing++ // compressing waits: the disk and the files are the recording's
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.finishing--
+		s.mu.Unlock()
+	}()
 	var last *audio.Status
 	if c != nil {
 		st := c.Stop()

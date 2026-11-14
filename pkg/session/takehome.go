@@ -2,6 +2,7 @@ package session
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"io"
 	"io/fs"
@@ -69,6 +70,9 @@ func (s *Session) HomeFiles(flac bool) ([]HomeFile, error) {
 		if err != nil {
 			return err
 		}
+		if strings.HasSuffix(rel, ".part") || strings.HasSuffix(rel, ".tmp") { // being written (compressing, meta.json)
+			return nil
+		}
 		f := HomeFile{Name: filepath.ToSlash(rel), Path: p, Size: info.Size(), Mod: info.ModTime()}
 		if flac && strings.HasPrefix(f.Name, "audio/") && strings.EqualFold(path.Ext(f.Name), ".wav") {
 			if w, err := audio.ReadWAV(p); err == nil && w.Format == 1 && w.Channels > 0 && w.DataSize > 0 &&
@@ -99,6 +103,18 @@ func (s *Session) HomeFiles(flac bool) ([]HomeFile, error) {
 		out = slices.DeleteFunc(out, func(f HomeFile) bool { return f.Name == rpp })
 		out = append(out, HomeFile{Name: rpp, Size: int64(b.Len()), Mod: time.Now(), data: b.Bytes()})
 	}
+	// one file per name: a WAV left over beside its FLAC (compressed) gives way
+	seen := map[string]bool{}
+	slices.SortStableFunc(out, func(a, b HomeFile) int { // the track meta.json names first
+		return cmp.Compare(b2i(!s.names(a.Path)), b2i(!s.names(b.Path)))
+	})
+	out = slices.DeleteFunc(out, func(f HomeFile) bool {
+		if seen[f.Name] {
+			return true
+		}
+		seen[f.Name] = true
+		return false
+	})
 	slices.SortFunc(out, func(a, b HomeFile) int {
 		if a.Audio() != b.Audio() {
 			if a.Audio() {
@@ -175,4 +191,24 @@ func HomeSize(files []HomeFile) (size int64, exact bool) {
 		}
 	}
 	return size, exact
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// names tells whether meta.json names the file at path as a track.
+func (s *Session) names(path string) bool {
+	if s.Meta.Audio == nil || path == "" {
+		return false
+	}
+	for _, t := range s.Meta.Audio.Tracks {
+		if t.File != "" && filepath.Join(s.Dir, filepath.FromSlash(t.File)) == path {
+			return true
+		}
+	}
+	return false
 }

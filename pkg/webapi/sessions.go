@@ -78,7 +78,7 @@ func (s *Server) publishRecord() { s.hub.publish("record", s.recordStatus()) }
 // request goes on meanwhile; the recording shows once it runs.
 func (s *Server) StartRecording(note string) error {
 	s.mu.Lock()
-	busy, local := s.rec != nil || s.recStarting != nil, s.local != nil
+	busy, local := s.rec != nil || s.recStarting != nil, s.local != nil || s.localOpening
 	s.mu.Unlock()
 	if busy { // at once, rather than after the start being made
 		return errors.New("already recording")
@@ -101,6 +101,9 @@ func (s *Server) StartRecording(note string) error {
 	case s.rec != nil || s.recStarting != nil:
 		s.mu.Unlock()
 		return errors.New("already recording")
+	case s.local != nil || s.localOpening: // opened since the first check
+		s.mu.Unlock()
+		return errors.New("a local replay is open: go back to the console to record")
 	case s.audio.testing: // started again since waitAudioFree
 		s.mu.Unlock()
 		return errors.New("the audio input is being tested: try again in a few seconds")

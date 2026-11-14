@@ -38,6 +38,7 @@ type compressState struct {
 	paused  string
 	err     string
 	cancel  context.CancelFunc // the track being compressed
+	poll    time.Duration      // tests: how often a waiting compression looks again
 }
 
 // compressView is the compression: GET /api/compress, "compress" events.
@@ -98,8 +99,8 @@ func (s *Server) compressInterrupt() {
 // compressBusy says why a session cannot be compressed now, "" if it can.
 func (s *Server) compressBusy(name string) string {
 	s.mu.Lock()
-	recording := s.rec != nil || s.recStarting != nil
-	inUse := s.replayCancel != nil && s.replayOf == name || s.local != nil && s.local.name == name
+	recording := s.rec != nil || s.recStarting != nil || s.finishing > 0
+	inUse := s.replayCancel != nil && s.replayOf == name || s.local != nil && s.local.name == name || s.localOpening
 	s.mu.Unlock()
 	switch {
 	case recording:
@@ -115,8 +116,16 @@ func (s *Server) compressBusy(name string) string {
 	return ""
 }
 
-// compressPollEvery is how often a waiting compression looks again.
-var compressPollEvery = 2 * time.Second
+// compressPollEvery is how often a waiting compression looks again
+// (compressState.poll replaces it in tests).
+const compressPollEvery = 2 * time.Second
+
+func (s *Server) compressPoll() time.Duration {
+	if s.cmp.poll > 0 {
+		return s.cmp.poll
+	}
+	return compressPollEvery
+}
 
 func (s *Server) compressRun() {
 	c := &s.cmp
@@ -134,8 +143,11 @@ func (s *Server) compressRun() {
 		c.mu.Lock()
 		switch {
 		case errors.Is(err, errCompressWait):
+			if c.paused == "in use" && len(c.queue) > 1 { // the others meanwhile
+				c.queue = append(c.queue[1:], name)
+			}
 			c.mu.Unlock()
-			time.Sleep(compressPollEvery)
+			time.Sleep(s.compressPoll())
 			continue
 		case err != nil:
 			c.err = fmt.Sprintf("%s: %v", name, err)
@@ -181,6 +193,14 @@ func (s *Server) compressSession(name string) error {
 	if info == nil {
 		return nil
 	}
+	for _, t := range info.Tracks { // a WAV left over (Windows: it was open) once its FLAC was named
+		if audio.IsFLAC(t.File) {
+			wav := filepath.Join(dir, filepath.FromSlash(strings.TrimSuffix(t.File, filepath.Ext(t.File))+".wav"))
+			if _, err := os.Stat(wav); err == nil && os.Remove(wav) == nil {
+				s.log.Info("compress: a WAV left over removed", "file", wav)
+			}
+		}
+	}
 	var todo []int
 	for i, t := range info.Tracks {
 		if t.File != "" && strings.EqualFold(filepath.Ext(t.File), ".wav") {
@@ -189,6 +209,9 @@ func (s *Server) compressSession(name string) error {
 	}
 	c.mu.Lock()
 	c.session, c.paused, c.done, c.total = name, "", 0, len(todo)
+	if strings.HasPrefix(c.err, name+":") { // an earlier run's: this one says again
+		c.err = ""
+	}
 	c.mu.Unlock()
 	s.publishCompress()
 	compressed := 0
@@ -206,24 +229,54 @@ func (s *Server) compressSession(name string) error {
 		c.track, c.done, c.paused, c.cancel = filepath.Base(t.File), k, "", cancel
 		c.mu.Unlock()
 		s.publishCompress()
+		// a recording, a replay or a copy starting meanwhile stops the track
+		var why string
+		watched := make(chan struct{})
+		go func() {
+			tick := time.NewTicker(s.compressPoll() / 4)
+			defer tick.Stop()
+			for {
+				select {
+				case <-watched:
+					return
+				case <-tick.C:
+					if w := s.compressBusy(name); w != "" {
+						c.mu.Lock()
+						why = w
+						c.mu.Unlock()
+						cancel()
+						return
+					}
+				}
+			}
+		}()
 		before, statErr := os.Stat(wav)
-		err := audio.CompressTrack(ctx, wav, dst)
+		err := statErr
+		if err == nil {
+			err = audio.CompressTrack(ctx, wav, dst)
+		}
+		close(watched)
 		cancel()
 		c.mu.Lock()
 		c.cancel = nil
+		if why == "" && errors.Is(err, context.Canceled) {
+			why = "recording" // compressInterrupt
+		}
+		stopped := why
 		c.mu.Unlock()
 		switch {
 		case errors.Is(err, context.Canceled):
-			setPaused("recording")
+			setPaused(stopped)
 			return errCompressWait
 		case errors.Is(err, audio.ErrNotCompressible):
 			s.log.Info("compress: kept as WAV", "session", name, "track", t.File, "why", err)
 			continue
-		case statErr != nil && err == nil:
-			err = statErr
-		}
-		if err != nil {
-			return err
+		case err != nil: // this track stays WAV; the others go on
+			s.log.Error("compress: kept as WAV", "session", name, "track", t.File, "err", err)
+			c.mu.Lock()
+			c.err = fmt.Sprintf("%s: %s: %v", name, t.File, err)
+			c.mu.Unlock()
+			continue
 		}
 		// the FLAC file is the track from now on, then the WAV goes; meta.json
 		// is read again (a review may have added a marker meanwhile)
@@ -289,4 +342,13 @@ func (s *Server) compressRoutes(mux *http.ServeMux) {
 		s.CompressSession(name)
 		writeJSON(w, http.StatusAccepted, s.compressView())
 	})
+}
+
+// compressing tells whether a session's tracks are being compressed now
+// (a copy or a download would see files come and go).
+func (s *Server) compressing(name string) bool {
+	c := &s.cmp
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.running && c.session == name && c.paused == ""
 }

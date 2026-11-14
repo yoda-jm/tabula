@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -112,8 +113,8 @@ func (s *Server) homeFiles(w http.ResponseWriter, name string, flac bool) (*sess
 	case s.recordingSession(name):
 		httpError(w, http.StatusConflict, errRecordingThis)
 		return nil, nil, false
-	case flac && !audio.FLACAvailable():
-		httpError(w, http.StatusConflict, errNoFLAC)
+	case s.compressing(name):
+		httpError(w, http.StatusConflict, errors.New("this session's tracks are being compressed: try again once it is done"))
 		return nil, nil, false
 	}
 	ses, err := s.openSession(dir)
@@ -124,6 +125,10 @@ func (s *Server) homeFiles(w http.ResponseWriter, name string, flac bool) (*sess
 	files, err := ses.HomeFiles(flac)
 	if err != nil {
 		httpError(w, http.StatusInternalServerError, err)
+		return nil, nil, false
+	}
+	if flac && !audio.FLACAvailable() && slices.ContainsFunc(files, func(f session.HomeFile) bool { return f.FLAC }) {
+		httpError(w, http.StatusConflict, errNoFLAC) // WAV tracks to convert; FLAC ones are copied as they are
 		return nil, nil, false
 	}
 	return ses, files, true

@@ -37,6 +37,9 @@ type Server struct {
 	cancelSub  func()
 	addr       string      // the console asked for, to go back to after a local replay
 	local      *localState // the local replay open (local.go)
+	// localOpening: a local replay is being opened (the session console
+	// built); a second one, a recording or a replay wait for it
+	localOpening bool
 
 	hub hub
 
@@ -75,6 +78,7 @@ type Server struct {
 	backup    usbBackupState // usbbackup.go
 	home      homeState      // takehome.go
 	cmp       compressState  // compress.go
+	finishing int            // recordings whose files are being finished (endRecording)
 
 	version string    // about.go
 	logFile string    // about.go

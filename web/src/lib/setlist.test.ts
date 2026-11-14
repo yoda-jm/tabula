@@ -20,6 +20,13 @@ describe("setlist", () => {
       songs: ["Opening", "Ballad", "Encore", "Shuffle", "No tempo", "128 bpm"],
       tempos: [120, 72.5, 96, 140, 0, 0],
     });
+    // only a tempo set apart, from 20 to 300: the words stay in the name otherwise
+    expect(parseSongs("Song 12 bpm\nSong 1120 bpm\nSong 120.25 bpm\nSong 99.5 bpm").songs).toEqual([
+      "Song 12 bpm",
+      "Song 1120 bpm",
+      "Song 120.25 bpm",
+      "Song",
+    ]);
     const s = { songs: ["Opening", "Ballad"], tempos: [120, 0], next: 0 };
     expect(setlistText(s)).toBe("Opening · 120 BPM\nBallad");
     expect(parseSongs(setlistText(s))).toEqual({ songs: s.songs, tempos: s.tempos });

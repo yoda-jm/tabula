@@ -360,7 +360,8 @@ audio settings does it once each recording stops.
   about the size of `flac -1`; Reaper and Audacity open them.
 - **Checked before a WAV goes.** Each track is encoded to
   `audio/NN Name.flac.part`, decoded again from its start and compared
-  with the WAV: its length and the MD5 of its samples. Only then is it
+  with the samples read from the WAV: its length and the MD5 of its
+  samples. Only then is it
   renamed, `meta.json` names the FLAC file, and the WAV is deleted. A crash
   leaves each track whole, WAV or FLAC; a `.part` left over is removed at
   the next run.
@@ -373,8 +374,14 @@ audio settings does it once each recording stops.
   again to name them. Taken home *as recorded*, they become WAV files again
   on the way; taken home in FLAC, they are copied as they are.
 - 16 and 24-bit tracks are compressed, and 32-bit ones holding 24 bits (the
-  card's): their low byte is checked to be empty over the whole track.
-  Float tracks, or 32 bits really used, stay WAV.
+  card's): their low byte is checked to be empty over the whole track
+  (taken home as recorded, they come back as 24-bit WAV files, the same
+  samples). Float tracks, or 32 bits really used, stay WAV. A track that
+  cannot be read stays as it is, the others are compressed, and the error
+  says which.
+- A copy to a disk or a download waits until the session is compressed
+  (409 meanwhile); a recording, a replay or a copy starting during a
+  track stops it, to be done again later.
 - On the development laptop, about 37 MB/s of WAV encoded and 47 MB/s decoded per
   core, so a track is read twice: a 3-hour show of 32 tracks (about 50 GB)
   takes about 40 minutes.

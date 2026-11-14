@@ -49,8 +49,10 @@ export function parseSetlist(text: string): string[] {
   return parseSongs(text).songs;
 }
 
-// A tempo after the name: "120 bpm", "· 92.5 BPM", "(120 bpm)", "- 120bpm".
-const TEMPO = /\s*[·(,\-–]?\s*(\d{2,3}(?:[.,]\d)?)\s*bpm\s*\)?\s*$/i;
+// A tempo after the name, set apart by a space or a sign: "120 bpm",
+// "· 92.5 BPM", "(120 bpm)", "- 120bpm"; from 20 to 300, else the words
+// stay in the name ("Song 1120 bpm", "Track 12 bpm").
+const TEMPO = /(?:\s*[·(,\-–]\s*|\s+)(\d{2,3}(?:[.,]\d)?)\s*bpm\s*\)?\s*$/i;
 
 /**
  * parseSongs reads songs typed one per line as parseSetlist does, with the
@@ -63,8 +65,9 @@ export function parseSongs(text: string): { songs: string[]; tempos: number[] } 
     let song = line.replace(/^\s*\d{1,3}\s*[.):\-–](?!\d)\s*/, "").replace(/\s+/g, " ").trim();
     let tempo = 0;
     const m = TEMPO.exec(song);
-    if (m && m.index > 0) {
-      tempo = Number(m[1].replace(",", "."));
+    const bpm = m ? Number(m[1].replace(",", ".")) : 0;
+    if (m && m.index > 0 && bpm >= 20 && bpm <= 300) {
+      tempo = bpm;
       song = song.slice(0, m.index).trim();
     }
     if (!song) continue;

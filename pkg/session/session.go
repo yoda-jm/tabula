@@ -413,7 +413,7 @@ func UpdateMeta(dir string, change func(*Meta)) error {
 		return fmt.Errorf("meta.json: %w", err)
 	}
 	change(&m)
-	return writeMeta(dir, m)
+	return writeMetaSynced(dir, m)
 }
 
 // AddMarker adds a marker to a finished session, at t seconds after its
@@ -510,6 +510,25 @@ func writeMeta(dir string, m Meta) error {
 		return err
 	}
 	return os.Rename(tmp, filepath.Join(dir, "meta.json"))
+}
+
+// writeMetaSynced writes meta.json as writeMeta does, made durable before
+// it returns: a finished session's tracks go once their FLAC is named
+// (never an empty meta.json after a power cut). Not while recording: a
+// slow disk would wait.
+func writeMetaSynced(dir string, m Meta) error {
+	data, _ := json.MarshalIndent(m, "", "  ")
+	tmp := filepath.Join(dir, "meta.json.tmp")
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	if err := syncFile(tmp); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, filepath.Join(dir, "meta.json")); err != nil {
+		return err
+	}
+	return audio.SyncDir(dir)
 }
 
 // Session is a recorded session, loaded in memory.

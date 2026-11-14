@@ -19,6 +19,13 @@ export function LocalBand() {
 
 function Band({ l }: { l: LocalStatus }) {
   const [now, setNow] = useState(Date.now());
+  // when this status came: the position moves on from it (this device's clock only)
+  const [received, setReceived] = useState(Date.now());
+  useEffect(() => {
+    const t = Date.now();
+    setReceived(t);
+    setNow(t);
+  }, [l]);
   const [drag, setDrag] = useState<number | null>(null); // the seek bar being dragged
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
   const [busy, setBusy] = useState(false);
@@ -50,7 +57,11 @@ function Band({ l }: { l: LocalStatus }) {
       setBusy(false);
     }
   };
-  const at = localAt(l, now);
+  const at = localAt(l, received, now);
+  // the position now, for the mark editor: the status and its time from the same render
+  const positionRef = useRef(() => at);
+  positionRef.current = () => localAt(l, received, Date.now());
+  const position = () => positionRef.current();
   const seek = (t: number) => act(() => localApi.transport({ at: Math.min(l.duration, Math.max(0, t)) }));
   const toggle = () => act(() => localApi.transport({ play: !l.playing, ...(at >= l.duration ? { at: 0 } : {}) }));
   const mark = () =>
@@ -220,7 +231,7 @@ function Band({ l }: { l: LocalStatus }) {
         <MarkEditor
           session={l.session}
           duration={l.duration}
-          now={() => localAt(store.status.local ?? l, Date.now())}
+          now={position}
           onSeek={(t) => void seek(t)}
           onClose={() => setEditing(false)}
         />

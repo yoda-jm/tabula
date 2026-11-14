@@ -74,6 +74,10 @@ func (s *Server) setlistLocked() setlistView {
 		s.log.Warn("setlist: not understood, starting empty", "file", filepath.Join(dir, setlistFile), "err", err)
 		return l.data
 	}
+	if v.Tempos != nil && len(v.Tempos) != len(v.Songs) { // edited by hand: the songs stay
+		s.log.Warn("setlist: the tempos do not match the songs, left out", "songs", len(v.Songs), "tempos", len(v.Tempos))
+		v.Tempos = nil
+	}
 	if v.Songs, v.Tempos, err = cleanSetlist(v.Songs, v.Tempos); err != nil {
 		s.log.Warn("setlist", "err", err)
 	}

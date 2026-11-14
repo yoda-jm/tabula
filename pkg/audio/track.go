@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -25,12 +26,31 @@ type TrackReader interface {
 	Close() error
 }
 
-// OpenTrack opens a mono WAV or FLAC track (by its extension).
+// OpenTrack opens a mono WAV or FLAC track (by its extension). A WAV
+// track gone is looked for as FLAC: compressed since its name was read.
 func OpenTrack(path string) (TrackReader, error) {
 	if IsFLAC(path) {
 		return openFLAC(path)
 	}
-	return openWAVTrack(path)
+	r, err := openWAVTrack(path)
+	if errors.Is(err, os.ErrNotExist) {
+		if f, ferr := openFLAC(strings.TrimSuffix(path, filepath.Ext(path)) + ".flac"); ferr == nil {
+			return f, nil
+		}
+	}
+	return r, err
+}
+
+// SyncDir makes a rename in dir durable (nothing to do on Windows).
+func SyncDir(dir string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	return errors.Join(d.Sync(), d.Close())
 }
 
 // IsFLAC tells a FLAC track by its name.
@@ -195,7 +215,7 @@ func CompressTrack(ctx context.Context, src, dst string) error {
 		return err
 	}
 	ok = true
-	return nil
+	return SyncDir(filepath.Dir(dst)) // the FLAC is there before the WAV can go
 }
 
 // verifyFLAC decodes a FLAC track from its start and checks its length and

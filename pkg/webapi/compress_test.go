@@ -11,14 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yoda-jm/tabula/pkg/audio"
 	"github.com/yoda-jm/tabula/pkg/session"
 )
 
 func TestCompressSession(t *testing.T) {
-	old := compressPollEvery
-	compressPollEvery = 20 * time.Millisecond
-	defer func() { compressPollEvery = old }()
 	api := New(quiet)
+	api.cmp.poll = 20 * time.Millisecond
 	sessions := t.TempDir()
 	api.SetSessionsDir(sessions)
 	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
@@ -120,5 +119,45 @@ func TestCompressSession(t *testing.T) {
 	}
 	if peak < 0.49 || peak > 0.51 {
 		t.Errorf("meters from the FLAC track: %v", tracks)
+	}
+}
+
+// A track that cannot be compressed (its WAV gone) stays as it is, the
+// others are compressed, and the error says which.
+func TestCompressSkipsABrokenTrack(t *testing.T) {
+	api := New(quiet)
+	api.cmp.poll = 20 * time.Millisecond
+	sessions := t.TempDir()
+	api.SetSessionsDir(sessions)
+	dir := filepath.Join(sessions, "show")
+	localSession(t, dir, "/ch/01")
+	writeMonoWAV(t, filepath.Join(dir, "audio", "02 Cajon.wav"), 96000, 0, 0.25)
+	session.UpdateMeta(dir, func(m *session.Meta) {
+		m.Audio.Tracks = append(m.Audio.Tracks[:1],
+			audio.Track{Channel: 3, Name: "Gone", File: "audio/03 Gone.wav"},
+			audio.Track{Channel: 2, Name: "Cajon", File: "audio/02 Cajon.wav"})
+	})
+	api.CompressSession("show")
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		if v := api.compressView(); len(v.Queue) == 0 {
+			if !strings.Contains(v.Error, "03 Gone.wav") {
+				t.Errorf("error: %q", v.Error)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("not done: %+v", api.compressView())
+		}
+	}
+	ses, err := session.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var files []string
+	for _, tr := range ses.Meta.Audio.Tracks {
+		files = append(files, tr.File)
+	}
+	if strings.Join(files, "|") != "audio/01 Hang.flac|audio/03 Gone.wav|audio/02 Cajon.flac" {
+		t.Errorf("tracks: %q", files)
 	}
 }

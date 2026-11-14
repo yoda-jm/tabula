@@ -285,3 +285,59 @@ func put(t *testing.T, url, body string) int {
 	resp.Body.Close()
 	return resp.StatusCode
 }
+
+// Opened many times at once: one local replay, the others refused, nothing
+// left running once it is closed.
+func TestLocalOpenOnce(t *testing.T) {
+	api := New(quiet)
+	sessions := t.TempDir()
+	api.SetSessionsDir(sessions)
+	localSession(t, filepath.Join(sessions, "show"), "/ch/01")
+	codes := make(chan int, 8)
+	for range 8 {
+		go func() {
+			code, _ := api.OpenLocal("show", 0)
+			codes <- code
+		}()
+	}
+	ok := 0
+	for range 8 {
+		if <-codes == http.StatusOK {
+			ok++
+		}
+	}
+	if ok != 1 {
+		t.Errorf("%d local replays opened", ok)
+	}
+	api.CloseLocal(false)
+	api.mu.Lock()
+	opening, local := api.localOpening, api.local
+	api.mu.Unlock()
+	if opening || local != nil {
+		t.Errorf("after closing: opening %v, local %v", opening, local)
+	}
+}
+
+// The session's own solos are not carried into the session console: SOLO
+// is the listener's.
+func TestLocalSessionSolosLeftOut(t *testing.T) {
+	api := New(quiet)
+	sessions := t.TempDir()
+	api.SetSessionsDir(sessions)
+	dir := filepath.Join(sessions, "show")
+	localSession(t, dir, "/ch/01")
+	f, _ := os.OpenFile(filepath.Join(dir, "events.jsonl"), os.O_APPEND|os.O_WRONLY, 0o644)
+	f.WriteString(`{"t":0.3,"addr":"/-stat/solosw/01","text":"ON"}` + "\n")
+	f.Close()
+	if code, err := api.OpenLocal("show", 1); err != nil {
+		t.Fatalf("%d %v", code, err)
+	}
+	defer api.CloseLocal(false)
+	l := api.localNow()
+	if v, _, _ := l.srv.Store().Get("/-stat/solosw/01"); v.Int != 0 {
+		t.Error("the session's solo is on in the session console")
+	}
+	if cue := l.view().Cue; len(cue) != 0 {
+		t.Errorf("cued: %+v", cue)
+	}
+}

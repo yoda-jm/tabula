@@ -31,10 +31,14 @@ export function nextMark(marks: Mark[], at: number): Mark | undefined {
   return marks.find((m) => m.t > at + 0.05);
 }
 
-/** localAt is where the replay is at now (Unix ms), moving on from the status while it plays. */
-export function localAt(l: LocalStatus, now: number): number {
+/**
+ * localAt is where the replay is at now, moving on while it plays from
+ * when this page received the status (both times from this device's
+ * clock: a phone's may differ from the server's by seconds).
+ */
+export function localAt(l: LocalStatus, received: number, now: number): number {
   if (!l.playing) return l.at;
-  return Math.min(l.duration, Math.max(0, l.at + ((now - l.at_ms) / 1000) * l.speed));
+  return Math.min(l.duration, Math.max(0, l.at + ((now - received) / 1000) * l.speed));
 }
 
 export const SPEEDS = [0.5, 1, 2, 4, 8];

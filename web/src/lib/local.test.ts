@@ -18,10 +18,11 @@ const base: LocalStatus = {
 
 describe("local replay", () => {
   it("moves on from the status while playing", () => {
-    expect(localAt(base, 1_005_000)).toBe(10);
-    expect(localAt({ ...base, playing: true }, 1_005_000)).toBe(15);
-    expect(localAt({ ...base, playing: true, speed: 4 }, 1_005_000)).toBe(30);
-    expect(localAt({ ...base, playing: true }, 2_000_000)).toBe(100); // not past the end
+    // received at 500_000 by a device whose clock is far from the server's (at_ms)
+    expect(localAt(base, 500_000, 505_000)).toBe(10);
+    expect(localAt({ ...base, playing: true }, 500_000, 505_000)).toBe(15);
+    expect(localAt({ ...base, playing: true, speed: 4 }, 500_000, 505_000)).toBe(30);
+    expect(localAt({ ...base, playing: true }, 500_000, 2_000_000)).toBe(100); // not past the end
   });
 
   it("lists what can be listened to", () => {

@@ -65,8 +65,11 @@ func newFLACWriter(w io.WriterAt, rate, bps int, total int64) (*flacWriter, erro
 		points = int((total + every - 1) / every)
 	}
 	f.seeks = make([]flacSeekPoint, 0, points)
-	// "fLaC", STREAMINFO, SEEKTABLE: written again at the end
-	f.audio = 4 + 4 + 34 + 4 + int64(18*points)
+	// "fLaC", STREAMINFO, SEEKTABLE (none for an empty track): written again at the end
+	f.audio = 4 + 4 + 34
+	if points > 0 {
+		f.audio += 4 + int64(18*points)
+	}
 	f.off = f.audio
 	return f, nil
 }

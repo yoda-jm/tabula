@@ -19,6 +19,7 @@ import (
 
 	"github.com/yoda-jm/tabula/pkg/audio"
 	"github.com/yoda-jm/tabula/pkg/emu"
+	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/schema"
 	"github.com/yoda-jm/tabula/pkg/session"
 	"github.com/yoda-jm/tabula/pkg/state"
@@ -135,7 +136,7 @@ func (s *Server) OpenLocal(name string, from float64) (int, error) {
 	}
 	s.mu.Lock()
 	switch {
-	case s.local != nil:
+	case s.local != nil || s.localOpening:
 		err = errors.New("a local replay is open: close it first")
 	case s.rec != nil || s.recStarting != nil:
 		err = errors.New("a recording is running: stop it before a local replay")
@@ -145,14 +146,28 @@ func (s *Server) OpenLocal(name string, from float64) (int, error) {
 		err = errors.New("the audio input is being tested")
 	}
 	back, model := s.addr, s.model
+	if err == nil {
+		s.localOpening = true // reserved while the session console is built
+	}
 	s.mu.Unlock()
 	if err != nil {
 		return http.StatusConflict, err
 	}
+	opened := false
+	defer func() {
+		if !opened {
+			s.mu.Lock()
+			s.localOpening = false
+			s.mu.Unlock()
+		}
+	}()
 
 	st := state.New(schema.Build(model))
 	from = min(max(from, 0), ses.Meta.Duration)
 	ses.StateAt(st, from)
+	for i := 1; i <= 80; i++ { // the session's solos stay out: SOLO cues the listener's tracks
+		st.Set(fmt.Sprintf("/-stat/solosw/%02d", i), osc.Int(0), "local")
+	}
 	l := &localState{name: name, ses: ses, back: back, speed: 1, at: from, lmode: "off", marks: []markView{}}
 	for _, m := range ses.Markers() {
 		l.marks = append(l.marks, markView{Label: m.Marker, T: m.T})
@@ -187,12 +202,12 @@ func (s *Server) OpenLocal(name string, from float64) (int, error) {
 		}
 	})
 	go func() { <-ctx.Done(); unwatch() }()
-	if left, right := audio.MainTracks(st); left > 0 && right > 0 {
+	if left, right := audio.MainTracks(st); recordedTrack(ses, left) && recordedTrack(ses, right) {
 		l.listen, l.lmode = []audio.MixTrack{{Channel: left, Gain: 1, Pan: -1}, {Channel: right, Gain: 1, Pan: 1}}, "stereo"
 	}
 
 	s.mu.Lock()
-	s.local = l
+	s.local, s.localOpening, opened = l, false, true
 	s.mu.Unlock()
 	s.log.Info("local replay", "session", name, "from", from, "console", l.addr, "back", back)
 	s.connectTo(l.addr)
@@ -269,6 +284,7 @@ func (s *Server) localPlayLocked(l *localState, seekOnly bool) {
 			}
 			l.since = time.Now()
 			s.startListenLocked(l)
+			go s.publishStatus() // the clock runs from now: pages move on from it
 			return nil
 		}}
 	go func() {
@@ -733,4 +749,17 @@ func (s *Server) putMarkers(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("markers edited", "session", name, "markers", len(marks))
 	writeJSON(w, http.StatusOK, map[string]any{"markers": ses.Markers()})
+}
+
+// recordedTrack tells whether track n of a session has a file.
+func recordedTrack(ses *session.Session, n int) bool {
+	if n <= 0 || ses.Meta.Audio == nil {
+		return false
+	}
+	for _, t := range ses.Meta.Audio.Tracks {
+		if t.Channel == n {
+			return t.File != ""
+		}
+	}
+	return false
 }

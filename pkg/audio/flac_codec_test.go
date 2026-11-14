@@ -75,6 +75,7 @@ func signals() map[string][]int32 {
 	sig("ramp", flacBlock, func(i int) float64 { return float64(i)/flacBlock*2 - 1 })
 	sig("tiny", 5, func(i int) float64 { return float64(i) / 10 })
 	sig("one", 1, func(int) float64 { return -0.5 })
+	sig("empty", 0, func(int) float64 { return 0 })
 	return out
 }
 
@@ -284,3 +285,22 @@ func TestFLACAsWAV(t *testing.T) {
 type bytesBuffer struct{ b []byte }
 
 func (w *bytesBuffer) Write(p []byte) (int, error) { w.b = append(w.b, p...); return len(p), nil }
+
+// A WAV track compressed since its name was read opens as FLAC.
+func TestOpenTrackCompressedMeanwhile(t *testing.T) {
+	dir := t.TempDir()
+	wav, fl := filepath.Join(dir, "s.wav"), filepath.Join(dir, "s.flac")
+	writeWAVSamples(t, wav, 24, signals()["ramp"])
+	if err := CompressTrack(context.Background(), wav, fl); err != nil {
+		t.Fatal(err)
+	}
+	want := readAll(t, wav)
+	os.Remove(wav)
+	got := readAll(t, wav)
+	if len(got) != len(want) || got[100] != want[100] {
+		t.Errorf("read %d samples, want %d", len(got), len(want))
+	}
+	if _, err := OpenTrack(filepath.Join(dir, "nope.wav")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a track nowhere: %v", err)
+	}
+}
