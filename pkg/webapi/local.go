@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -54,7 +55,8 @@ type localState struct {
 	cancel  context.CancelFunc
 	gen     int // the play running, so an old one ending changes nothing
 	listen  []audio.MixTrack
-	lmode   string // "off", "stereo", "tracks"
+	lmode   string           // "off", "stereo", "tracks"
+	cue     []audio.MixTrack // the raw tracks cued (the strips soloed): heard in place of listen
 	pb      *audio.Playback
 	lerr    string
 	err     string
@@ -72,6 +74,7 @@ type localView struct {
 	Main     [2]int           `json:"main"`             // the tracks recording main L and R, 0 if none
 	Listen   string           `json:"listen"`           // off, stereo, tracks
 	Tracks   []audio.MixTrack `json:"tracks,omitempty"` // what plays
+	Cue      []audio.MixTrack `json:"cue,omitempty"`    // the raw tracks cued with SOLO, heard instead
 	Heard    bool             `json:"heard"`            // the listening plays now
 	Error    string           `json:"error,omitempty"`  // the replay or the listening stopped on it
 	Back     string           `json:"back,omitempty"`   // the console to go back to
@@ -90,7 +93,7 @@ func (l *localState) view() *localView {
 	defer l.mu.Unlock()
 	v := &localView{Session: l.name, Duration: l.ses.Meta.Duration, At: l.position(), AtTime: time.Now().UnixMilli(),
 		Playing: l.playing, Speed: l.speed, Audio: l.levels != nil, Listen: l.lmode, Tracks: l.listen,
-		Heard: l.pb != nil, Error: l.err, Back: l.back}
+		Heard: l.pb != nil, Error: l.err, Back: l.back, Cue: l.cue}
 	if v.Error == "" {
 		v.Error = l.lerr
 	}
@@ -166,6 +169,15 @@ func (s *Server) OpenLocal(name string, from float64) (int, error) {
 	ctx, stop := context.WithCancel(context.Background())
 	l.stop, l.addr = stop, conn.LocalAddr().String()
 	go l.srv.Serve(ctx, conn)
+	unwatch := st.Subscribe(func(ch []state.Change) {
+		for _, c := range ch {
+			if strings.HasPrefix(c.Leaf.Addr, "/-stat/solosw/") {
+				s.localCue(l)
+				return
+			}
+		}
+	})
+	go func() { <-ctx.Done(); unwatch() }()
 	if left, right := audio.MainTracks(st); left > 0 && right > 0 {
 		l.listen, l.lmode = []audio.MixTrack{{Channel: left, Gain: 1, Pan: -1}, {Channel: right, Gain: 1, Pan: 1}}, "stereo"
 	}
@@ -236,7 +248,7 @@ func (s *Server) localPlayLocked(l *localState, seekOnly bool) {
 	l.cancel, l.err = cancel, ""
 	l.playing, l.since = !seekOnly, time.Time{}
 	from, speed := l.at, l.speed
-	p := &session.Player{S: l.ses, Target: session.StoreTarget{Store: l.srv.Store()}, Speed: speed,
+	p := &session.Player{S: l.ses, Target: session.StoreTarget{Store: l.srv.Store()}, Speed: speed, Skip: isSolo,
 		OnReady: func() error {
 			if seekOnly {
 				return errSeeked
@@ -295,7 +307,11 @@ func (s *Server) localPauseLocked(l *localState) {
 func (s *Server) startListenLocked(l *localState) {
 	l.lerr = ""
 	info := l.ses.Meta.Audio
-	if len(l.listen) == 0 || l.speed != 1 || info == nil {
+	mix := l.listen
+	if len(l.cue) > 0 {
+		mix = l.cue
+	}
+	if len(mix) == 0 || l.speed != 1 || info == nil {
 		return
 	}
 	s.mu.Lock()
@@ -303,7 +319,7 @@ func (s *Server) startListenLocked(l *localState) {
 	s.mu.Unlock()
 	cfg.PlayTo, cfg.PlayCommand = listenDevice(cfg.Recorder), ""
 	pb, err := audio.StartPlayback(cfg, l.ses.Dir, *info, audio.PlayOptions{
-		From: info.AudioTime(l.position()), Log: s.log, Sink: sink, Mix: l.listen})
+		From: info.AudioTime(l.position()), Log: s.log, Sink: sink, Mix: mix})
 	if err != nil {
 		l.lerr = "listening: " + err.Error()
 		s.log.Warn("local replay: listening", "err", err)
@@ -329,6 +345,65 @@ func (s *Server) stopListenLocked(l *localState) {
 	if l.pb != nil {
 		go l.pb.Stop()
 		l.pb = nil
+	}
+}
+
+// isSolo tells the solo switches apart: the session's own solos are not
+// replayed, the headphones are the listener's (localCue).
+func isSolo(path string) bool { return strings.HasPrefix(path, "/-stat/solo") }
+
+// localCue cues raw tracks with the session console's SOLO buttons, as an
+// engineer checks a source in the headphones: the track recording a
+// soloed input strip is heard in the middle, as recorded (after the
+// headamp, before EQ, dynamics and fader: not the console's solo), and
+// soloing L/R cues the stereo out when recorded; in place of the Listen
+// choice, which is back once no solo is left.
+func (s *Server) localCue(l *localState) {
+	st := l.srv.Store()
+	tracks := audio.InputTracks(st)
+	recorded := map[int]bool{}
+	if info := l.ses.Meta.Audio; info != nil {
+		for _, t := range info.Tracks {
+			recorded[t.Channel] = t.File != ""
+		}
+	}
+	var cue []audio.MixTrack
+	seen := map[int]bool{}
+	add := func(track int, pan float64) {
+		if track > 0 && recorded[track] && !seen[track] {
+			seen[track] = true
+			cue = append(cue, audio.MixTrack{Channel: track, Gain: 1, Pan: pan})
+		}
+	}
+	on := func(i int) bool { // strip i of the 80, from 0
+		v, _, err := st.Get(fmt.Sprintf("/-stat/solosw/%02d", i+1))
+		return err == nil && v.Int == 1
+	}
+	for i, track := range tracks {
+		if on(i) {
+			add(track, 0)
+		}
+	}
+	if on(70) { // main L/R
+		left, right := audio.MainTracks(st)
+		add(left, -1)
+		add(right, 1)
+	}
+	l.mu.Lock()
+	same := len(cue) == len(l.cue)
+	for i := range cue {
+		same = same && cue[i] == l.cue[i]
+	}
+	if !same {
+		l.cue = cue
+		if l.playing && !l.since.IsZero() { // heard from where it is
+			s.stopListenLocked(l)
+			s.startListenLocked(l)
+		}
+	}
+	l.mu.Unlock()
+	if !same {
+		s.publishStatus()
 	}
 }
 

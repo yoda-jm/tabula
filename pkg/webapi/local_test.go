@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/yoda-jm/tabula/pkg/audio"
+	"github.com/yoda-jm/tabula/pkg/osc"
 	"github.com/yoda-jm/tabula/pkg/scene"
 	"github.com/yoda-jm/tabula/pkg/schema"
 	"github.com/yoda-jm/tabula/pkg/session"
@@ -203,6 +204,19 @@ func TestLocalReplay(t *testing.T) {
 	if n == 0 || n%8 != 0 {
 		t.Errorf("listening: %d bytes, want stereo frames", n)
 	}
+
+	// SOLO cues the raw track in the headphones: Hang's, in the middle
+	soloAddr := fmt.Sprintf("/-stat/solosw/%02d", hang+1)
+	l.srv.Store().Set(soloAddr, osc.Int(1), "test")
+	waitFor("cue", func() bool { s := status().Local.Cue; return len(s) == 1 && s[0].Channel == 1 && s[0].Pan == 0 })
+	// a seek replays the session, not its solos: the cue stays
+	transport(`{"at":0.5}`)
+	time.Sleep(200 * time.Millisecond)
+	if s := status().Local.Cue; len(s) != 1 {
+		t.Errorf("the cue after a seek: %+v", s)
+	}
+	l.srv.Store().Set(soloAddr, osc.Int(0), "test")
+	waitFor("cue released", func() bool { return len(status().Local.Cue) == 0 })
 
 	// back to the console: the same one, writes disarmed
 	if code := post(t, ts.URL+"/api/local/close", ``); code != http.StatusOK {

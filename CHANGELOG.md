@@ -16,8 +16,10 @@
   the input meters follow the recorded tracks, and the stereo out (when
   recorded) or a track plays on the laptop, in step. A band on every
   page: play, pause, seek, speed, listen, back to the console (writes
-  disarmed). `/api/local/…`; the emulator takes input levels from outside
-  (`emu.Config.Inputs`).
+  disarmed). Listen takes any tracks, each left, centre or right; SOLO
+  CUEs the raw track of a channel in the phones, as an engineer checks a
+  source, then the choice is back. `/api/local/…`; the emulator takes
+  input levels from outside (`emu.Config.Inputs`).
 - The setlist takes a **tempo per song**, typed after its name (*Opening
   120 bpm*): the FX page sets it to the effects with one tap. `Setlist`
   has `tempos`, one per song.

@@ -38,9 +38,12 @@ client accepts it.
 While a local replay is open (see [recording](recording.md#replaying-locally)),
 the status has `local`: `{"session", "duration", "at", "at_ms", "playing",
 "speed", "audio", "main": [l, r], "listen": "off" | "stereo" | "tracks",
-"tracks"?, "heard", "error"?, "back"?}`. `at` is the position in seconds,
+"tracks"?, "cue"?, "heard", "error"?, "back"?}`. `at` is the position in seconds,
 read at `at_ms` (Unix ms): pages move on from it while `playing`. `main`
-holds the tracks recording main L and R (0: not recorded), `heard` says
+holds the tracks recording main L and R (0: not recorded), `cue` the raw
+tracks cued with SOLO on the session console (`[{"track", "gain",
+"pan"}]`, heard instead of `tracks`; the session's solos are not
+replayed), `heard` says
 the listening plays, `back` the console to go back to. `console` is then
 the session console, armed.
 

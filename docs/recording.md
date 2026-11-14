@@ -189,11 +189,21 @@ transport and the way back:
   the EQ only on the RTA). A session without tracks gets the emulator's
   synthetic signal.
 - **Listen**: the stereo out when the card recorded main L and R (two
-  tracks fed by outputs carrying Main L and Main R), or one track in both
-  ears, played on this machine's own output (`default` for aplay and
+  tracks fed by outputs carrying Main L and Main R), one track in both
+  ears, or **Choose tracks…**: any of them, each left, centre or right,
+  played on this machine's own output (`default` for aplay and
   ffmpeg, `@DEFAULT_SINK@` for pacat) by the player of the virtual
   soundcheck, in step with the replay. At 1× only: at other speeds the
   replay runs silent.
+- **CUE** with the console's SOLO buttons, as an engineer checks a
+  source in the headphones: soloing a channel or aux input on any page
+  sends the raw track that recorded its input to the phones, in the
+  middle, instead of the Listen choice (*CUE · raw 1 Hang* in the band);
+  soloing L/R cues the stereo out when it was recorded. Several solos
+  cue several tracks; with no solo left, the Listen choice is back. It is
+  the track as recorded: after the headamp, before EQ, dynamics and
+  fader, so earlier than a console's PFL. The session's own solos are not
+  replayed: the phones are yours.
 - **Back to the console** stops it all and connects to the console left,
   writes disarmed.
 

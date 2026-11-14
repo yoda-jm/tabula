@@ -68,6 +68,8 @@ export interface LocalStatus {
   main: [number, number];
   listen: "off" | "stereo" | "tracks";
   tracks?: MixTrack[];
+  /** the raw tracks cued with SOLO on the session console: heard instead of the Listen choice */
+  cue?: MixTrack[];
   /** the listening plays now */
   heard: boolean;
   error?: string;

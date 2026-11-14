@@ -3,7 +3,7 @@
 // and the way back to the console.
 
 import { useEffect, useRef, useState } from "react";
-import type { LocalStatus, Status } from "../lib/api";
+import type { LocalStatus, MixTrack, Status } from "../lib/api";
 import type { AudioTrack } from "../lib/audio";
 import { SPEEDS, listenChoices, listenKey, localApi, localAt } from "../lib/local";
 import { formatDuration, sessionApi } from "../lib/session";
@@ -21,6 +21,7 @@ function Band({ l }: { l: LocalStatus }) {
   const [drag, setDrag] = useState<number | null>(null); // the seek bar being dragged
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   // the time moves on while playing
   useEffect(() => {
@@ -132,24 +133,118 @@ function Band({ l }: { l: LocalStatus }) {
             value={key}
             disabled={busy}
             onChange={(e) => {
+              if (e.target.value === "pick") return setPicking(true);
               const c = choices.find((x) => x.key === e.target.value);
               if (c) void act(() => localApi.listen(c.body));
             }}
           >
-            {key === "custom" && <option value="custom">Several tracks</option>}
+            {key === "custom" && <option value="custom">{l.tracks?.length} tracks</option>}
             {choices.map((c) => (
               <option key={c.key} value={c.key}>
                 {c.label}
               </option>
             ))}
+            <option value="pick">Choose tracks…</option>
           </select>
         </label>
+      )}
+      {picking && (
+        <TrackPicker
+          tracks={tracks.filter((t) => t.file)}
+          chosen={l.listen === "stereo" ? stereoMix(l) : (l.tracks ?? [])}
+          onCancel={() => setPicking(false)}
+          onApply={(mix) => {
+            setPicking(false);
+            void act(() => localApi.listen({ tracks: mix }));
+          }}
+        />
+      )}
+      {!!l.cue?.length && (
+        <span
+          className="local-cue"
+          title="CUE: SOLO sends the raw track as recorded to the phones (after the headamp, before EQ, dynamics and fader: earlier than a PFL), instead of the Listen choice until no solo is left"
+        >
+          CUE · raw{" "}
+          {l.cue
+            .map((m) => {
+              const t = tracks.find((x) => x.channel === m.track);
+              return `${m.track}${t?.name ? " " + t.name : ""}`;
+            })
+            .join(", ")}
+        </span>
       )}
       {silentSpeed && <span className="local-note">silent at {l.speed}× (1× to listen)</span>}
       {l.error && <span className="local-note error">{l.error}</span>}
       <button type="button" className="btn small local-back" disabled={busy} onClick={() => void act(() => localApi.close())}>
         {l.back ? "Back to the console" : "Close"}
       </button>
+    </div>
+  );
+}
+
+/** stereoMix is the stereo out as tracks, to start a choice from it. */
+const stereoMix = (l: LocalStatus): MixTrack[] => [
+  { track: l.main[0], gain: 1, pan: -1 },
+  { track: l.main[1], gain: 1, pan: 1 },
+];
+
+const PANS: { label: string; pan: number }[] = [
+  { label: "L", pan: -1 },
+  { label: "C", pan: 0 },
+  { label: "R", pan: 1 },
+];
+
+/** TrackPicker chooses the tracks heard, each left, centre or right. */
+function TrackPicker(props: { tracks: AudioTrack[]; chosen: MixTrack[]; onApply(mix: MixTrack[]): void; onCancel(): void }) {
+  const [mix, setMix] = useState<Map<number, number>>(() => new Map(props.chosen.map((m) => [m.track, m.pan])));
+  const set = (track: number, pan: number | null) =>
+    setMix((prev) => {
+      const next = new Map(prev);
+      if (pan === null) next.delete(track);
+      else next.set(track, pan);
+      return next;
+    });
+  return (
+    <div className="local-picker" role="dialog" aria-label="Tracks to listen to">
+      <div className="local-picker-list">
+        {props.tracks.map((t) => {
+          const pan = mix.get(t.channel);
+          return (
+            <div key={t.channel} className="local-picker-row">
+              <label>
+                <input type="checkbox" checked={pan !== undefined} onChange={(e) => set(t.channel, e.target.checked ? 0 : null)} />{" "}
+                {t.channel}
+                {t.name ? ` · ${t.name}` : ""}
+              </label>
+              <span className="seg" role="group" aria-label={`Track ${t.channel}: pan`}>
+                {PANS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    className={"btn small seg-btn" + (pan === p.pan ? " lit" : "")}
+                    aria-pressed={pan === p.pan}
+                    onClick={() => set(t.channel, p.pan)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="row">
+        <button
+          type="button"
+          className="btn primary small"
+          onClick={() => props.onApply([...mix].map(([track, pan]) => ({ track, gain: 1, pan })))}
+        >
+          Listen to {mix.size} track{mix.size === 1 ? "" : "s"}
+        </button>
+        <button type="button" className="btn small" onClick={props.onCancel}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
