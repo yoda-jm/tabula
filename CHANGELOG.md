@@ -43,6 +43,8 @@
   site says what is new in it. The README no longer says X32-Edit connects
   to the emulator (it has not been tried); the roadmap (`docs/PLAN.md`)
   lists what was done since v0.2.0.
+- The README and the site's front page list tap tempo, the local replay
+  with CUE and marks, and the FLAC compression of a session's tracks.
 
 ## v0.3.0 — show safety, the mixing pages, a patch list
 

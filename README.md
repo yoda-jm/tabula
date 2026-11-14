@@ -13,13 +13,16 @@ Tools for Behringer X32 / Midas M32 digital consoles, in Go.
 - **`tabula`** — a client that connects to a console or to the emulator and
   serves a web GUI to the laptop at the desk and to the band's phones:
   mixer, meters, channel details with headamps and a draggable EQ, routing
-  with a patchbay, effects with a graphic EQ and RTA, scenes, safes and
-  scene files, the console's USB stick, every parameter. For the show: a
-  pre-show check, a patch list PDF for the venue's engineer, in-ear mixes
-  on the musicians' phones, and recording and replay with the audio tracks
-  of the console's USB card, markers and a setlist, audio that recovers by
-  itself mid-show (see [recording](docs/recording.md)). Read-only until you
-  arm writes; undo takes back the last changes.
+  with a patchbay, effects with a graphic EQ, RTA and tap tempo, scenes,
+  safes and scene files, the console's USB stick, every parameter. For the
+  show: a pre-show check, a patch list PDF for the venue's engineer, in-ear
+  mixes on the musicians' phones, and recording and replay with the audio
+  tracks of the console's USB card, markers and a setlist, audio that
+  recovers by itself mid-show. After it: a replay on the laptop without the
+  console, heard in step with every move, marks added and edited while
+  reviewing, and the tracks compressed to FLAC, lossless (see
+  [recording](docs/recording.md)). Read-only until you arm writes; undo
+  takes back the last changes.
 
 See [how the emulator simulates the console](docs/emulator.md) (audio flow,
 meters, RTA, effects, linked strips), [the pages of the GUI](docs/gui.md) and

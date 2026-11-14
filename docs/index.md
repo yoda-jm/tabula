@@ -194,7 +194,10 @@ tabula -console 192.168.1.62 -http :8033
 - **FX**: the 8 effect slots and where each is used (fed by a bus,
   inserted on a strip), an editor per slot with the effect's parameters, and
   a graphic EQ editor with the RTA behind the bands; the RTA also shows
-  behind a channel's EQ curve.
+  behind a channel's EQ curve. **Tap tempo** for the delays and
+  modulations: tap on the beat (or the T key), type a tempo, or take the
+  song's from the setlist, and the delay's time follows at a note value of
+  it (1/4, 1/8., 1/4T…).
 - **Scenes**: the scenes, snippets and presets the console holds; recall
   (after a confirmation), save, rename, copy and delete them, load channel
   presets onto a strip and effect presets into a slot; the scene safes and
@@ -224,7 +227,14 @@ tabula -console 192.168.1.62 -http :8033
   audio records even without the console link. Markers from any page, and
   a setlist: one tap marks the next song. A session goes home as one zip or
   onto a USB disk, in WAV or FLAC, and its tracks can play back through
-  the console for a virtual soundcheck. See [recording a show](recording.md).
+  the console for a virtual soundcheck. **Replay locally**, without the
+  console: every page follows the show as it was, the input meters follow
+  the recorded tracks, and the stereo out or the tracks you choose play on
+  the laptop in step; SOLO cues a channel's raw track in the phones, as an
+  engineer checks a source. Mark the moments while reviewing, and rename,
+  move or remove the markers afterwards. A session's tracks can be
+  compressed to FLAC in place, lossless, at about half the size. See
+  [recording a show](recording.md).
 - **In-ear mixes for the band**: each musician scans a QR code and gets
   their own mix on their phone, and nothing else; viewers watch without
   touching; the Access page shows whose phone is online. Links use the
