@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LocalStatus } from "./api";
-import { listenChoices, listenKey, localAt } from "./local";
+import { listenChoices, listenKey, localAt, nextMark, prevMark } from "./local";
 
 const base: LocalStatus = {
   session: "show",
@@ -12,6 +12,7 @@ const base: LocalStatus = {
   audio: true,
   main: [0, 0],
   listen: "off",
+  markers: [],
   heard: false,
 };
 
@@ -38,5 +39,19 @@ describe("local replay", () => {
     expect(listenKey({ ...base, listen: "tracks", tracks: [{ track: 1, gain: 1, pan: 0 }] })).toBe("t1");
     expect(listenKey({ ...withMain, listen: "stereo" })).toBe("stereo");
     expect(listenKey(base)).toBe("off");
+  });
+
+  it("goes to the marks before and after", () => {
+    const marks = [
+      { label: "1. Intro", t: 10 },
+      { label: "2. Song", t: 70 },
+      { label: "Mark 2:30", t: 150 },
+    ];
+    expect(nextMark(marks, 0)?.t).toBe(10);
+    expect(nextMark(marks, 10)?.t).toBe(70); // on a mark: the next one
+    expect(nextMark(marks, 151)).toBeUndefined();
+    expect(prevMark(marks, 100)?.t).toBe(70);
+    expect(prevMark(marks, 71)?.t).toBe(10); // just after a mark: the one before
+    expect(prevMark(marks, 5)).toBeUndefined();
   });
 });

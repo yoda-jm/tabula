@@ -38,7 +38,7 @@ client accepts it.
 While a local replay is open (see [recording](recording.md#replaying-locally)),
 the status has `local`: `{"session", "duration", "at", "at_ms", "playing",
 "speed", "audio", "main": [l, r], "listen": "off" | "stereo" | "tracks",
-"tracks"?, "cue"?, "heard", "error"?, "back"?}`. `at` is the position in seconds,
+"tracks"?, "cue"?, "markers": [{"label", "t"}], "heard", "error"?, "back"?}`. `at` is the position in seconds,
 read at `at_ms` (Unix ms): pages move on from it while `playing`. `main`
 holds the tracks recording main L and R (0: not recorded), `cue` the raw
 tracks cued with SOLO on the session console (`[{"track", "gain",
@@ -325,6 +325,7 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | POST | `/api/local/transport` | `{"play"?: bool, "at"?: seconds, "speed"?: x}` | `Status`: plays or pauses, seeks (the state of that time is set at once), sets the speed (0.25 to 16, else 400); 409 when none is open |
 | PUT | `/api/local/listen` | `{"preset": "stereo" \| "off"}` or `{"tracks": [{"track": n, "gain": 1, "pan": 0}]}` | `Status`: what plays on this machine (`gain` 0 to 4, `pan` -1 left to 1 right); 409 for `stereo` when the card did not record main L/R, 400 for a track not recorded |
 | POST | `/api/local/close` | | `Status`: connected again to the console left, writes disarmed; 409 when none is open |
+| POST | `/api/local/mark` | `{"label"?: text, "at"?: seconds}` | `{"marked": {"label", "t"}, "status": Status}`: a marker added to the session replayed, at the replay's position unless `at` (`Mark 12:34` without a label): appended to `events.jsonl` with `"origin": "review"`, counted in `meta.json`, in the Reaper project and the labels. 400 for a label over 80 characters, 409 when none is open |
 | GET | `/api/undo` | | `UndoView`: `{"count", "what"?, "at"?}`, what Undo takes back (the engineer's last change made from tabula) |
 | POST | `/api/undo` | | `UndoView` after undoing the last step: the values it overwrote are sent back to the console; 403 unless writes are armed; 409 when there is nothing to undo; 502 when the console does not answer (a step not started stays) |
 | POST | `/api/strips/copy` | `{"from": "/ch/01", "to": ["/ch/02"], "sections": ["eq", "dyn"]}` | `{"nodes"}`: the sections' nodes (`preamp`, `delay`, `gate`, `dyn`, `insert`, `eq`, `sends`: `mix/01`…, `main`: `mix`) sent to each target with the `/` command; one undo step. Strips of the same kind only (`ch`, `auxin`, `fxrtn`, `bus`, `mtx`); 400 otherwise or when none has the sections; 403 unless armed |

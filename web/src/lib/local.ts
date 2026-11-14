@@ -11,7 +11,25 @@ export const localApi = {
   transport: (t: { play?: boolean; at?: number; speed?: number }) => call<Status>("POST", "/api/local/transport", t),
   listen: (body: { preset: "stereo" | "off" } | { tracks: MixTrack[] }) => call<Status>("PUT", "/api/local/listen", body),
   close: () => call<Status>("POST", "/api/local/close", {}),
+  /** mark adds a marker to the session, at the replay's position ("Mark 12:34" without a label) */
+  mark: (label = "") => call<{ marked: { label: string; t: number }; status: Status }>("POST", "/api/local/mark", { label }),
 };
+
+type Mark = { label: string; t: number };
+
+/**
+ * prevMark is the mark to go back to: the one before at, or the one before
+ * that when at is just after a mark (2 s), as a player's "previous" does.
+ */
+export function prevMark(marks: Mark[], at: number): Mark | undefined {
+  const before = marks.filter((m) => m.t < at - 2);
+  return before[before.length - 1];
+}
+
+/** nextMark is the first mark after at. */
+export function nextMark(marks: Mark[], at: number): Mark | undefined {
+  return marks.find((m) => m.t > at + 0.05);
+}
 
 /** localAt is where the replay is at now (Unix ms), moving on from the status while it plays. */
 export function localAt(l: LocalStatus, now: number): number {

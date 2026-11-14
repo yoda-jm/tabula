@@ -3891,3 +3891,6 @@ code.wrap {
   font-weight: 600;
   font-size: 0.85rem;
 }
+.local-marks {
+  max-width: 14em;
+}

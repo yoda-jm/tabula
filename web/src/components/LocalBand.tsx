@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalStatus, MixTrack, Status } from "../lib/api";
 import type { AudioTrack } from "../lib/audio";
-import { SPEEDS, listenChoices, listenKey, localApi, localAt } from "../lib/local";
+import { SPEEDS, listenChoices, listenKey, localApi, localAt, nextMark, prevMark } from "../lib/local";
 import { formatDuration, sessionApi } from "../lib/session";
 import { useStatus } from "../store/hooks";
 import { store } from "../store/store";
@@ -51,10 +51,20 @@ function Band({ l }: { l: LocalStatus }) {
   const at = localAt(l, now);
   const seek = (t: number) => act(() => localApi.transport({ at: Math.min(l.duration, Math.max(0, t)) }));
   const toggle = () => act(() => localApi.transport({ play: !l.playing, ...(at >= l.duration ? { at: 0 } : {}) }));
+  const mark = () =>
+    act(async () => {
+      const r = await localApi.mark();
+      store.toast(`Marked: ${r.marked.label}`, "info");
+      return r.status;
+    });
+  const marks = l.markers ?? [];
+  const prev = prevMark(marks, at);
+  const next = nextMark(marks, at);
+  const toMark = (m?: { t: number }) => m && void seek(m.t);
 
-  // Space plays or pauses, ← → move by 5 s (not in a field)
-  const keys = useRef({ toggle, seek, at });
-  keys.current = { toggle, seek, at };
+  // Space plays or pauses, ← → move by 5 s, [ ] go to the marks, M marks (not in a field)
+  const keys = useRef({ toggle, seek, at, mark, prev, next, toMark });
+  keys.current = { toggle, seek, at, mark, prev, next, toMark };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -65,6 +75,12 @@ function Band({ l }: { l: LocalStatus }) {
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         e.preventDefault();
         void keys.current.seek(keys.current.at + (e.key === "ArrowLeft" ? -5 : 5));
+      } else if (e.key === "[" || e.key === "]") {
+        e.preventDefault();
+        keys.current.toMark(e.key === "[" ? keys.current.prev : keys.current.next);
+      } else if (e.key.toLowerCase() === "m" && !e.repeat) {
+        e.preventDefault();
+        void keys.current.mark();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -90,6 +106,29 @@ function Band({ l }: { l: LocalStatus }) {
         <button type="button" className="btn small" disabled={busy} onClick={() => void seek(at + 5)} title="On 5 s (→)" aria-label="Forward 5 seconds">
           ⏩
         </button>
+        <button
+          type="button"
+          className="btn small"
+          disabled={busy || !prev}
+          onClick={() => toMark(prev)}
+          title={prev ? `Back to ${prev.label} ([)` : "No mark before"}
+          aria-label="Previous mark"
+        >
+          ⏮
+        </button>
+        <button
+          type="button"
+          className="btn small"
+          disabled={busy || !next}
+          onClick={() => toMark(next)}
+          title={next ? `On to ${next.label} (])` : "No mark after"}
+          aria-label="Next mark"
+        >
+          ⏭
+        </button>
+        <button type="button" className="btn small" disabled={busy} onClick={() => void mark()} title="Mark this moment in the session (M)">
+          ⚑ Mark
+        </button>
       </span>
       <input
         className="local-seek"
@@ -98,6 +137,7 @@ function Band({ l }: { l: LocalStatus }) {
         max={l.duration || 1}
         step={0.1}
         value={drag ?? at}
+        list={marks.length ? "local-marks" : undefined}
         aria-label="Position in the session"
         onChange={(e) => setDrag(Number(e.target.value))}
         onPointerUp={() => {
@@ -109,6 +149,29 @@ function Band({ l }: { l: LocalStatus }) {
           setDrag(null);
         }}
       />
+      {marks.length > 0 && (
+        <datalist id="local-marks">
+          {marks.map((m) => (
+            <option key={`${m.t} ${m.label}`} value={m.t} label={m.label} />
+          ))}
+        </datalist>
+      )}
+      {marks.length > 0 && (
+        <select
+          className="select small local-marks"
+          value=""
+          disabled={busy}
+          aria-label="Go to a mark"
+          onChange={(e) => e.target.value && void seek(Number(e.target.value))}
+        >
+          <option value="">Go to a mark…</option>
+          {marks.map((m) => (
+            <option key={`${m.t} ${m.label}`} value={m.t}>
+              {formatDuration(m.t)} · {m.label}
+            </option>
+          ))}
+        </select>
+      )}
       <span className="local-time">
         {formatDuration(drag ?? at)} / {formatDuration(l.duration)}
       </span>

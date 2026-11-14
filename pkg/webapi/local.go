@@ -9,9 +9,12 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/yoda-jm/tabula/pkg/audio"
 	"github.com/yoda-jm/tabula/pkg/emu"
@@ -57,6 +60,7 @@ type localState struct {
 	listen  []audio.MixTrack
 	lmode   string           // "off", "stereo", "tracks"
 	cue     []audio.MixTrack // the raw tracks cued (the strips soloed): heard in place of listen
+	marks   []markView       // the session's markers, in time order, with those added here
 	pb      *audio.Playback
 	lerr    string
 	err     string
@@ -75,6 +79,7 @@ type localView struct {
 	Listen   string           `json:"listen"`           // off, stereo, tracks
 	Tracks   []audio.MixTrack `json:"tracks,omitempty"` // what plays
 	Cue      []audio.MixTrack `json:"cue,omitempty"`    // the raw tracks cued with SOLO, heard instead
+	Markers  []markView       `json:"markers"`          // the session's markers, in time order
 	Heard    bool             `json:"heard"`            // the listening plays now
 	Error    string           `json:"error,omitempty"`  // the replay or the listening stopped on it
 	Back     string           `json:"back,omitempty"`   // the console to go back to
@@ -93,7 +98,7 @@ func (l *localState) view() *localView {
 	defer l.mu.Unlock()
 	v := &localView{Session: l.name, Duration: l.ses.Meta.Duration, At: l.position(), AtTime: time.Now().UnixMilli(),
 		Playing: l.playing, Speed: l.speed, Audio: l.levels != nil, Listen: l.lmode, Tracks: l.listen,
-		Heard: l.pb != nil, Error: l.err, Back: l.back, Cue: l.cue}
+		Heard: l.pb != nil, Error: l.err, Back: l.back, Cue: l.cue, Markers: slices.Clone(l.marks)}
 	if v.Error == "" {
 		v.Error = l.lerr
 	}
@@ -147,7 +152,10 @@ func (s *Server) OpenLocal(name string, from float64) (int, error) {
 	st := state.New(schema.Build(model))
 	from = min(max(from, 0), ses.Meta.Duration)
 	ses.StateAt(st, from)
-	l := &localState{name: name, ses: ses, back: back, speed: 1, at: from, lmode: "off"}
+	l := &localState{name: name, ses: ses, back: back, speed: 1, at: from, lmode: "off", marks: []markView{}}
+	for _, m := range ses.Markers() {
+		l.marks = append(l.marks, markView{Label: m.Marker, T: m.T})
+	}
 	cfg := emu.Config{Model: model, Name: "tabula-session", Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	if info := ses.Meta.Audio; info != nil {
 		if l.levels, err = audio.OpenLevels(dir, *info); err != nil {
@@ -439,6 +447,7 @@ func (s *Server) localRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/local/transport", s.localTransport)
 	mux.HandleFunc("PUT /api/local/listen", s.localListen)
 	mux.HandleFunc("POST /api/local/close", s.localClose)
+	mux.HandleFunc("POST /api/local/mark", s.localMark)
 }
 
 func (s *Server) localOpen(w http.ResponseWriter, r *http.Request) {
@@ -572,4 +581,67 @@ func (s *Server) localClose(w http.ResponseWriter, r *http.Request) {
 	}
 	s.CloseLocal(true)
 	writeJSON(w, http.StatusOK, s.status())
+}
+
+// localMark adds a marker to the session replayed, at the replay's
+// position ("at": another time): {"label"?, "at"?}. Without a label: "Mark
+// 12:34". It goes into the session (events.jsonl, meta.json) and its
+// exports, as a marker set while recording does.
+func (s *Server) localMark(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Label string   `json:"label"`
+		At    *float64 `json:"at"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, http.StatusBadRequest, errors.New(`expects {"label": text, "at": seconds}`))
+		return
+	}
+	label := strings.Join(strings.Fields(req.Label), " ")
+	if utf8.RuneCountInString(label) > maxSongChars {
+		httpError(w, http.StatusBadRequest, fmt.Errorf("a marker takes %d characters at most", maxSongChars))
+		return
+	}
+	l := s.localNow()
+	if l == nil {
+		httpError(w, http.StatusConflict, errors.New("no local replay is open"))
+		return
+	}
+	l.mu.Lock()
+	t := l.position()
+	if req.At != nil {
+		t = min(max(*req.At, 0), l.ses.Meta.Duration)
+	}
+	l.mu.Unlock()
+	if label == "" {
+		label = "Mark " + clock(t)
+	}
+	e, err := session.AddMarker(l.ses.Dir, t, label)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, err)
+		return
+	}
+	m := markView{Label: e.Marker, T: e.T}
+	l.mu.Lock()
+	i := sort.Search(len(l.marks), func(i int) bool { return l.marks[i].T > m.T })
+	l.marks = slices.Insert(l.marks, i, m)
+	l.mu.Unlock()
+	if l.ses.Meta.Audio != nil { // the Reaper project and the labels hold it too
+		if ses, err := s.openSession(l.ses.Dir); err == nil {
+			if err := ses.WriteExports(); err != nil {
+				s.log.Warn("local replay: exports", "err", err)
+			}
+		}
+	}
+	s.log.Info("local replay: marked", "session", l.name, "label", m.Label, "t", m.T)
+	s.publishStatus()
+	writeJSON(w, http.StatusOK, map[string]any{"marked": m, "status": s.status()})
+}
+
+// clock writes seconds as m:ss or h:mm:ss.
+func clock(t float64) string {
+	sec := int(t)
+	if sec >= 3600 {
+		return fmt.Sprintf("%d:%02d:%02d", sec/3600, sec/60%60, sec%60)
+	}
+	return fmt.Sprintf("%d:%02d", sec/60, sec%60)
 }

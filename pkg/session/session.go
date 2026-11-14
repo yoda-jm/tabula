@@ -392,9 +392,59 @@ func (r *Recorder) Stop() error {
 	return errors.Join(err, r.writeMeta(m))
 }
 
-// WriteMeta replaces a session's meta.json at once (compressing its
-// tracks names their FLAC files there).
-func WriteMeta(dir string, m Meta) error { return writeMeta(dir, m) }
+// metaMu makes the read, change and write of a finished session's
+// meta.json one step: compressing its tracks and marking it in a review
+// change it side by side.
+var metaMu sync.Mutex
+
+// UpdateMeta reads a finished session's meta.json, changes it and writes
+// it back at once.
+func UpdateMeta(dir string, change func(*Meta)) error {
+	metaMu.Lock()
+	defer metaMu.Unlock()
+	data, err := os.ReadFile(filepath.Join(dir, "meta.json"))
+	if err != nil {
+		return err
+	}
+	var m Meta
+	if err := json.Unmarshal(data, &m); err != nil {
+		return fmt.Errorf("meta.json: %w", err)
+	}
+	change(&m)
+	return writeMeta(dir, m)
+}
+
+// AddMarker adds a marker to a finished session, at t seconds after its
+// start: a mark made while reviewing it (a local replay). It is appended
+// to events.jsonl (Open sorts the events by time) and counted in
+// meta.json; its Origin is "review".
+func AddMarker(dir string, t float64, label string) (Event, error) {
+	e := Event{T: t, Marker: label, Origin: "review"}
+	path := filepath.Join(dir, "events.jsonl")
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0o644)
+	if err != nil {
+		return e, err
+	}
+	line, _ := json.Marshal(e)
+	line = append(line, '\n')
+	if st, err := f.Stat(); err == nil && st.Size() > 0 { // a last line left unfinished stays on its own
+		last := make([]byte, 1)
+		if _, err := f.ReadAt(last, st.Size()-1); err == nil && last[0] != '\n' {
+			line = append([]byte{'\n'}, line...)
+		}
+	}
+	_, err = f.Write(line)
+	if serr := f.Sync(); err == nil {
+		err = serr
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return e, err
+	}
+	return e, UpdateMeta(dir, func(m *Meta) { m.Markers++ })
+}
 
 // writeMeta replaces meta.json at once: it is rewritten while recording.
 func writeMeta(dir string, m Meta) error {

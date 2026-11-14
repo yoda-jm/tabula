@@ -225,13 +225,27 @@ func (s *Server) compressSession(name string) error {
 		if err != nil {
 			return err
 		}
-		// the FLAC file is the track from now on, then the WAV goes
-		info.Tracks[i].File = rel
-		if err := session.WriteMeta(dir, ses.Meta); err != nil {
-			info.Tracks[i].File = t.File
+		// the FLAC file is the track from now on, then the WAV goes; meta.json
+		// is read again (a review may have added a marker meanwhile)
+		named := false
+		err = session.UpdateMeta(dir, func(m *session.Meta) {
+			if m.Audio == nil {
+				return
+			}
+			for j := range m.Audio.Tracks {
+				if m.Audio.Tracks[j].Channel == t.Channel && m.Audio.Tracks[j].File == t.File {
+					m.Audio.Tracks[j].File, named = rel, true
+				}
+			}
+		})
+		if err == nil && !named {
+			err = fmt.Errorf("%s is no longer in meta.json", t.File)
+		}
+		if err != nil {
 			os.Remove(dst)
 			return err
 		}
+		info.Tracks[i].File = rel
 		if err := os.Remove(wav); err != nil {
 			s.log.Warn("compress: the WAV is still there", "file", wav, "err", err)
 		}
@@ -242,8 +256,12 @@ func (s *Server) compressSession(name string) error {
 			c.mu.Unlock()
 		}
 	}
-	if compressed > 0 {
-		if err := ses.WriteExports(); err != nil { // the Reaper project names the FLAC files
+	if compressed > 0 { // the Reaper project names the FLAC files (read again: markers added meanwhile)
+		fresh, err := s.openSession(dir)
+		if err == nil {
+			err = fresh.WriteExports()
+		}
+		if err != nil {
 			s.log.Warn("compress: exports", "session", name, "err", err)
 		}
 	}

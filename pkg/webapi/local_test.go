@@ -218,6 +218,26 @@ func TestLocalReplay(t *testing.T) {
 	l.srv.Store().Set(soloAddr, osc.Int(0), "test")
 	waitFor("cue released", func() bool { return len(status().Local.Cue) == 0 })
 
+	// marks: at the position, or at a time, sorted, kept in the session
+	transport(`{"at":1.25}`)
+	if code := post(t, ts.URL+"/api/local/mark", `{}`); code != http.StatusOK {
+		t.Fatalf("mark: %d", code)
+	}
+	post(t, ts.URL+"/api/local/mark", `{"label":"  Chorus   in ","at":0.5}`)
+	if code := post(t, ts.URL+"/api/local/mark", `{"label":"`+strings.Repeat("x", 81)+`"}`); code != http.StatusBadRequest {
+		t.Errorf("a long label: %d", code)
+	}
+	if m := status().Local.Markers; len(m) != 2 || m[0].Label != "Chorus in" || m[0].T != 0.5 || m[1].Label != "Mark 0:01" || m[1].T != 1.25 {
+		t.Errorf("markers: %+v", m)
+	}
+	ses, err := session.Open(filepath.Join(sessions, "show"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := ses.Markers(); len(m) != 2 || ses.Meta.Markers != 2 || m[0].Origin != "review" || ses.Meta.Events != 2 {
+		t.Errorf("in the session: %+v, meta %d markers %d events", m, ses.Meta.Markers, ses.Meta.Events)
+	}
+
 	// back to the console: the same one, writes disarmed
 	if code := post(t, ts.URL+"/api/local/close", ``); code != http.StatusOK {
 		t.Fatalf("close: %d", code)

@@ -180,6 +180,12 @@ transport and the way back:
 - **▶ Play / ❚❚ Pause** (Space), ⏪ ⏩ 5 s (← →), a seek bar, a speed
   (0.5× to 8×). A seek sets the state of that time at once, as a replay
   does; the pages move once to it.
+- **Marks**: ⏮ ⏭ (`[` `]`) go to the previous and next marker (the
+  songs of the setlist, the markers set while recording, the marks of the
+  review), **Go to a mark…** lists them, and the seek bar shows them.
+  **⚑ Mark** (M) marks the moment: *Mark 12:34*, added to the session
+  (`events.jsonl`, with `"origin": "review"`, and `meta.json`) and to its
+  Reaper project and labels, as a marker set while recording is.
 - The **input meters follow the recorded tracks**: each channel or aux
   input shows the level of the card track that recorded its input (the
   card routing of the session, followed to the channel's source), at the

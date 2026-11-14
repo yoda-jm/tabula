@@ -18,7 +18,8 @@
   page: play, pause, seek, speed, listen, back to the console (writes
   disarmed). Listen takes any tracks, each left, centre or right; SOLO
   CUEs the raw track of a channel in the phones, as an engineer checks a
-  source, then the choice is back. `/api/local/…`; the emulator takes
+  source, then the choice is back. ⏮ ⏭ go to the markers and the songs,
+  ⚑ Mark (M) adds one to the session while reviewing it. `/api/local/…`; the emulator takes
   input levels from outside (`emu.Config.Inputs`).
 - **Compressing a session's tracks** to FLAC in place, lossless, about half
   the size of live tracks: **Compress** in a session's details, or after

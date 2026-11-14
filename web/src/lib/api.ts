@@ -70,6 +70,8 @@ export interface LocalStatus {
   tracks?: MixTrack[];
   /** the raw tracks cued with SOLO on the session console: heard instead of the Listen choice */
   cue?: MixTrack[];
+  /** the session's markers in time order, those added in the review too */
+  markers: { label: string; t: number }[];
   /** the listening plays now */
   heard: boolean;
   error?: string;

@@ -394,3 +394,28 @@ func TestRecordConsoleLater(t *testing.T) {
 		t.Errorf("audio alone: %v %+v", err, s)
 	}
 }
+
+// A marker added in a review goes after the changes, on its own line even
+// when the last one was left unfinished, and is counted in meta.json.
+func TestAddMarker(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "meta.json"), []byte(`{"format":1,"events":1,"markers":0,"duration":10}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "events.jsonl"), []byte(`{"t":2,"addr":"/ch/01/mix/on","text":"OFF"}`), 0o644)
+	if _, err := AddMarker(dir, 5, "Solo"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AddMarker(dir, 1, "Intro"); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := s.Markers()
+	if len(s.Damaged) > 0 || len(m) != 2 || m[0].Marker != "Intro" || m[1].Marker != "Solo" || m[1].Origin != "review" || s.Meta.Markers != 2 {
+		t.Errorf("markers %+v, damaged %v, meta %d", m, s.Damaged, s.Meta.Markers)
+	}
+	if len(s.Events) != 3 || s.Events[1].Addr != "/ch/01/mix/on" {
+		t.Errorf("events: %+v", s.Events)
+	}
+}
