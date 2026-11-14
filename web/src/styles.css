@@ -3807,3 +3807,60 @@ code.wrap {
   align-items: center;
   gap: 6px;
 }
+
+/* ---------- local replay (a session played back without the console) ---------- */
+
+.local-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 6px 16px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+  border-bottom: 1px solid var(--accent);
+}
+.local-title {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.local-transport {
+  display: inline-flex;
+  gap: 4px;
+}
+.btn.local-play {
+  min-width: 6.5em;
+}
+.local-seek {
+  flex: 1 1 160px;
+  min-width: 120px;
+  accent-color: var(--accent);
+}
+.local-time {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.local-listen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.local-listen .select {
+  max-width: 16em;
+}
+.local-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.local-note.error {
+  color: var(--danger);
+}
+.btn.local-back {
+  margin-left: auto;
+}
+.pill.local .dot {
+  background: var(--accent);
+}
+.select.small {
+  min-height: 32px;
+  padding: 2px 8px;
+}

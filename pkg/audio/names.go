@@ -28,6 +28,53 @@ func TrackNames(st *state.Store) []string {
 	return out
 }
 
+// InputTracks finds the card track (1-32) that records the input of each
+// input strip, 0 for none: index 0-31 the channels, 32-39 the aux inputs.
+// The first track taking an input is the one.
+func InputTracks(st *state.Store) [40]int {
+	r := router{st}
+	byInput := map[int]int{}
+	for t := 1; t <= 32; t++ {
+		if in := r.cardSource(t).input; in > 0 && byInput[in] == 0 {
+			byInput[in] = t
+		}
+	}
+	var out [40]int
+	for i := range out {
+		p := fmt.Sprintf("/ch/%02d/config/source", i+1)
+		if i >= 32 {
+			p = fmt.Sprintf("/auxin/%02d/config/source", i-31)
+		}
+		if in := r.channelInput(r.int(p)); in > 0 {
+			out[i] = byInput[in]
+		}
+	}
+	return out
+}
+
+// MainTracks finds the card tracks recording the main L and R (an output
+// whose source is Main L or Main R), 0 for one not recorded.
+func MainTracks(st *state.Store) (left, right int) {
+	r := router{st}
+	for t := 1; t <= 32; t++ {
+		src := r.cardSource(t)
+		if src.output == "" {
+			continue
+		}
+		switch r.int(fmt.Sprintf("/outputs/%s/%02d/src", src.output, src.n)) {
+		case 1:
+			if left == 0 {
+				left = t
+			}
+		case 2:
+			if right == 0 {
+				right = t
+			}
+		}
+	}
+	return left, right
+}
+
 type router struct{ st *state.Store }
 
 // text is the node text of a parameter ("A1-8", `"Hang"`), "" if unknown.
@@ -143,8 +190,13 @@ func (r router) userOut(n int) source {
 	return source{}
 }
 
+// cardSource is what card track t (1-32) records.
+func (r router) cardSource(t int) source {
+	return r.block(r.text(fmt.Sprintf("/config/routing/CARD/%s", blocks8[(t-1)/8])), (t-1)%8)
+}
+
 func (r router) cardTrack(t int) string {
-	src := r.block(r.text(fmt.Sprintf("/config/routing/CARD/%s", blocks8[(t-1)/8])), (t-1)%8)
+	src := r.cardSource(t)
 	switch {
 	case src.input > 0:
 		return r.inputName(src.input)

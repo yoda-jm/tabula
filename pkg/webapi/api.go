@@ -35,6 +35,8 @@ type Server struct {
 	connecting bool
 	lastErr    string
 	cancelSub  func()
+	addr       string      // the console asked for, to go back to after a local replay
+	local      *localState // the local replay open (local.go)
 
 	hub hub
 
@@ -121,6 +123,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	s.libraryRoutes(mux)
 	s.sceneFileRoutes(mux)
 	s.setlistRoutes(mux)
+	s.localRoutes(mux)
 	s.patchlistRoutes(mux)
 	s.usbRoutes(mux)
 	s.audioRoutes(mux)
@@ -135,6 +138,16 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 // or its Wi-Fi still connects (and records with -record). Connecting again
 // replaces a connection being made (an address mistyped).
 func (s *Server) Connect(addr string) error {
+	s.CloseLocal(false) // another console asked for: the local replay ends
+	s.mu.Lock()
+	s.addr = addr
+	s.mu.Unlock()
+	return s.connectTo(addr)
+}
+
+// connectTo connects to the console at addr: a console, or the session
+// console of a local replay (writes armed there: nothing real moves).
+func (s *Server) connectTo(addr string) error {
 	s.mu.Lock()
 	s.closeLocked()
 	s.connecting, s.lastErr = true, ""
@@ -156,6 +169,9 @@ func (s *Server) Connect(addr string) error {
 			return
 		}
 		s.client, s.mirror, s.lastErr = c, mirror, ""
+		if s.local != nil && s.local.addr == addr {
+			c.Arm(true)
+		}
 		s.mu.Unlock()
 		s.publishStatus()
 
@@ -267,7 +283,8 @@ type statusView struct {
 	Connecting bool            `json:"connecting"`
 	Error      string          `json:"error,omitempty"`
 	Console    *console.Status `json:"console,omitempty"`
-	Version    string          `json:"version"` // tabula's (a page open across an update sees it change)
+	Local      *localView      `json:"local,omitempty"` // a local replay is open: the console is the session's
+	Version    string          `json:"version"`         // tabula's (a page open across an update sees it change)
 }
 
 func (s *Server) status() statusView {
@@ -278,6 +295,11 @@ func (s *Server) status() statusView {
 		st := s.client.Status()
 		v.Console = &st
 		v.Connected = st.Connected && !s.connecting
+	}
+	if l := s.local; l != nil {
+		s.mu.Unlock() // the local replay's lock is taken before the server's
+		v.Local = l.view()
+		s.mu.Lock()
 	}
 	return v
 }
@@ -316,7 +338,9 @@ func (s *Server) connect(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) disconnect(w http.ResponseWriter, r *http.Request) {
+	s.CloseLocal(false)
 	s.mu.Lock()
+	s.addr = ""
 	s.closeLocked()
 	s.mu.Unlock()
 	s.publishStatus()

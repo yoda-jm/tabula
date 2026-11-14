@@ -35,6 +35,15 @@ client accepts it.
 
 `connecting` stays true until the initial sync is over (`synced` reaches `total`).
 
+While a local replay is open (see [recording](recording.md#replaying-locally)),
+the status has `local`: `{"session", "duration", "at", "at_ms", "playing",
+"speed", "audio", "main": [l, r], "listen": "off" | "stereo" | "tracks",
+"tracks"?, "heard", "error"?, "back"?}`. `at` is the position in seconds,
+read at `at_ms` (Unix ms): pages move on from it while `playing`. `main`
+holds the tracks recording main L and R (0: not recorded), `heard` says
+the listening plays, `back` the console to go back to. `console` is then
+the session console, armed.
+
 `link` is measured by the read-back: while connected, tabula asks the
 console for every node again, 25 a second (the mix nodes every other
 time). `rtt_ms` is the smoothed round trip, `lost` how many of the last
@@ -307,6 +316,10 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | DELETE | `/api/sessions/{name}` | | 204: the session folder is removed, audio included (not `audio.json`); 409 while it is recorded or replayed |
 | POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1, "audio"?: true, "routing"?: true}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console). With `audio`, a virtual soundcheck (below): 409 for a session without audio tracks, while recording, while the input is tested, or when no player can be run; 400 for a speed other than 1; with `routing` too, 502 when the routing cannot be switched |
 | POST | `/api/replay/stop` | | `Record` |
+| POST | `/api/local/open` | `{"session": name, "from": seconds}` | `Status` with `local`: a local replay (below) of the session, paused at `from`; tabula leaves the console and connects to the session console. 404 for no such session; 409 while one is open, while recording, replaying to the console or testing the input |
+| POST | `/api/local/transport` | `{"play"?: bool, "at"?: seconds, "speed"?: x}` | `Status`: plays or pauses, seeks (the state of that time is set at once), sets the speed (0.25 to 16, else 400); 409 when none is open |
+| PUT | `/api/local/listen` | `{"preset": "stereo" \| "off"}` or `{"tracks": [{"track": n, "gain": 1, "pan": 0}]}` | `Status`: what plays on this machine (`gain` 0 to 4, `pan` -1 left to 1 right); 409 for `stereo` when the card did not record main L/R, 400 for a track not recorded |
+| POST | `/api/local/close` | | `Status`: connected again to the console left, writes disarmed; 409 when none is open |
 | GET | `/api/undo` | | `UndoView`: `{"count", "what"?, "at"?}`, what Undo takes back (the engineer's last change made from tabula) |
 | POST | `/api/undo` | | `UndoView` after undoing the last step: the values it overwrote are sent back to the console; 403 unless writes are armed; 409 when there is nothing to undo; 502 when the console does not answer (a step not started stays) |
 | POST | `/api/strips/copy` | `{"from": "/ch/01", "to": ["/ch/02"], "sections": ["eq", "dyn"]}` | `{"nodes"}`: the sections' nodes (`preamp`, `delay`, `gate`, `dyn`, `insert`, `eq`, `sends`: `mix/01`…, `main`: `mix`) sent to each target with the `/` command; one undo step. Strips of the same kind only (`ch`, `auxin`, `fxrtn`, `bus`, `mtx`); 400 otherwise or when none has the sections; 403 unless armed |

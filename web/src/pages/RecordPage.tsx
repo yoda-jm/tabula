@@ -12,6 +12,7 @@ import type { AudioView } from "../lib/audio";
 import type { Record as RecordStatus, SessionDetail, SessionSummary } from "../lib/session";
 import { audioApi, audioPlan, audioSummary, exportUrl, formatBytes, plural } from "../lib/audio";
 import { damagedText, formatDuration, parseTime, sessionApi } from "../lib/session";
+import { localApi } from "../lib/local";
 import { nextSong, setlistApi, songTimes } from "../lib/setlist";
 import { PLAY_BLOCKS, ROUTSWITCH, playRouting, playableTracks } from "../lib/soundcheck";
 import { useCanWrite, useRecord, useSetlist, useStatus, useValue } from "../store/hooks";
@@ -569,6 +570,13 @@ function Session(props: { name: string; rec: RecordStatus | null; audio: AudioVi
       {detail && <SessionAudio detail={detail} />}
       {detail && <TakeHome detail={detail} recording={!!rec?.recording} recordingThis={recordingThis} />}
 
+      <LocalReplay
+        name={name}
+        from={fromSeconds}
+        tracks={tracks}
+        blocked={rec?.recording ? "Not while recording." : rec?.replaying ? "Not while a replay to the console runs." : ""}
+      />
+
       <h4>Replay onto the console</h4>
       <p className="muted">
         A replay moves the console as it was recorded: its settings, faders and mutes.
@@ -752,5 +760,44 @@ export function PlayRoutingNote({ toCard }: { toCard: boolean }) {
     <p className="muted">
       {r.playing ? "The inputs already hear the PLAY routing" : "The PLAY routing"} takes the card on inputs {r.card.join(", ")}.
     </p>
+  );
+}
+
+/**
+ * LocalReplay opens a session on this machine, without the console: the
+ * pages follow the session, its meters follow the recorded tracks, and
+ * the tracks chosen are heard here (docs/recording.md).
+ */
+function LocalReplay({ name, from, tracks, blocked }: { name: string; from: number; tracks: number; blocked: string }) {
+  const local = useStatus().local;
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    setBusy(true);
+    try {
+      store.setStatus(await localApi.open(name, Number.isNaN(from) ? 0 : from));
+    } catch (e) {
+      store.toast(`Local replay: ${(e as Error).message}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const here = local?.session === name;
+  return (
+    <>
+      <h4>Replay locally</h4>
+      <p className="muted">
+        Play the session back here, without the console: tabula leaves the console and every page follows the session as it
+        followed the console, {tracks > 0 ? "the meters following the recorded tracks, and you listen to the stereo out or a track on this machine" : "with no audio (this session has no tracks)"}
+        . Nothing reaches the console meanwhile; <em>Back to the console</em> in the band at the top connects to it again,
+        writes disarmed.
+      </p>
+      <div className="row">
+        <button type="button" className="btn" disabled={busy || !!blocked || !!local || Number.isNaN(from)} onClick={() => void open()}>
+          {here ? "Open in the band above" : "▶ Replay locally"}
+        </button>
+        {blocked && <span className="muted">{blocked}</span>}
+        {local && !here && <span className="muted">{local.session} is replayed locally: close it first.</span>}
+      </div>
+    </>
   );
 }

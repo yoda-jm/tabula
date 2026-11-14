@@ -36,6 +36,11 @@ type Config struct {
 	Traffic       int          // packets kept for the debug page
 	UnhandledLog  io.Writer    // optional JSON lines log of unhandled requests
 	Logger        *slog.Logger
+	// Inputs, if set, gives the levels of the input strips (0-31 the
+	// channels, 32-39 the aux inputs; 1.0 = 0 dBFS) in place of the
+	// synthetic signal, once per meter frame: a local replay feeds the
+	// recorded tracks. A strip whose source is off stays silent.
+	Inputs func() [40]float64
 }
 
 // Client is a remote peer seen by the emulator.

@@ -114,11 +114,20 @@ func (s *Server) levels(now time.Time) *mixLevels {
 		}
 	}
 
+	var inputs [40]float64
+	if s.cfg.Inputs != nil {
+		inputs = s.cfg.Inputs()
+	}
+
 	// Channels feed buses and mains; FX returns follow the FX send buses.
 	pass := func(lo, hi int) {
 		for i := lo; i < hi; i++ {
 			p := strips[i]
 			switch {
+			case i < 40 && s.cfg.Inputs != nil:
+				if r.int(p+"/config/source") > 0 {
+					lv.in[i] = inputs[i]
+				}
 			case i < 32 && r.int(p+"/config/source") > 0:
 				lv.in[i] = signal(i, t)
 			case i >= 40:

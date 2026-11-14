@@ -78,10 +78,13 @@ func (s *Server) publishRecord() { s.hub.publish("record", s.recordStatus()) }
 // request goes on meanwhile; the recording shows once it runs.
 func (s *Server) StartRecording(note string) error {
 	s.mu.Lock()
-	busy := s.rec != nil || s.recStarting != nil
+	busy, local := s.rec != nil || s.recStarting != nil, s.local != nil
 	s.mu.Unlock()
 	if busy { // at once, rather than after the start being made
 		return errors.New("already recording")
+	}
+	if local {
+		return errors.New("a local replay is open: go back to the console to record")
 	}
 	if err := s.waitAudioFree(); err != nil {
 		return err
@@ -410,7 +413,8 @@ func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
-	busy := s.rec != nil && filepath.Base(s.rec.Dir()) == name || s.replayCancel != nil && s.replayOf == name
+	busy := s.rec != nil && filepath.Base(s.rec.Dir()) == name || s.replayCancel != nil && s.replayOf == name ||
+		s.local != nil && s.local.name == name
 	s.mu.Unlock()
 	if busy {
 		httpError(w, http.StatusConflict, errors.New("this session is being recorded or replayed"))
@@ -453,9 +457,12 @@ func (s *Server) replayStart(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	c := s.client
-	busy := s.replayCancel != nil
+	busy, local := s.replayCancel != nil, s.local != nil
 	s.mu.Unlock()
 	switch {
+	case local:
+		httpError(w, http.StatusConflict, errors.New("a local replay is open: go back to the console first"))
+		return
 	case c == nil:
 		httpError(w, http.StatusConflict, errors.New("not connected"))
 		return

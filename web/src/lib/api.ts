@@ -42,6 +42,37 @@ export interface Status {
   console?: ConsoleStatus;
   /** tabula's version ("v0.2.0", "dev 9f91019") */
   version?: string;
+  /** a local replay is open: the console is the session's (lib/local.ts) */
+  local?: LocalStatus;
+}
+
+/** MixTrack is a track listened to in a local replay: gain linear, pan -1 (left) to 1 (right). */
+export interface MixTrack {
+  track: number;
+  gain: number;
+  pan: number;
+}
+
+/** LocalStatus is the local replay open: a session played back on this machine, without the console. */
+export interface LocalStatus {
+  session: string;
+  duration: number;
+  /** seconds of the session, read at at_ms (Unix ms): pages move on from it while playing */
+  at: number;
+  at_ms: number;
+  playing: boolean;
+  speed: number;
+  /** the session has tracks: the input meters follow them */
+  audio: boolean;
+  /** the tracks recording main L and R, 0 if none */
+  main: [number, number];
+  listen: "off" | "stereo" | "tracks";
+  tracks?: MixTrack[];
+  /** the listening plays now */
+  heard: boolean;
+  error?: string;
+  /** the console to go back to */
+  back?: string;
 }
 
 /** About is which tabula runs, since when, and where it keeps its files (GET /api/about, the engineer's). */

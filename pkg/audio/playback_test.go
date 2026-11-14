@@ -222,3 +222,47 @@ func TestPlaybackProgram(t *testing.T) {
 		t.Errorf("failing player: %v", p.Err())
 	}
 }
+
+// A mix plays the chosen tracks in two channels, panned and scaled; the
+// tracks left out are not read.
+func TestPlaybackMix(t *testing.T) {
+	dir, info := playSession(t)
+	sink := &sinkBuffer{}
+	p, err := StartPlayback(DefaultConfig(), dir, info, PlayOptions{
+		Sink: func() (io.WriteCloser, error) { return sink, nil },
+		Mix:  []MixTrack{{Channel: 2, Gain: 1, Pan: -1}, {Channel: 4, Gain: 0.5}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-p.Done():
+	case <-time.After(5 * time.Second):
+		t.Fatal("playback did not end")
+	}
+	if p.Err() != nil {
+		t.Fatal(p.Err())
+	}
+	raw := sink.b.Bytes()
+	if len(raw) != 1000*8 {
+		t.Fatalf("%d bytes, want 1000 stereo frames", len(raw))
+	}
+	at := func(k, ch int) int32 { return int32(binary.LittleEndian.Uint32(raw[8*k+4*ch:])) }
+	for _, k := range []int{0, 499, 500, 999} {
+		wantL, wantR := int32(256*(k+1)), int32(0)
+		if k < 500 {
+			wantL += int32(32768 * (k + 1))
+			wantR = int32(32768 * (k + 1))
+		}
+		if at(k, 0) != wantL || at(k, 1) != wantR {
+			t.Errorf("frame %d: %d %d, want %d %d", k, at(k, 0), at(k, 1), wantL, wantR)
+		}
+	}
+	// only the tracks of the mix are opened
+	if _, err := StartPlayback(DefaultConfig(), dir, info, PlayOptions{
+		Sink: func() (io.WriteCloser, error) { return &sinkBuffer{}, nil },
+		Mix:  []MixTrack{{Channel: 3, Gain: 1}},
+	}); err == nil {
+		t.Error("a mix of a track without a file: no error")
+	}
+}

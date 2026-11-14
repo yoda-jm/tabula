@@ -10,6 +10,14 @@
   are averaged, and a pause or a tap off the beat starts a new tempo. The
   console's own tap, a user button on an effect's `Time`, takes the last
   interval alone.
+- **Replay locally**: a session plays back on the laptop without the
+  console. tabula starts a session console (its emulator, holding the
+  session) and connects to it: every page follows the show as it was,
+  the input meters follow the recorded tracks, and the stereo out (when
+  recorded) or a track plays on the laptop, in step. A band on every
+  page: play, pause, seek, speed, listen, back to the console (writes
+  disarmed). `/api/local/…`; the emulator takes input levels from outside
+  (`emu.Config.Inputs`).
 - The setlist takes a **tempo per song**, typed after its name (*Opening
   120 bpm*): the FX page sets it to the effects with one tap. `Setlist`
   has `tempos`, one per song.

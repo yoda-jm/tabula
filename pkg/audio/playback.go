@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,6 +111,25 @@ type PlayOptions struct {
 	Log  *slog.Logger
 	// Sink, if set, receives the stream instead of the player program.
 	Sink func() (io.WriteCloser, error)
+	// Mix, if set, plays these tracks mixed into two channels (left,
+	// right) instead of each track on its own channel: listening to a
+	// session on the laptop. The player is asked for 2 channels.
+	Mix []MixTrack
+}
+
+// MixTrack is a track in a stereo mix: Channel its track number (1-based),
+// Gain linear, Pan from -1 (left) to 1 (right).
+type MixTrack struct {
+	Channel int     `json:"track"`
+	Gain    float64 `json:"gain"`
+	Pan     float64 `json:"pan"`
+}
+
+// gains are the left and right gains of a track in a mix: centre plays at
+// full level in both, a hard pan in one only.
+func (m MixTrack) gains() (l, r float64) {
+	pan := min(max(m.Pan, -1), 1)
+	return m.Gain * min(1, 1-pan), m.Gain * min(1, 1+pan)
 }
 
 // Playback plays tracks to the card.
@@ -131,7 +151,8 @@ type Playback struct {
 }
 
 type playTrack struct {
-	channel int // 0-based in the stream
+	channel int     // 0-based in the stream
+	gl, gr  float64 // its gains in a mix
 	f       *os.File
 	r       *bufio.Reader
 	format  sampleFormat
@@ -157,8 +178,16 @@ func StartPlayback(cfg Config, dir string, info Info, opt PlayOptions) (*Playbac
 	if opt.From > 0 {
 		skip = int64(opt.From * float64(info.Rate))
 	}
+	mixed := map[int]MixTrack{}
+	for _, m := range opt.Mix {
+		mixed[m.Channel] = m
+	}
 	for _, t := range info.Tracks {
 		if t.File == "" || t.Channel < 1 || t.Channel > info.Channels {
+			continue
+		}
+		m, inMix := mixed[t.Channel]
+		if opt.Mix != nil && !inMix {
 			continue
 		}
 		tr, err := openTrack(filepath.Join(dir, filepath.FromSlash(t.File)), info.Rate, skip)
@@ -167,6 +196,7 @@ func StartPlayback(cfg Config, dir string, info Info, opt PlayOptions) (*Playbac
 			return nil, err
 		}
 		tr.channel = t.Channel - 1
+		tr.gl, tr.gr = m.gains()
 		p.tracks = append(p.tracks, tr)
 	}
 	if len(p.tracks) == 0 {
@@ -216,7 +246,7 @@ func openTrack(path string, rate int, skip int64) (playTrack, error) {
 }
 
 func (p *Playback) startPlayer(cfg Config) error {
-	args, err := cfg.PlayCommandLine(p.info.Channels, p.info.Rate)
+	args, err := cfg.PlayCommandLine(p.channels(), p.info.Rate)
 	if err != nil {
 		return err
 	}
@@ -293,9 +323,18 @@ func (p *Playback) run() {
 	}
 }
 
-// stream interleaves the tracks into the card's channels.
+// channels is the stream's channel count: the session's, 2 for a mix.
+func (p *Playback) channels() int {
+	if p.opt.Mix != nil {
+		return 2
+	}
+	return p.info.Channels
+}
+
+// stream interleaves the tracks into the card's channels, or mixes them
+// into two.
 func (p *Playback) stream() error {
-	width := 4 * p.info.Channels
+	width := 4 * p.channels()
 	buf := make([]byte, playFrames*width)
 	if p.opt.From < 0 { // the audio started after this point of the session
 		for silence := int64(-p.opt.From * float64(p.info.Rate)); silence > 0; {
@@ -308,6 +347,10 @@ func (p *Playback) stream() error {
 		}
 	}
 	block := make([]byte, playFrames*4)
+	var accL, accR []float64
+	if p.opt.Mix != nil {
+		accL, accR = make([]float64, playFrames), make([]float64, playFrames)
+	}
 	for {
 		n := int64(0)
 		for _, t := range p.tracks {
@@ -323,16 +366,36 @@ func (p *Playback) stream() error {
 			if _, err := io.ReadFull(t.r, block[:m*size]); err != nil {
 				return fmt.Errorf("%s: %w", filepath.Base(t.f.Name()), err)
 			}
-			for k := range m {
-				off := k*width + 4*t.channel
-				putSample(buf[off:off+4], t.format.sample(block[k*size:]), 4)
+			if accL != nil {
+				for k := range m {
+					v := float64(t.format.sample(block[k*size:]))
+					accL[k] += v * t.gl
+					accR[k] += v * t.gr
+				}
+			} else {
+				for k := range m {
+					off := k*width + 4*t.channel
+					putSample(buf[off:off+4], t.format.sample(block[k*size:]), 4)
+				}
 			}
 			t.left -= int64(m)
+		}
+		if accL != nil {
+			for k := range int(n) {
+				putSample(buf[k*8:k*8+4], clip32(accL[k]), 4)
+				putSample(buf[k*8+4:k*8+8], clip32(accR[k]), 4)
+				accL[k], accR[k] = 0, 0
+			}
 		}
 		if err := p.write(buf[:n*int64(width)], n); err != nil {
 			return err
 		}
 	}
+}
+
+// clip32 rounds a mixed sample to 32 bits, clipped at full scale.
+func clip32(v float64) int32 {
+	return int32(min(max(math.Round(v), math.MinInt32), math.MaxInt32))
 }
 
 // errPlayerGone is a write to a player that no longer reads.

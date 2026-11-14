@@ -78,6 +78,9 @@ export function ConnectionPill({ onClick }: { onClick(): void }) {
   } else if (c && !c.connected) {
     cls = "bad";
     text = `${c.info.name || c.addr}: no answer`;
+  } else if (s.connected && c && s.local) {
+    cls = "local";
+    text = `Session ${s.local.session}`;
   } else if (s.connected && c) {
     cls = "ok";
     text = [c.info.name, c.info.model, c.info.firmware && "fw " + c.info.firmware].filter(Boolean).join(" · ");

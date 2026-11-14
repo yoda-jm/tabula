@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { MarkerButton } from "./components/Marker";
+import { LocalBand } from "./components/LocalBand";
 import { ArmControl, AudioBanner, ConnectionPill, RecIndicator, StreamBanner, Toasts, UndoButton, UpdateBanner } from "./components/shell";
 import { atLeast } from "./lib/access";
 import type { Role } from "./lib/api";
@@ -114,6 +115,7 @@ function ConsoleApp({ role }: { role: Role }) {
         </nav>
         <StreamBanner />
         <UpdateBanner />
+        {engineer && <LocalBand />}
         {engineer && <AudioBanner onOpen={page !== "record" ? () => go({ page: "record" }) : undefined} />}
       </div>
       <main className="main">

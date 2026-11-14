@@ -1,0 +1,231 @@
+package webapi
+
+import (
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/yoda-jm/tabula/pkg/audio"
+	"github.com/yoda-jm/tabula/pkg/scene"
+	"github.com/yoda-jm/tabula/pkg/schema"
+	"github.com/yoda-jm/tabula/pkg/session"
+	"github.com/yoda-jm/tabula/pkg/state"
+)
+
+// writeMonoWAV writes a 16-bit mono track at 48 kHz holding level (0-1)
+// from frame from on, silence before.
+func writeMonoWAV(t *testing.T, path string, frames, from int, level float64) {
+	t.Helper()
+	data := make([]byte, 2*frames)
+	for i := from; i < frames; i++ {
+		v := int16(level * 32767)
+		if i%2 == 1 {
+			v = -v
+		}
+		binary.LittleEndian.PutUint16(data[2*i:], uint16(v))
+	}
+	h := make([]byte, 44)
+	copy(h, "RIFF")
+	binary.LittleEndian.PutUint32(h[4:], uint32(36+len(data)))
+	copy(h[8:], "WAVEfmt ")
+	binary.LittleEndian.PutUint32(h[16:], 16)
+	binary.LittleEndian.PutUint16(h[20:], 1)
+	binary.LittleEndian.PutUint16(h[22:], 1)
+	binary.LittleEndian.PutUint32(h[24:], 48000)
+	binary.LittleEndian.PutUint32(h[28:], 96000)
+	binary.LittleEndian.PutUint16(h[32:], 2)
+	binary.LittleEndian.PutUint16(h[34:], 16)
+	copy(h[36:], "data")
+	binary.LittleEndian.PutUint32(h[40:], uint32(len(data)))
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	if err := os.WriteFile(path, append(h, data...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// localSession writes a 2 s session of the demo band: the scene at the
+// start, track 1 (Hang) silent for 1 s then at half level, and two
+// changes to the channel it feeds.
+func localSession(t *testing.T, dir string, ch string) {
+	t.Helper()
+	scn, err := os.ReadFile("../../testdata/scenes/demo.scn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "start.scn"), scn, 0o644)
+	writeMonoWAV(t, filepath.Join(dir, "audio", "01 Hang.wav"), 96000, 48000, 0.5)
+	meta := session.Meta{Format: 1, Start: time.Now(), Console: "M32C test", Events: 2, Duration: 2,
+		Audio: &audio.Info{Rate: 48000, Bits: 16, Channels: 32, Frames: 96000,
+			Tracks: []audio.Track{{Channel: 1, Name: "Hang", File: "audio/01 Hang.wav"}, {Channel: 2, Name: "Cajon"}}}}
+	b, _ := json.Marshal(meta)
+	os.WriteFile(filepath.Join(dir, "meta.json"), b, 0o644)
+	events := `{"t":0.5,"addr":"` + ch + `/mix/fader","text":"-20.0"}` + "\n" +
+		`{"t":1.0,"addr":"` + ch + `/mix/on","text":"OFF"}` + "\n"
+	os.WriteFile(filepath.Join(dir, "events.jsonl"), []byte(events), 0o644)
+}
+
+func TestLocalReplay(t *testing.T) {
+	_, emuAddr := startEmu(t)
+	api := New(quiet)
+	sessions := t.TempDir()
+	api.SetSessionsDir(sessions)
+	ts := httptest.NewServer(api.Handler(http.NotFoundHandler()))
+	defer ts.Close()
+	post(t, ts.URL+"/api/connect", `{"addr":"`+emuAddr+`"}`)
+	connected(t, ts.URL)
+
+	// the channel hearing Hang, recorded on track 1
+	demo := state.New(schema.Build("M32C"))
+	f, _ := os.Open("../../testdata/scenes/demo.scn")
+	scene.Load(f, demo, "test")
+	f.Close()
+	hang := -1
+	for i, track := range audio.InputTracks(demo) {
+		if track == 1 && i < 32 {
+			hang = i
+			break
+		}
+	}
+	if hang < 0 {
+		t.Fatal("no channel records on track 1 in the demo scene")
+	}
+	ch := fmt.Sprintf("/ch/%02d", hang+1)
+	localSession(t, filepath.Join(sessions, "show"), ch)
+
+	status := func() statusView {
+		var st statusView
+		getJSON(t, ts.URL+"/api/status", &st)
+		return st
+	}
+	transport := func(body string) int { return post(t, ts.URL+"/api/local/transport", body) }
+	mirrored := func(addr string) string {
+		api.mu.Lock()
+		m := api.mirror
+		api.mu.Unlock()
+		if m == nil {
+			return ""
+		}
+		v, l, err := m.Get(addr)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(m.TypeOf(l).Format(v))
+	}
+	waitFor := func(what string, ok func() bool) {
+		t.Helper()
+		for deadline := time.Now().Add(10 * time.Second); !ok(); time.Sleep(20 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatalf("%s: %+v", what, status().Local)
+			}
+		}
+	}
+
+	if code := transport(`{"play":true}`); code != http.StatusConflict {
+		t.Errorf("transport, no local replay: %d", code)
+	}
+	if code := post(t, ts.URL+"/api/local/open", `{"session":"nope"}`); code != http.StatusNotFound {
+		t.Errorf("no such session: %d", code)
+	}
+	if code := post(t, ts.URL+"/api/local/open", `{"session":"show"}`); code != http.StatusOK {
+		t.Fatalf("open: %d", code)
+	}
+	connected(t, ts.URL)
+	st := status()
+	if st.Local == nil || st.Local.Back != emuAddr || st.Console == nil || st.Console.Addr == emuAddr || !st.Console.Armed {
+		t.Fatalf("open: %+v %+v", st.Local, st.Console)
+	}
+	if !st.Local.Audio || st.Local.Listen != "off" || st.Local.Duration != 2 {
+		t.Errorf("open: %+v", st.Local)
+	}
+	if code := post(t, ts.URL+"/api/local/open", `{"session":"show"}`); code != http.StatusConflict {
+		t.Errorf("opened twice: %d", code)
+	}
+	if code := post(t, ts.URL+"/api/record/start", ``); code == http.StatusOK {
+		t.Error("recording while a local replay is open")
+	}
+
+	// a seek while paused sets the state of that time, which the GUI's mirror follows
+	if code := transport(`{"at":1.5}`); code != http.StatusOK {
+		t.Fatalf("seek: %d", code)
+	}
+	waitFor("seek", func() bool { return mirrored(ch+"/mix/fader") == "-20.0" && mirrored(ch+"/mix/on") == "OFF" })
+	if l := status().Local; l.Playing || l.At != 1.5 {
+		t.Errorf("after the seek: %+v", l)
+	}
+	// the meters: Hang is silent before 1 s, at half level after
+	l := api.localNow()
+	if in := l.inputs(); in[hang] < 0.49 || in[hang] > 0.51 {
+		t.Errorf("Hang at 1.5 s: %v", in[hang])
+	}
+	transport(`{"at":0.2}`)
+	waitFor("back to 0.2", func() bool { return mirrored(ch+"/mix/on") == "ON" })
+	if in := l.inputs(); in[hang] != 0 {
+		t.Errorf("Hang at 0.2 s: %v", in[hang])
+	}
+
+	// played at 4×, to the end
+	transport(`{"play":true,"speed":4}`)
+	waitFor("the end", func() bool { l := status().Local; return !l.Playing && l.At == 2 })
+	if mirrored(ch+"/mix/on") != "OFF" {
+		t.Error("the changes were not replayed")
+	}
+
+	// listening: the stereo out was not recorded; track 1 plays, in step at 1×
+	if code := put(t, ts.URL+"/api/local/listen", `{"preset":"stereo"}`); code != http.StatusConflict {
+		t.Errorf("stereo, not recorded: %d", code)
+	}
+	if code := put(t, ts.URL+"/api/local/listen", `{"tracks":[{"track":2,"gain":1}]}`); code != http.StatusBadRequest {
+		t.Errorf("a track without a file: %d", code)
+	}
+	sink := &streamSink{}
+	api.mu.Lock()
+	api.sc.sink = func() (io.WriteCloser, error) { return sink, nil }
+	api.mu.Unlock()
+	if code := put(t, ts.URL+"/api/local/listen", `{"tracks":[{"track":1,"gain":1,"pan":0}]}`); code != http.StatusOK {
+		t.Fatalf("listen: %d", code)
+	}
+	transport(`{"at":1,"play":true,"speed":1}`)
+	waitFor("heard", func() bool { return status().Local.Heard })
+	time.Sleep(100 * time.Millisecond)
+	transport(`{"play":false}`)
+	sink.mu.Lock()
+	n := sink.b.Len()
+	sink.mu.Unlock()
+	if n == 0 || n%8 != 0 {
+		t.Errorf("listening: %d bytes, want stereo frames", n)
+	}
+
+	// back to the console: the same one, writes disarmed
+	if code := post(t, ts.URL+"/api/local/close", ``); code != http.StatusOK {
+		t.Fatalf("close: %d", code)
+	}
+	connected(t, ts.URL)
+	st = status()
+	if st.Local != nil || st.Console == nil || st.Console.Addr != emuAddr || st.Console.Armed {
+		t.Errorf("back: %+v %+v", st.Local, st.Console)
+	}
+	if code := post(t, ts.URL+"/api/local/close", ``); code != http.StatusConflict {
+		t.Errorf("closed twice: %d", code)
+	}
+}
+
+func put(t *testing.T, url, body string) int {
+	t.Helper()
+	req, _ := http.NewRequest("PUT", url, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}

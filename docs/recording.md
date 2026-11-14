@@ -162,6 +162,46 @@ soundcheck (below). To hear the show elsewhere, open the audio tracks with
 the markers (below). Writes must be armed, since a replay writes to the
 console.
 
+## Replaying locally
+
+**Replay locally** (session details, on the Record page) plays a session
+back on the machine running tabula, **without the console**: to look
+back at a show after it, at the venue or at home. tabula starts a
+*session console* inside itself (the emulator, on `127.0.0.1`, holding
+the session's state), leaves the console it was connected to, and
+connects to the session console. Every page then follows the session as
+it follows a console: the faders, mutes, EQ and effects move as they
+moved at the show. Nothing reaches the real console meanwhile: tabula
+holds no link to it.
+
+A band under the top bar, on every page, carries the session, the
+transport and the way back:
+
+- **▶ Play / ❚❚ Pause** (Space), ⏪ ⏩ 5 s (← →), a seek bar, a speed
+  (0.5× to 8×). A seek sets the state of that time at once, as a replay
+  does; the pages move once to it.
+- The **input meters follow the recorded tracks**: each channel or aux
+  input shows the level of the card track that recorded its input (the
+  card routing of the session, followed to the channel's source), at the
+  time of the replay. A channel whose input has no track is silent. Then
+  the emulator's audio flow takes them through faders, mutes, sends and
+  DCAs to the buses and mains, as in [the emulator](emulator.md) (no pan,
+  the EQ only on the RTA). A session without tracks gets the emulator's
+  synthetic signal.
+- **Listen**: the stereo out when the card recorded main L and R (two
+  tracks fed by outputs carrying Main L and Main R), or one track in both
+  ears, played on this machine's own output (`default` for aplay and
+  ffmpeg, `@DEFAULT_SINK@` for pacat) by the player of the virtual
+  soundcheck, in step with the replay. At 1× only: at other speeds the
+  replay runs silent.
+- **Back to the console** stops it all and connects to the console left,
+  writes disarmed.
+
+Writes are armed on the session console (nothing real moves): a fader
+moved meanwhile moves there, until the session changes it again. Not
+while recording, nor during a replay onto the console; recording waits
+until the band is closed.
+
 ## Virtual soundcheck
 
 A session recorded with its audio can be played back **through the

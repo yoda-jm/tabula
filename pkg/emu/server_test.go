@@ -682,3 +682,22 @@ func TestMeterGainReductionsAndDCAs(t *testing.T) {
 		t.Errorf("DCA off: ch 1 %v, DCA %v", lv.post[0], lv.dca[0])
 	}
 }
+
+// A local replay gives the inputs the levels of the recorded tracks: a
+// channel without a track is silent, an aux input carries its own.
+func TestInputsHook(t *testing.T) {
+	s := offline()
+	var in [40]float64
+	in[0], in[33] = 0.5, 0.25
+	s.cfg.Inputs = func() [40]float64 { return in }
+	apply(t, s, "/ch/01/config \"Kick\" 1 RD 1", "/ch/02/config \"Snare\" 1 RD 2", "/auxin/02/config \"Laptop\" 1 RD 34")
+	lv := s.levels(time.Now())
+	if lv.in[0] != 0.5 || lv.in[1] != 0 || lv.in[33] != 0.25 {
+		t.Errorf("inputs: ch1 %v ch2 %v aux2 %v", lv.in[0], lv.in[1], lv.in[33])
+	}
+	// a channel whose source is off stays silent
+	apply(t, s, "/ch/01/config \"Kick\" 1 RD 0")
+	if lv = s.levels(time.Now()); lv.in[0] != 0 {
+		t.Errorf("source off: %v", lv.in[0])
+	}
+}

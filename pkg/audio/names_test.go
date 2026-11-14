@@ -191,3 +191,39 @@ card 2: XUSB [X-USB], device 0: USB Audio [USB Audio]
 		t.Errorf("older ffmpeg: %+v", got)
 	}
 }
+
+func TestInputAndMainTracks(t *testing.T) {
+	st := state.New(schema.Build("X32"))
+	apply := func(lines ...string) {
+		t.Helper()
+		if errs := st.ApplyLines(lines, "test"); len(errs) > 0 {
+			t.Fatal(errs)
+		}
+	}
+	// Factory patch: channel n hears local input n, which card track n records.
+	apply(`/ch/03/config "Kick" 1 RD 3`, `/ch/04/config "Kick 2" 1 RD 3`)
+	tr := InputTracks(st)
+	if tr[0] != 1 || tr[2] != 3 || tr[3] != 3 || tr[31] != 32 {
+		t.Errorf("factory: %v", tr)
+	}
+	// Card 9-16 from AES50-B 1-8, which the input patch puts on inputs 17-24;
+	// local 9-16 are no longer recorded.
+	apply("/config/routing/CARD AN1-8 B1-8 AN17-24 UIN1-8", "/config/routing/IN AN1-8 AN9-16 B1-8 AN25-32 AUX1-4",
+		`/ch/20/config "Sax" 1 RD 20`, `/ch/10/config "Gtr" 1 RD 10`)
+	tr = InputTracks(st)
+	if tr[19] != 12 || tr[9] != 0 || tr[17] != 10 {
+		t.Errorf("AES50-B: %v", tr)
+	}
+	if l, r := MainTracks(st); l != 0 || r != 0 {
+		t.Errorf("no main recorded: %d %d", l, r)
+	}
+	// Main L/R on outputs 1-2, recorded by card 1-2; aux in 3 from its socket.
+	apply("/config/routing/CARD OUT1-8 AuxIN1-6/TB P161-8 UOUT1-8",
+		"/outputs/main/01 2 POST OFF", "/outputs/main/02 1 POST OFF", `/auxin/03/config "Laptop" 1 RD 35`)
+	if l, r := MainTracks(st); l != 2 || r != 1 {
+		t.Errorf("main: %d %d", l, r)
+	}
+	if tr = InputTracks(st); tr[34] != 11 || tr[0] != 0 {
+		t.Errorf("aux in: %v", tr)
+	}
+}
