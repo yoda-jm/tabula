@@ -419,3 +419,43 @@ func TestAddMarker(t *testing.T) {
 		t.Errorf("events: %+v", s.Events)
 	}
 }
+
+// The mark editor replaces the markers; the changes, unreadable lines
+// too, stay as they were.
+func TestSetMarkers(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "meta.json"), []byte(`{"format":1,"events":2,"markers":2,"duration":10}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "events.jsonl"), []byte(`{"t":1,"marker":"1. Intro"}
+{"t":2,"addr":"/ch/01/mix/on","text":"OFF"}
+not json
+{"t":6,"marker":"Mark 0:06","origin":"review"}
+{"t":7,"addr":"/ch/01/mix/on","text":"ON"}
+`), 0o644)
+	err := SetMarkers(dir, []Event{{T: 8, Marker: "Encore"}, {T: 1, Marker: "1. Opening"}, {T: 6, Marker: "Feedback", Origin: "review"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, m := range s.Markers() {
+		got = append(got, fmt.Sprintf("%g %s %s", m.T, m.Marker, m.Origin))
+	}
+	if strings.Join(got, "|") != "1 1. Opening |6 Feedback review|8 Encore " || s.Meta.Markers != 3 {
+		t.Errorf("markers: %q, meta %d", got, s.Meta.Markers)
+	}
+	if len(s.Events) != 5 || len(s.Damaged) != 1 {
+		t.Errorf("events %d, damaged %v", len(s.Events), s.Damaged)
+	}
+	if data, _ := os.ReadFile(filepath.Join(dir, "events.jsonl")); !strings.Contains(string(data), "not json\n") {
+		t.Error("the unreadable line is gone")
+	}
+	if err := SetMarkers(dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	if s, _ := Open(dir); len(s.Markers()) != 0 || s.Meta.Markers != 0 || len(s.Events) != 2 {
+		t.Errorf("no markers: %+v", s.Events)
+	}
+}

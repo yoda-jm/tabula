@@ -14,12 +14,14 @@ package session
 
 import (
 	"bufio"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -444,6 +446,60 @@ func AddMarker(dir string, t float64, label string) (Event, error) {
 		return e, err
 	}
 	return e, UpdateMeta(dir, func(m *Meta) { m.Markers++ })
+}
+
+// SetMarkers replaces the markers of a finished session (the mark
+// editor): the lines of events.jsonl that are not markers stay as they
+// are, unreadable ones too, the markers given follow in time order. The
+// file is replaced at once, and meta.json counts them.
+func SetMarkers(dir string, marks []Event) error {
+	metaMu.Lock()
+	path := filepath.Join(dir, "events.jsonl")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		metaMu.Unlock()
+		return err
+	}
+	var out []byte
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var e Event
+		if json.Unmarshal([]byte(line), &e) == nil && e.Marker != "" && e.Addr == "" {
+			continue // a marker: replaced
+		}
+		out = append(append(out, line...), '\n')
+	}
+	sorted := slices.Clone(marks)
+	slices.SortStableFunc(sorted, func(a, b Event) int { return cmp.Compare(a.T, b.T) })
+	for _, m := range sorted {
+		line, _ := json.Marshal(Event{T: m.T, Marker: m.Marker, Origin: m.Origin})
+		out = append(append(out, line...), '\n')
+	}
+	tmp := path + ".tmp"
+	err = os.WriteFile(tmp, out, 0o644)
+	if err == nil {
+		err = syncFile(tmp)
+	}
+	if err == nil {
+		err = os.Rename(tmp, path)
+	}
+	metaMu.Unlock()
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return UpdateMeta(dir, func(m *Meta) { m.Markers = len(sorted) })
+}
+
+func syncFile(path string) error {
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	err = f.Sync()
+	return errors.Join(err, f.Close())
 }
 
 // writeMeta replaces meta.json at once: it is rewritten while recording.

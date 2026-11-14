@@ -238,6 +238,28 @@ func TestLocalReplay(t *testing.T) {
 		t.Errorf("in the session: %+v, meta %d markers %d events", m, ses.Meta.Markers, ses.Meta.Events)
 	}
 
+	// the mark editor: renamed, moved, one removed, one added; the band follows
+	edit := func(body string) int { return put(t, ts.URL+"/api/sessions/show/markers", body) }
+	if code := edit(`{"markers":[{"label":"Chorus","t":0.75},{"label":"Outro","t":1.9,"origin":"review"}]}`); code != http.StatusOK {
+		t.Fatalf("edit: %d", code)
+	}
+	if m := status().Local.Markers; len(m) != 2 || m[0].Label != "Chorus" || m[0].T != 0.75 || m[1].Label != "Outro" {
+		t.Errorf("after the edit: %+v", m)
+	}
+	for body, want := range map[string]int{
+		`{"markers":[{"label":"  ","t":1}]}`:     http.StatusBadRequest,
+		`{"markers":[{"label":"Late","t":99}]}`:  http.StatusBadRequest,
+		`{"markers":[{"label":"Early","t":-1}]}`: http.StatusBadRequest,
+		`{"nope":1}`:                             http.StatusBadRequest,
+	} {
+		if code := edit(body); code != want {
+			t.Errorf("%s: %d, want %d", body, code, want)
+		}
+	}
+	if code := put(t, ts.URL+"/api/sessions/nope/markers", `{"markers":[]}`); code != http.StatusNotFound {
+		t.Errorf("no such session: %d", code)
+	}
+
 	// back to the console: the same one, writes disarmed
 	if code := post(t, ts.URL+"/api/local/close", ``); code != http.StatusOK {
 		t.Fatalf("close: %d", code)

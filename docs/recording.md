@@ -139,7 +139,10 @@ the next song to mark: it is still there after a restart, and every
 engineer device shows the same next song (two devices marking at the same
 time never mark the same song twice). A session keeps the setlist it was
 recorded with (`setlist.json` in its folder), and its details list the
-songs with the time each was marked.
+songs with the time each was marked. **✎ Edit the markers** in a
+session's details renames, moves (m:ss.s), removes or adds markers once
+the recording has stopped: the changes stay as they are, the Reaper
+project and the labels are written again.
 
 ## Replaying a session
 
@@ -186,6 +189,8 @@ transport and the way back:
   **⚑ Mark** (M) marks the moment: *Mark 12:34*, added to the session
   (`events.jsonl`, with `"origin": "review"`, and `meta.json`) and to its
   Reaper project and labels, as a marker set while recording is.
+  **✎ Marks** opens the mark editor: rename, move (a time, or **Now**),
+  remove or add markers, **Go** to one; saved at once.
 - The **input meters follow the recorded tracks**: each channel or aux
   input shows the level of the card track that recorded its input (the
   card routing of the session, followed to the channel's source), at the

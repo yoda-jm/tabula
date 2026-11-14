@@ -104,7 +104,18 @@ export const sessionApi = {
   replay: (session: string, from: number, speed: number, soundcheck?: { audio: true; routing: boolean }) =>
     call<Record>("POST", "/api/replay/start", { session, from, speed, ...soundcheck }, LONG),
   stopReplay: () => call<Record>("POST", "/api/replay/stop", {}),
+  /** setMarkers replaces the session's markers (the mark editor) */
+  setMarkers: (session: string, markers: { label: string; t: number; origin?: string }[]) =>
+    call<{ markers: SessionEvent[] }>("PUT", "/api/sessions/" + encodeURIComponent(session) + "/markers", { markers }),
 };
+
+/** formatMarkTime writes a marker's time to edit: m:ss.s or h:mm:ss.s. */
+export function formatMarkTime(t: number): string {
+  const tenths = Math.round(Math.max(0, t) * 10);
+  const s = Math.floor(tenths / 10);
+  const frac = `${String(s % 60).padStart(2, "0")}.${tenths % 10}`;
+  return s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${frac}` : `${Math.floor(s / 60)}:${frac}`;
+}
 
 /** formatDuration prints seconds as h:mm:ss or m:ss. */
 export function formatDuration(seconds: number): string {

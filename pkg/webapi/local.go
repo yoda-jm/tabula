@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -448,6 +449,7 @@ func (s *Server) localRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/local/listen", s.localListen)
 	mux.HandleFunc("POST /api/local/close", s.localClose)
 	mux.HandleFunc("POST /api/local/mark", s.localMark)
+	mux.HandleFunc("PUT /api/sessions/{name}/markers", s.putMarkers)
 }
 
 func (s *Server) localOpen(w http.ResponseWriter, r *http.Request) {
@@ -644,4 +646,91 @@ func clock(t float64) string {
 		return fmt.Sprintf("%d:%02d:%02d", sec/3600, sec/60%60, sec%60)
 	}
 	return fmt.Sprintf("%d:%02d", sec/60, sec%60)
+}
+
+// maxMarkers is the most markers a session takes from the mark editor.
+const maxMarkers = 1000
+
+// putMarkers replaces a session's markers (the mark editor):
+// {"markers": [{"label", "t", "origin"?}]}, labels tidied (1 to 80
+// characters), times within the session. Not while it is recorded.
+func (s *Server) putMarkers(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	dir, err := s.sessionDir(name)
+	if err != nil {
+		httpError(w, http.StatusNotFound, err)
+		return
+	}
+	var req struct {
+		Markers []struct {
+			Label  string  `json:"label"`
+			T      float64 `json:"t"`
+			Origin string  `json:"origin"`
+		} `json:"markers"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Markers == nil {
+		httpError(w, http.StatusBadRequest, errors.New(`expects {"markers": [{"label", "t"}]}`))
+		return
+	}
+	s.mu.Lock()
+	recording := s.rec != nil && filepath.Base(s.rec.Dir()) == name
+	s.mu.Unlock()
+	if recording {
+		httpError(w, http.StatusConflict, errors.New("this session is being recorded: its markers are edited once it stops"))
+		return
+	}
+	ses, err := s.openSession(dir)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if len(req.Markers) > maxMarkers {
+		httpError(w, http.StatusBadRequest, fmt.Errorf("a session takes %d markers at most", maxMarkers))
+		return
+	}
+	marks := make([]session.Event, 0, len(req.Markers))
+	for _, m := range req.Markers {
+		label := strings.Join(strings.Fields(m.Label), " ")
+		switch {
+		case label == "":
+			httpError(w, http.StatusBadRequest, errors.New("a marker needs a label"))
+			return
+		case utf8.RuneCountInString(label) > maxSongChars:
+			httpError(w, http.StatusBadRequest, fmt.Errorf("%q: a marker takes %d characters at most", label, maxSongChars))
+			return
+		case !(m.T >= 0 && m.T <= ses.Meta.Duration):
+			httpError(w, http.StatusBadRequest, fmt.Errorf("%q: %v s is not in the session (0 to %v s)", label, m.T, ses.Meta.Duration))
+			return
+		}
+		origin := m.Origin
+		if origin != "review" {
+			origin = "" // a marker set while recording, or edited
+		}
+		marks = append(marks, session.Event{T: m.T, Marker: label, Origin: origin})
+	}
+	if err := session.SetMarkers(dir, marks); err != nil {
+		httpError(w, http.StatusInternalServerError, err)
+		return
+	}
+	ses, err = s.openSession(dir)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if ses.Meta.Audio != nil {
+		if err := ses.WriteExports(); err != nil {
+			s.log.Warn("markers: exports", "session", name, "err", err)
+		}
+	}
+	if l := s.localNow(); l != nil && l.name == name { // the band shows them
+		l.mu.Lock()
+		l.marks = l.marks[:0:0]
+		for _, m := range ses.Markers() {
+			l.marks = append(l.marks, markView{Label: m.Marker, T: m.T})
+		}
+		l.mu.Unlock()
+		s.publishStatus()
+	}
+	s.log.Info("markers edited", "session", name, "markers", len(marks))
+	writeJSON(w, http.StatusOK, map[string]any{"markers": ses.Markers()})
 }

@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { placeMarker } from "../components/Marker";
+import { MarkEditor } from "../components/MarkEditor";
 import { ConfirmDialog } from "../components/shell";
 import { ApiError } from "../lib/api";
 import type { AudioView } from "../lib/audio";
@@ -413,6 +414,7 @@ function Session(props: { name: string; rec: RecordStatus | null; audio: AudioVi
   const speed = withTracks ? 1 : speedChosen;
   const [asking, setAsking] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editingMarks, setEditingMarks] = useState(false);
   const recordingThis = !!rec?.recording && rec.name === name;
   const markers = rec?.meta?.markers;
 
@@ -552,7 +554,27 @@ function Session(props: { name: string; rec: RecordStatus | null; audio: AudioVi
         </>
       )}
 
-      {detail?.markers && detail.markers.length > 0 && (
+      {detail && editingMarks && (
+        <>
+          <h4>Markers</h4>
+          <MarkEditor
+            session={name}
+            duration={duration}
+            onClose={() => {
+              setEditingMarks(false);
+              void sessionApi.session(name).then(setDetail, () => undefined);
+            }}
+          />
+        </>
+      )}
+      {detail && !editingMarks && !recordingThis && (
+        <div className="row">
+          <button type="button" className="btn small" onClick={() => setEditingMarks(true)}>
+            ✎ {detail.markers?.length ? "Edit the markers" : "Add markers"}
+          </button>
+        </div>
+      )}
+      {!editingMarks && detail?.markers && detail.markers.length > 0 && (
         <>
           <h4>Markers</h4>
           <ul className="markers">

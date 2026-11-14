@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { LocalStatus, MixTrack, Status } from "../lib/api";
 import type { AudioTrack } from "../lib/audio";
+import { MarkEditor } from "./MarkEditor";
 import { SPEEDS, listenChoices, listenKey, localApi, localAt, nextMark, prevMark } from "../lib/local";
 import { formatDuration, sessionApi } from "../lib/session";
 import { useStatus } from "../store/hooks";
@@ -22,6 +23,7 @@ function Band({ l }: { l: LocalStatus }) {
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   // the time moves on while playing
   useEffect(() => {
@@ -129,6 +131,9 @@ function Band({ l }: { l: LocalStatus }) {
         <button type="button" className="btn small" disabled={busy} onClick={() => void mark()} title="Mark this moment in the session (M)">
           ⚑ Mark
         </button>
+        <button type="button" className="btn small" aria-pressed={editing} onClick={() => setEditing(!editing)} title="Rename, move, remove or add markers">
+          ✎ Marks
+        </button>
       </span>
       <input
         className="local-seek"
@@ -210,6 +215,15 @@ function Band({ l }: { l: LocalStatus }) {
             <option value="pick">Choose tracks…</option>
           </select>
         </label>
+      )}
+      {editing && (
+        <MarkEditor
+          session={l.session}
+          duration={l.duration}
+          now={() => localAt(store.status.local ?? l, Date.now())}
+          onSeek={(t) => void seek(t)}
+          onClose={() => setEditing(false)}
+        />
       )}
       {picking && (
         <TrackPicker
