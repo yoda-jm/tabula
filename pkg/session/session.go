@@ -392,6 +392,10 @@ func (r *Recorder) Stop() error {
 	return errors.Join(err, r.writeMeta(m))
 }
 
+// WriteMeta replaces a session's meta.json at once (compressing its
+// tracks names their FLAC files there).
+func WriteMeta(dir string, m Meta) error { return writeMeta(dir, m) }
+
 // writeMeta replaces meta.json at once: it is rewritten while recording.
 func writeMeta(dir string, m Meta) error {
 	data, _ := json.MarshalIndent(m, "", "  ")

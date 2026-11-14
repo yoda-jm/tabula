@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"math"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -155,12 +154,11 @@ type Playback struct {
 }
 
 type playTrack struct {
-	channel int     // 0-based in the stream
-	gl, gr  float64 // its gains in a mix, as heard now
-	tl, tr  float64 // the gains it fades to (SetMix), under Playback.mu
-	f       *os.File
-	r       *bufio.Reader
-	format  sampleFormat
+	channel int         // 0-based in the stream
+	gl, gr  float64     // its gains in a mix, as heard now
+	tl, tr  float64     // the gains it fades to (SetMix), under Playback.mu
+	r       TrackReader // WAV or FLAC
+	name    string
 	left    int64 // frames still to read
 }
 
@@ -226,31 +224,22 @@ func StartPlayback(cfg Config, dir string, info Info, opt PlayOptions) (*Playbac
 	return p, nil
 }
 
-// openTrack opens a mono track and moves to frame skip.
+// openTrack opens a mono track, WAV or FLAC, and moves to frame skip.
 func openTrack(path string, rate int, skip int64) (playTrack, error) {
-	info, err := ReadWAV(path)
+	r, err := OpenTrack(path)
 	if err != nil {
 		return playTrack{}, err
 	}
-	format, err := info.sampleFormat()
-	switch {
-	case err != nil:
-		return playTrack{}, fmt.Errorf("%s: %w", filepath.Base(path), err)
-	case info.Channels != 1:
-		return playTrack{}, fmt.Errorf("%s: %d channels, expected a mono track", filepath.Base(path), info.Channels)
-	case info.Rate != rate:
-		return playTrack{}, fmt.Errorf("%s: %d Hz, the session is at %d Hz", filepath.Base(path), info.Rate, rate)
+	if r.Rate() != rate {
+		r.Close()
+		return playTrack{}, fmt.Errorf("%s: %d Hz, the session is at %d Hz", filepath.Base(path), r.Rate(), rate)
 	}
-	f, err := os.Open(path)
-	if err != nil {
+	skip = min(skip, r.Frames())
+	if err := r.SeekFrame(skip); err != nil {
+		r.Close()
 		return playTrack{}, err
 	}
-	skip = min(skip, info.Frames)
-	if _, err := f.Seek(info.DataOffset+skip*int64(format.size), io.SeekStart); err != nil {
-		f.Close()
-		return playTrack{}, err
-	}
-	return playTrack{f: f, r: bufio.NewReaderSize(f, 64<<10), format: format, left: info.Frames - skip}, nil
+	return playTrack{r: r, name: filepath.Base(path), left: r.Frames() - skip}, nil
 }
 
 func (p *Playback) startPlayer(cfg Config) error {
@@ -354,7 +343,7 @@ func (p *Playback) stream() error {
 			silence -= n
 		}
 	}
-	block := make([]byte, playFrames*4)
+	block := make([]int32, playFrames)
 	var accL, accR []float64
 	if p.opt.Mix != nil {
 		accL, accR = make([]float64, playFrames), make([]float64, playFrames)
@@ -376,9 +365,13 @@ func (p *Playback) stream() error {
 		}
 		for i := range p.tracks {
 			t := &p.tracks[i]
-			m, size := int(min(t.left, n)), t.format.size
-			if _, err := io.ReadFull(t.r, block[:m*size]); err != nil {
-				return fmt.Errorf("%s: %w", filepath.Base(t.f.Name()), err)
+			m := int(min(t.left, n))
+			for got := 0; got < m; {
+				k, err := t.r.Read(block[got:m])
+				if err != nil {
+					return fmt.Errorf("%s: %w", t.name, err)
+				}
+				got += k
 			}
 			if accL != nil {
 				p.mu.Lock()
@@ -391,7 +384,7 @@ func (p *Playback) stream() error {
 				dl, dr := (tl-t.gl)/float64(n), (tr-t.gr)/float64(n)
 				if t.gl != 0 || t.gr != 0 || tl != 0 || tr != 0 {
 					for k := range m {
-						v := float64(t.format.sample(block[k*size:]))
+						v := float64(block[k])
 						accL[k] += v * (t.gl + dl*float64(k+1))
 						accR[k] += v * (t.gr + dr*float64(k+1))
 					}
@@ -400,7 +393,7 @@ func (p *Playback) stream() error {
 			} else {
 				for k := range m {
 					off := k*width + 4*t.channel
-					putSample(buf[off:off+4], t.format.sample(block[k*size:]), 4)
+					putSample(buf[off:off+4], block[k], 4)
 				}
 			}
 			t.left -= int64(m)
@@ -465,7 +458,7 @@ func (p *Playback) isStopping() bool {
 
 func (p *Playback) closeTracks() {
 	for _, t := range p.tracks {
-		t.f.Close()
+		t.r.Close()
 	}
 }
 

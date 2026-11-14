@@ -33,7 +33,11 @@ type HomeFile struct {
 	// FLAC is a WAV track converted on the way, Frames its length.
 	FLAC   bool
 	Frames int64
-	data   []byte // a file made on the way: the Reaper project of FLAC tracks
+	// WAV is a FLAC track (a compressed session) decoded back into the WAV
+	// it was, Out the size of that WAV.
+	WAV  bool
+	Out  int64
+	data []byte // a file made on the way: the Reaper project of FLAC tracks
 }
 
 // Audio reports whether the file is a track (WAV or FLAC): zips store
@@ -49,7 +53,7 @@ func (f HomeFile) Audio() bool {
 // at them.
 func (s *Session) HomeFiles(flac bool) ([]HomeFile, error) {
 	var out []HomeFile
-	converted := map[string]bool{}
+	converted := map[string]string{} // track → its name taken home
 	err := filepath.WalkDir(s.Dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -69,8 +73,15 @@ func (s *Session) HomeFiles(flac bool) ([]HomeFile, error) {
 		if flac && strings.HasPrefix(f.Name, "audio/") && strings.EqualFold(path.Ext(f.Name), ".wav") {
 			if w, err := audio.ReadWAV(p); err == nil && w.Format == 1 && w.Channels > 0 && w.DataSize > 0 &&
 				(w.Bits == 16 || w.Bits == 24 || w.Bits == 32) {
-				converted[f.Name] = true
+				converted[f.Name] = flacName(f.Name)
 				f.FLAC, f.Frames, f.Name = true, w.DataSize/int64(w.Channels*w.Bits/8), flacName(f.Name)
+			}
+		}
+		if !flac && strings.HasPrefix(f.Name, "audio/") && audio.IsFLAC(f.Name) { // compressed: as recorded
+			if size, err := audio.FLACAsWAVSize(p); err == nil {
+				wav := strings.TrimSuffix(f.Name, path.Ext(f.Name)) + ".wav"
+				converted[f.Name] = wav
+				f.WAV, f.Out, f.Name = true, size, wav
 			}
 		}
 		out = append(out, f)
@@ -118,6 +129,10 @@ func (f HomeFile) WriteTo(ctx context.Context, w io.Writer, read func(n int64)) 
 		return err
 	}
 	defer in.Close()
+	if f.WAV {
+		in.Close()
+		return audio.WriteFLACAsWAV(ctx, w, f.Path, read)
+	}
 	r := &progressReader{ctx: ctx, r: in, read: read}
 	if f.FLAC {
 		return audio.EncodeFLAC(ctx, w, r, f.Frames)
@@ -149,10 +164,13 @@ func (p *progressReader) Read(b []byte) (int, error) {
 func HomeSize(files []HomeFile) (size int64, exact bool) {
 	exact = true
 	for _, f := range files {
-		if f.FLAC {
+		switch {
+		case f.FLAC:
 			size += int64(float64(f.Size) * FLACRatio)
 			exact = false
-		} else {
+		case f.WAV:
+			size += f.Out
+		default:
 			size += f.Size
 		}
 	}

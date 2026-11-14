@@ -319,6 +319,8 @@ snapshot, a regular scene file), `start.nodes` (other nodes), `events.jsonl`
 | DELETE | `/api/sessions/{name}` | | 204: the session folder is removed, audio included (not `audio.json`); 409 while it is recorded or replayed |
 | POST | `/api/replay/start` | `{"session": name, "from": seconds, "speed": 1, "audio"?: true, "routing"?: true}` | 202 + `Record`; 403 unless writes are armed (a replay writes to the console). With `audio`, a virtual soundcheck (below): 409 for a session without audio tracks, while recording, while the input is tested, or when no player can be run; 400 for a speed other than 1; with `routing` too, 502 when the routing cannot be switched |
 | POST | `/api/replay/stop` | | `Record` |
+| POST | `/api/sessions/{name}/compress` | | 202 + `Compress`: the session's WAV tracks are queued to become FLAC files in place, losslessly ([recording](recording.md#compressing-the-tracks)); 404 for no such session, 409 while it is recorded |
+| GET | `/api/compress` | | `Compress`: `{"queue": [names], "session"?, "track"?, "done", "total", "saved", "paused"?: "recording" \| "in use", "error"?}`: the sessions waiting (the first is compressed), the track and how many of the session's are done, the bytes saved since tabula started. Also sent as `compress` events to the engineers. A compressed track's `meta.audio.tracks[].file` names its `.flac` file |
 | POST | `/api/local/open` | `{"session": name, "from": seconds}` | `Status` with `local`: a local replay (below) of the session, paused at `from`; tabula leaves the console and connects to the session console. 404 for no such session; 409 while one is open, while recording, replaying to the console or testing the input |
 | POST | `/api/local/transport` | `{"play"?: bool, "at"?: seconds, "speed"?: x}` | `Status`: plays or pauses, seeks (the state of that time is set at once), sets the speed (0.25 to 16, else 400); 409 when none is open |
 | PUT | `/api/local/listen` | `{"preset": "stereo" \| "off"}` or `{"tracks": [{"track": n, "gain": 1, "pan": 0}]}` | `Status`: what plays on this machine (`gain` 0 to 4, `pan` -1 left to 1 right); 409 for `stereo` when the card did not record main L/R, 400 for a track not recorded |
@@ -448,7 +450,9 @@ starts it again once fixed. Engineer only.
 
 `AudioConfig`: `{"enabled", "recorder": "arecord"|"parecord"|"ffmpeg"|"custom",
 "device", "channels": 32, "rate": 48000, "tracks"?: "1-16", "bits": 24,
-"plain_names"?, "command"?, "input"?, "play_to"?, "play_command"?}` —
+"plain_names"?, "command"?, "input"?, "play_to"?, "play_command"?,
+"compress"?}` — `compress` compresses each session's tracks to FLAC once
+its recording stops (below);
 `command` is the custom recorder's command line (`{device}`, `{channels}`,
 `{rate}` replaced), writing raw samples in the `input` format (`s16le`,
 `s24le`, `s24-32le`, `s32le`, `f32le`) or a WAV stream. `play_to` is where

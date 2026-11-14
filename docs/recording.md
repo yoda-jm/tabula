@@ -336,6 +336,38 @@ two seconds are missing (Audacity and Reaper read what is there). A file
 past 4 GiB (a single 24-bit track gets there after 8 hours) turns into
 RF64, which Audacity, Reaper and Ardour read.
 
+## Compressing the tracks
+
+A session's tracks can be **compressed to FLAC in place**: lossless, the
+samples read back bit for bit, at about half the size of live tracks
+(silent or simple ones much less). **Compress (FLAC, lossless)** in the
+session's details does it; *Compress the tracks after recording* in the
+audio settings does it once each recording stops.
+
+- tabula writes and reads FLAC itself: nothing to install, the same on
+  every system. The files are standard FLAC (`flac -t` checks them), at
+  about the size of `flac -1`; Reaper and Audacity open them.
+- **Checked before a WAV goes.** Each track is encoded to
+  `audio/NN Name.flac.part`, decoded again from its start and compared
+  with the WAV: its length and the MD5 of its samples. Only then is it
+  renamed, `meta.json` names the FLAC file, and the WAV is deleted. A crash
+  leaves each track whole, WAV or FLAC; a `.part` left over is removed at
+  the next run.
+- **Never in the way**: one track at a time in the background. It waits
+  while a recording runs (a track being compressed when one starts is
+  given up and done again after), and while the session is replayed,
+  replayed locally or copied to a disk.
+- Replays, the virtual soundcheck, the local replay (meters and
+  listening) read FLAC tracks as WAV ones; the Reaper project is written
+  again to name them. Taken home *as recorded*, they become WAV files again
+  on the way; taken home in FLAC, they are copied as they are.
+- 16 and 24-bit tracks are compressed, and 32-bit ones holding 24 bits (the
+  card's): their low byte is checked to be empty over the whole track.
+  Float tracks, or 32 bits really used, stay WAV.
+- On the development laptop, about 37 MB/s of WAV encoded and 47 MB/s decoded per
+  core, so a track is read twice: a 3-hour show of 32 tracks (about 50 GB)
+  takes about 40 minutes.
+
 ## When the audio is not recorded
 
 The audio and the console are recorded side by side: when the audio
@@ -564,7 +596,9 @@ become 24-bit FLAC files: the console's card sends 24-bit audio. The FLAC
 files say their length, but carry no MD5 checksum (they are written as they
 are made; the zip's own checksums cover the transfer). The Reaper project
 of a FLAC copy points at the FLAC files; keep the WAV version to put a
-session back into a sessions folder.
+session back into a sessions folder. A session whose tracks were
+[compressed](#compressing-the-tracks) already holds FLAC files: they are
+copied as they are, and decoded back into WAV for a copy *as recorded*.
 
 **⤓ Download as a zip**: one zip of the folder (`2026-10-25_203512/…`,
 or `2026-10-25_203512 FLAC/…`), made while it downloads. The device

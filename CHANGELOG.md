@@ -20,6 +20,16 @@
   CUEs the raw track of a channel in the phones, as an engineer checks a
   source, then the choice is back. `/api/local/…`; the emulator takes
   input levels from outside (`emu.Config.Inputs`).
+- **Compressing a session's tracks** to FLAC in place, lossless, about half
+  the size of live tracks: **Compress** in a session's details, or after
+  every recording (audio settings). tabula writes and reads FLAC itself
+  (no ffmpeg), each track checked against its WAV (length, MD5 of the
+  samples) before the WAV goes; one track at a time in the background,
+  waiting while recording or while the session is in use. Replays, the
+  virtual soundcheck, the local replay and the exports read FLAC tracks
+  as WAV ones; taken home as recorded, they become WAV again.
+  `/api/sessions/{name}/compress`, `/api/compress`, `compress` in
+  `audio.json`.
 - The setlist takes a **tempo per song**, typed after its name (*Opening
   120 bpm*): the FX page sets it to the effects with one tap. `Setlist`
   has `tempos`, one per song.

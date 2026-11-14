@@ -86,6 +86,7 @@ func (s *Server) StartRecording(note string) error {
 	if local {
 		return errors.New("a local replay is open: go back to the console to record")
 	}
+	s.compressInterrupt() // the disk is the recording's
 	if err := s.waitAudioFree(); err != nil {
 		return err
 	}

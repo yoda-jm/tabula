@@ -23,6 +23,8 @@ export interface AudioConfig {
   play_to?: string;
   /** replaces the player matching the recorder ({device}, {channels}, {rate}); reads raw s32le */
   play_command?: string;
+  /** compress each session's tracks to FLAC (lossless) once its recording stops */
+  compress?: boolean;
 }
 
 export interface AudioTrack {
@@ -152,6 +154,7 @@ const FIELDS: { key: keyof AudioConfig; label: string; show?(c: AudioConfig): st
   { key: "command", label: "Command" },
   { key: "input", label: "Raw samples" },
   { key: "plain_names", label: "File names", show: (c) => (c.plain_names ? "Track 01…" : "from the routing") },
+  { key: "compress", label: "After recording", show: (c) => (c.compress ? "compressed to FLAC" : "kept as WAV") },
 ];
 
 /**

@@ -68,6 +68,9 @@ type Config struct {
 	// set apart, with POST /api/record/usb: saving the other settings keeps
 	// it.
 	USBBackup bool `json:"usb_backup,omitempty"`
+	// Compress compresses a session's tracks to FLAC, losslessly, once its
+	// recording stops (webapi/compress.go).
+	Compress bool `json:"compress,omitempty"`
 }
 
 // Recorders known by name; "custom" runs Config.Command.

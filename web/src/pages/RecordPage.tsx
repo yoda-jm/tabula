@@ -12,6 +12,8 @@ import type { AudioView } from "../lib/audio";
 import type { Record as RecordStatus, SessionDetail, SessionSummary } from "../lib/session";
 import { audioApi, audioPlan, audioSummary, exportUrl, formatBytes, plural } from "../lib/audio";
 import { damagedText, formatDuration, parseTime, sessionApi } from "../lib/session";
+import type { Compress } from "../lib/compress";
+import { compressApi, compressLine, trackFormats } from "../lib/compress";
 import { localApi } from "../lib/local";
 import { nextSong, setlistApi, songTimes } from "../lib/setlist";
 import { PLAY_BLOCKS, ROUTSWITCH, playRouting, playableTracks } from "../lib/soundcheck";
@@ -568,6 +570,13 @@ function Session(props: { name: string; rec: RecordStatus | null; audio: AudioVi
       )}
 
       {detail && <SessionAudio detail={detail} />}
+      {detail && (
+        <CompressTracks
+          detail={detail}
+          recordingThis={recordingThis}
+          onDone={() => void sessionApi.session(name).then(setDetail, () => undefined)}
+        />
+      )}
       {detail && <TakeHome detail={detail} recording={!!rec?.recording} recordingThis={recordingThis} />}
 
       <LocalReplay
@@ -798,6 +807,68 @@ function LocalReplay({ name, from, tracks, blocked }: { name: string; from: numb
         {blocked && <span className="muted">{blocked}</span>}
         {local && !here && <span className="muted">{local.session} is replayed locally: close it first.</span>}
       </div>
+    </>
+  );
+}
+
+/**
+ * CompressTracks compresses the session's WAV tracks to FLAC in place,
+ * losslessly, in the background, and follows it (docs/recording.md).
+ */
+function CompressTracks({ detail, recordingThis, onDone }: { detail: SessionDetail; recordingThis: boolean; onDone(): void }) {
+  const [c, setC] = useState<Compress | null>(null);
+  const formats = trackFormats(detail.meta.audio);
+  const queued = !!c && c.queue.includes(detail.name);
+  // followed while queued, then the details read again (sizes, file names)
+  useEffect(() => {
+    let alive = true;
+    let was = false;
+    const tick = async () => {
+      try {
+        const v = await compressApi.get();
+        if (!alive) return;
+        setC(v);
+        const now = v.queue.includes(detail.name);
+        if (was && !now) onDone();
+        was = now;
+      } catch {
+        // tabula not reachable: keep what we knew
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 1000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [detail.name]);
+  if (formats.wav === 0 && formats.flac === 0) return null;
+  const start = async () => {
+    try {
+      setC(await compressApi.start(detail.name));
+    } catch (e) {
+      store.toast(`Compress: ${(e as Error).message}`, "error");
+    }
+  };
+  const line = compressLine(c, detail.name);
+  return (
+    <>
+      <h4>Compression</h4>
+      <p className="muted">
+        {formats.flac > 0 && formats.wav === 0
+          ? `The ${plural(formats.flac, "track")} are FLAC files, lossless${detail.size ? ` (the session takes ${formatBytes(detail.size)})` : ""}. Replays and exports read them as they are; taken home "as recorded", they become WAV files again.`
+          : `${plural(formats.wav, "track")} in WAV${formats.flac ? `, ${formats.flac} already in FLAC` : ""}. Compressing turns them into FLAC files in place: lossless, about half the size (${detail.size ? `about ${formatBytes(detail.flac_size ?? detail.size * 0.7)} instead of ${formatBytes(detail.size)}` : "about 70 %"}), each checked against its WAV before the WAV goes. Replays and exports read them as they are; it waits while recording.`}
+      </p>
+      {formats.wav > 0 && (
+        <div className="row">
+          <button type="button" className="btn" disabled={queued || recordingThis} onClick={() => void start()}>
+            Compress (FLAC, lossless)
+          </button>
+          {line && <span className="muted">{line}</span>}
+          {recordingThis && <span className="muted">Not while it is recorded.</span>}
+        </div>
+      )}
+      {c?.error && c.error.startsWith(detail.name + ":") && <p className="error">{c.error}</p>}
     </>
   );
 }

@@ -660,6 +660,11 @@ function AudioSettings(props: { view: AudioView; audio: Audio; onSaved(v: AudioV
         <input type="checkbox" checked={!!cfg.plain_names} onChange={(e) => set({ plain_names: e.target.checked })} />
         Name the files “Track 01”…, not after the console's routing (a device that is not the console's card)
       </label>
+      <label className="check">
+        <input type="checkbox" checked={!!cfg.compress} onChange={(e) => set({ compress: e.target.checked })} />
+        Compress the tracks after recording: FLAC, lossless, about half the size, checked against the WAV before it goes;
+        replays and exports read them as they are
+      </label>
       {!dirty && view.command && (
         <p className="muted">
           Runs <code className="wrap">{view.command}</code>

@@ -287,6 +287,12 @@ func (s *Server) endRecording(rec *session.Recorder, c *audio.Capture) (*audio.S
 		if oerr != nil {
 			s.log.Error("session exports", "err", oerr)
 		}
+		s.mu.Lock()
+		compress := s.audio.cfg.Compress
+		s.mu.Unlock()
+		if compress { // once the recording is over (compressBusy waits for it)
+			s.CompressSession(filepath.Base(rec.Dir()))
+		}
 	}
 	return last, err
 }

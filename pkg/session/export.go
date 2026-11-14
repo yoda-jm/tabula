@@ -100,9 +100,10 @@ func (s *Session) AudioTime(t float64) float64 {
 // audio file is an item on its own track, starting when its first sample
 // was captured, and the markers are project markers at the place of the
 // audio they were set on. Paths are relative to the session directory:
-// the project opens from there. The tracks in flac are FLAC files instead
-// of WAV files (a session taken home converted, takehome.go).
-func (s *Session) writeReaper(w io.Writer, flac map[string]bool) error {
+// the project opens from there. A track in renamed is written under that
+// name, WAV or FLAC by its extension (a session taken home converted,
+// takehome.go); a compressed session's tracks are FLAC files already.
+func (s *Session) writeReaper(w io.Writer, renamed map[string]string) error {
 	a := s.Meta.Audio
 	rate := 48000
 	offset := 0.0
@@ -120,14 +121,18 @@ func (s *Session) writeReaper(w io.Writer, flac map[string]bool) error {
 	if a != nil {
 		for _, t := range a.Tracks {
 			frames := a.Frames
-			if info, err := audio.ReadWAV(filepath.Join(s.Dir, filepath.FromSlash(t.File))); err == nil {
-				frames = info.Frames
+			if n, err := audio.TrackFrames(filepath.Join(s.Dir, filepath.FromSlash(t.File))); err == nil {
+				frames = n
 			}
 			name := strings.TrimSuffix(filepath.Base(t.File), filepath.Ext(t.File))
 			fmt.Fprintf(b, "  <TRACK\n    NAME %s\n", rppString(name))
-			file, source := t.File, "WAVE"
-			if flac[t.File] {
-				file, source = flacName(t.File), "FLAC"
+			file := t.File
+			if r, ok := renamed[t.File]; ok {
+				file = r
+			}
+			source := "WAVE"
+			if audio.IsFLAC(file) {
+				source = "FLAC"
 			}
 			fmt.Fprintf(b, "    <ITEM\n      POSITION %s\n      LENGTH %s\n      NAME %s\n",
 				seconds(shift+offset), seconds(float64(frames)/float64(a.Rate)), rppString(path.Base(file)))

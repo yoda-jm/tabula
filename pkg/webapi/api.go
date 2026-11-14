@@ -74,6 +74,7 @@ type Server struct {
 	usb       usbState       // usb.go
 	backup    usbBackupState // usbbackup.go
 	home      homeState      // takehome.go
+	cmp       compressState  // compress.go
 
 	version string    // about.go
 	logFile string    // about.go
@@ -124,6 +125,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	s.sceneFileRoutes(mux)
 	s.setlistRoutes(mux)
 	s.localRoutes(mux)
+	s.compressRoutes(mux)
 	s.patchlistRoutes(mux)
 	s.usbRoutes(mux)
 	s.audioRoutes(mux)

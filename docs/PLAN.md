@@ -92,6 +92,8 @@ Driven by the unknown-request log while connecting the real editors:
 - [x] Roles checked by the server: engineer (this machine, or an engineer link), musician (own in-ear bus only, phone page "In-ears", works without arming when allowed), viewer (read-only); access links with QR codes on the Access page, kept in `access.json`, revocable at once (`docs/access.md`); the Access page shows which devices have a page open.
 - [x] Links by the laptop's name (`actarus.local`) when the network answers for it, so they survive a new IP address.
 - [x] Local replay, phase 1: a session played back without the console (session console, transport, meters from the tracks, listening on the laptop).
+- [x] Compressing a session's tracks to FLAC in place (lossless, checked against the WAV, in the background), every reader reading FLAC tracks.
+- [ ] Take a session home in FLAC with tabula's own encoder rather than ffmpeg.
 - [ ] Local replay, phase 2: the Changes tab (each change in plain English, a show log export), follow mode, held parameters.
 - [ ] Local replay, phase 3: listening in the browser, the RTA from the tracks, a rough console mix.
 - [ ] Board-mix audio streaming (WebRTC), PA calibration.
