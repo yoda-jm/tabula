@@ -307,10 +307,7 @@ func (s *Server) localPauseLocked(l *localState) {
 func (s *Server) startListenLocked(l *localState) {
 	l.lerr = ""
 	info := l.ses.Meta.Audio
-	mix := l.listen
-	if len(l.cue) > 0 {
-		mix = l.cue
-	}
+	mix := l.heardLocked()
 	if len(mix) == 0 || l.speed != 1 || info == nil {
 		return
 	}
@@ -345,6 +342,28 @@ func (s *Server) stopListenLocked(l *localState) {
 	if l.pb != nil {
 		go l.pb.Stop()
 		l.pb = nil
+	}
+}
+
+// heardLocked is what the listener hears: the tracks cued, else the
+// Listen choice. Called with l.mu held.
+func (l *localState) heardLocked() []audio.MixTrack {
+	if len(l.cue) > 0 {
+		return l.cue
+	}
+	return l.listen
+}
+
+// remixLocked changes what is heard while playing: in the stream when the
+// player runs (a crossfade, no gap), else by starting it. Called with
+// l.mu held.
+func (s *Server) remixLocked(l *localState) {
+	switch {
+	case !l.playing || l.since.IsZero(): // heard from the next play
+	case l.pb != nil:
+		l.pb.SetMix(l.heardLocked())
+	default:
+		s.startListenLocked(l)
 	}
 }
 
@@ -396,10 +415,7 @@ func (s *Server) localCue(l *localState) {
 	}
 	if !same {
 		l.cue = cue
-		if l.playing && !l.since.IsZero() { // heard from where it is
-			s.stopListenLocked(l)
-			s.startListenLocked(l)
-		}
+		s.remixLocked(l)
 	}
 	l.mu.Unlock()
 	if !same {
@@ -543,10 +559,7 @@ func (s *Server) localListen(w http.ResponseWriter, r *http.Request) {
 	}
 	l.mu.Lock()
 	l.listen, l.lmode = mix, mode
-	if l.playing { // the new mix from where it is
-		s.localPauseLocked(l)
-		s.localPlayLocked(l, false)
-	}
+	s.remixLocked(l)
 	l.mu.Unlock()
 	s.publishStatus()
 	writeJSON(w, http.StatusOK, s.status())

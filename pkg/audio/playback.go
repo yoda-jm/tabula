@@ -113,7 +113,10 @@ type PlayOptions struct {
 	Sink func() (io.WriteCloser, error)
 	// Mix, if set, plays these tracks mixed into two channels (left,
 	// right) instead of each track on its own channel: listening to a
-	// session on the laptop. The player is asked for 2 channels.
+	// session on the laptop. The player is asked for 2 channels. Every
+	// recorded track is read, so that SetMix changes what is heard in the
+	// stream, without a gap; changes fade over a block (about 20 ms), the
+	// start fades in, and Stop fades out: no click.
 	Mix []MixTrack
 }
 
@@ -147,12 +150,14 @@ type Playback struct {
 	frames   int64 // frames sent to the player
 	err      error
 	stopping bool
+	fading   bool // a mix fades out, then its stream ends
 	stderr   []string
 }
 
 type playTrack struct {
 	channel int     // 0-based in the stream
-	gl, gr  float64 // its gains in a mix
+	gl, gr  float64 // its gains in a mix, as heard now
+	tl, tr  float64 // the gains it fades to (SetMix), under Playback.mu
 	f       *os.File
 	r       *bufio.Reader
 	format  sampleFormat
@@ -186,18 +191,21 @@ func StartPlayback(cfg Config, dir string, info Info, opt PlayOptions) (*Playbac
 		if t.File == "" || t.Channel < 1 || t.Channel > info.Channels {
 			continue
 		}
-		m, inMix := mixed[t.Channel]
-		if opt.Mix != nil && !inMix {
-			continue
-		}
 		tr, err := openTrack(filepath.Join(dir, filepath.FromSlash(t.File)), info.Rate, skip)
 		if err != nil {
 			p.closeTracks()
 			return nil, err
 		}
 		tr.channel = t.Channel - 1
-		tr.gl, tr.gr = m.gains()
+		tr.tl, tr.tr = mixed[t.Channel].gains() // from silence: the start fades in
+		delete(mixed, t.Channel)
 		p.tracks = append(p.tracks, tr)
+	}
+	if opt.Mix != nil && len(mixed) > 0 {
+		p.closeTracks()
+		for ch := range mixed {
+			return nil, fmt.Errorf("track %d was not recorded", ch)
+		}
 	}
 	if len(p.tracks) == 0 {
 		return nil, errors.New("this session has no audio tracks")
@@ -360,6 +368,12 @@ func (p *Playback) stream() error {
 			return nil // every track is over
 		}
 		clear(buf[:n*int64(width)])
+		fading := false // this block fades out: the stream ends after it
+		if accL != nil {
+			p.mu.Lock()
+			fading = p.fading
+			p.mu.Unlock()
+		}
 		for i := range p.tracks {
 			t := &p.tracks[i]
 			m, size := int(min(t.left, n)), t.format.size
@@ -367,11 +381,22 @@ func (p *Playback) stream() error {
 				return fmt.Errorf("%s: %w", filepath.Base(t.f.Name()), err)
 			}
 			if accL != nil {
-				for k := range m {
-					v := float64(t.format.sample(block[k*size:]))
-					accL[k] += v * t.gl
-					accR[k] += v * t.gr
+				p.mu.Lock()
+				tl, tr := t.tl, t.tr
+				p.mu.Unlock()
+				if fading {
+					tl, tr = 0, 0
 				}
+				// a linear fade over the block to the gains asked for
+				dl, dr := (tl-t.gl)/float64(n), (tr-t.gr)/float64(n)
+				if t.gl != 0 || t.gr != 0 || tl != 0 || tr != 0 {
+					for k := range m {
+						v := float64(t.format.sample(block[k*size:]))
+						accL[k] += v * (t.gl + dl*float64(k+1))
+						accR[k] += v * (t.gr + dr*float64(k+1))
+					}
+				}
+				t.gl, t.gr = tl, tr
 			} else {
 				for k := range m {
 					off := k*width + 4*t.channel
@@ -390,6 +415,24 @@ func (p *Playback) stream() error {
 		if err := p.write(buf[:n*int64(width)], n); err != nil {
 			return err
 		}
+		if fading { // the block just written faded out
+			return nil
+		}
+	}
+}
+
+// SetMix changes the tracks heard in a mix, fading to their gains over a
+// block; a track not in mix fades out. A track not recorded is ignored.
+func (p *Playback) SetMix(mix []MixTrack) {
+	gains := map[int]MixTrack{}
+	for _, m := range mix {
+		gains[m.Channel] = m
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i := range p.tracks {
+		t := &p.tracks[i]
+		t.tl, t.tr = gains[t.channel+1].gains()
 	}
 }
 
@@ -426,12 +469,23 @@ func (p *Playback) closeTracks() {
 	}
 }
 
-// Stop stops the playback at once and waits for the player to end.
+// Stop stops the playback at once and waits for the player to end; a mix
+// fades out first (a block, then what the player holds).
 func (p *Playback) Stop() {
 	select {
 	case <-p.done: // over: its player is gone (its process id may be someone else's now)
 		return
 	default:
+	}
+	if p.opt.Mix != nil {
+		p.mu.Lock()
+		p.fading = true
+		p.mu.Unlock()
+		select {
+		case <-p.done:
+			return
+		case <-time.After(400 * time.Millisecond):
+		}
 	}
 	p.mu.Lock()
 	p.stopping = true

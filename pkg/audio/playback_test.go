@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -248,14 +249,17 @@ func TestPlaybackMix(t *testing.T) {
 		t.Fatalf("%d bytes, want 1000 stereo frames", len(raw))
 	}
 	at := func(k, ch int) int32 { return int32(binary.LittleEndian.Uint32(raw[8*k+4*ch:])) }
+	// the first block (all 1000 frames here) fades in: frame k at (k+1)/1000
 	for _, k := range []int{0, 499, 500, 999} {
-		wantL, wantR := int32(256*(k+1)), int32(0)
+		fade := float64(k+1) / 1000
+		wantL, wantR := 256*float64(k+1), 0.0
 		if k < 500 {
-			wantL += int32(32768 * (k + 1))
-			wantR = int32(32768 * (k + 1))
+			wantL += 32768 * float64(k+1)
+			wantR = 32768 * float64(k+1)
 		}
-		if at(k, 0) != wantL || at(k, 1) != wantR {
-			t.Errorf("frame %d: %d %d, want %d %d", k, at(k, 0), at(k, 1), wantL, wantR)
+		wantL, wantR = math.Round(wantL*fade), math.Round(wantR*fade)
+		if math.Abs(float64(at(k, 0))-wantL) > 1 || math.Abs(float64(at(k, 1))-wantR) > 1 {
+			t.Errorf("frame %d: %d %d, want %v %v", k, at(k, 0), at(k, 1), wantL, wantR)
 		}
 	}
 	// only the tracks of the mix are opened
@@ -265,4 +269,84 @@ func TestPlaybackMix(t *testing.T) {
 	}); err == nil {
 		t.Error("a mix of a track without a file: no error")
 	}
+}
+
+// gateSink takes one block at a time, when the test lets it.
+type gateSink struct {
+	blocks chan []byte
+	next   chan struct{}
+}
+
+func (g *gateSink) Write(p []byte) (int, error) {
+	g.blocks <- append([]byte(nil), p...)
+	<-g.next
+	return len(p), nil
+}
+
+func (g *gateSink) Close() error { return nil }
+
+func writeConst(t *testing.T, path string, frames int, v int32) {
+	t.Helper()
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	w, err := createWAV(createFile, path, 48000, 24, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range frames {
+		b := make([]byte, w.bytes)
+		putSample(b, v, w.bytes)
+		w.buf = append(w.buf, b...)
+	}
+	if err := w.finish(int64(frames)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Changing the tracks heard crossfades in the stream (no gap, no jump),
+// and stopping fades out.
+func TestPlaybackMixCrossfade(t *testing.T) {
+	dir := t.TempDir()
+	const a, b = 1 << 18, 1 << 22
+	writeConst(t, filepath.Join(dir, "audio", "01 A.wav"), 10*playFrames, a<<8)
+	writeConst(t, filepath.Join(dir, "audio", "02 B.wav"), 10*playFrames, b<<8)
+	info := Info{Rate: 48000, Bits: 24, Channels: 2, Tracks: []Track{
+		{Channel: 1, File: "audio/01 A.wav"}, {Channel: 2, File: "audio/02 B.wav"}}}
+	g := &gateSink{blocks: make(chan []byte), next: make(chan struct{})}
+	p, err := StartPlayback(DefaultConfig(), dir, info, PlayOptions{
+		Sink: func() (io.WriteCloser, error) { return g, nil },
+		Mix:  []MixTrack{{Channel: 1, Gain: 1}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	left := func(blk []byte, k int) float64 { return float64(int32(binary.LittleEndian.Uint32(blk[8*k:]))) }
+	last := func(blk []byte) float64 { return left(blk, len(blk)/8-1) }
+	in := <-g.blocks // fades in to A
+	if left(in, 0) >= (a<<8)/100 || last(in) != a<<8 {
+		t.Errorf("fade in: %v … %v", left(in, 0), last(in))
+	}
+	g.next <- struct{}{}
+	steady := <-g.blocks
+	p.SetMix([]MixTrack{{Channel: 2, Gain: 1}})
+	g.next <- struct{}{}
+	cross := <-g.blocks // from A to B, smoothly
+	if left(steady, 0) != a<<8 || math.Abs(left(cross, 0)-a<<8) > (b<<8)/float64(playFrames)*2 || last(cross) != b<<8 {
+		t.Errorf("crossfade: %v, then %v … %v", left(steady, 0), left(cross, 0), last(cross))
+	}
+	stopped := make(chan struct{})
+	go func() { p.Stop(); close(stopped) }()
+	g.next <- struct{}{}
+	// the block in flight may still be B; the last one fades to silence
+	var out []byte
+	for out = range g.blocks {
+		if last(out) == 0 {
+			break
+		}
+		g.next <- struct{}{}
+	}
+	if last(out) != 0 || left(out, 0) < (b<<8)*0.9 {
+		t.Errorf("fade out: %v … %v", left(out, 0), last(out))
+	}
+	g.next <- struct{}{}
+	<-stopped
 }
