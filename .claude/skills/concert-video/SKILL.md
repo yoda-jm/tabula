@@ -43,7 +43,8 @@ time and never written down. `scripts/common.py get KEY` prints a setting.
 - **One video for the whole concert**, the sets joined. Cut what is not
   the show and say so: false starts (a song stopped and restarted, e.g. the
   voices still muted), the break, and the break music from the console's
-  USB player (commercial recordings). A short fade at each cut.
+  USB player (commercial recordings). A short fade at each cut. The break
+  keeps its chapter (below).
 - **The sound is the front-of-house stereo** the audience heard: often a
   matrix pair recorded on two card tracks, not Main LR. Check the routing.
   One gain to −14 LUFS and a peak limiter at 0.85 run at 192 kHz (true peak
@@ -56,13 +57,20 @@ time and never written down. `scripts/common.py get KEY` prints a setting.
   00:00:00 : Title - Artist
   00:03:01 : Title - Artist
   00:18:52 : BAND INTRODUCTION
+  00:49:16 : INTERMISSION
+  00:49:33 : Title - Artist
   ```
-  The first at 00:00:00. A song starts 1 s before its first note, or before
-  the reference note or chord given to the singers, or on the count-in; the
-  talk introducing a song stays in the chapter before. Spoken parts in
-  capitals (GREETINGS, BAND INTRODUCTION, THANKS, SPEECH); encores marked
-  "(encore)". In French (`"lang": "fr"`): Chapitrage, DEBUT, PRESENTATION DES
-  MUSICIENS, REMERCIEMENTS, DISCOURS, "(rappel)". Keep the artists'
+  The first at 00:00:00, and each at least 10 s long: YouTube shows no
+  chapters at all when one is shorter (`chapters.py` warns). A song starts
+  1 s before its first note, or before the reference note or chord given
+  to the singers, or on the count-in; the talk introducing a song stays in
+  the chapter before. Spoken parts in capitals (GREETINGS, BAND
+  INTRODUCTION, THANKS, SPEECH); encores marked "(encore)". **Each break
+  is an INTERMISSION chapter**, though the break itself is cut: from the
+  end of the set's last song (the applause, the break announcement) to the
+  next set's first chapter; keep at least 10 s of it in the set's `b`. In
+  French (`"lang": "fr"`): Chapitrage, DEBUT, PRESENTATION DES MUSICIENS,
+  REMERCIEMENTS, DISCOURS, ENTRACTE, "(rappel)". Keep the artists'
   spellings the band used before (earlier chapter lists, the setlist).
 - **The chat is in English, intent first, then the real change in
   parentheses**: *Boost the presence on the electric guitar (Gtr EQ 3 +1.5

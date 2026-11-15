@@ -32,9 +32,9 @@ def setting(key):
 # The words of the chapters and titles, per project.json "lang" (default en).
 LABELS = {
     "en": {"header": "Chapters", "greetings": "GREETINGS", "band": "BAND INTRODUCTION", "thanks": "THANKS",
-           "speech": "SPEECH", "encore": "(encore)", "part": "Part {n}"},
+           "speech": "SPEECH", "break": "INTERMISSION", "encore": "(encore)", "part": "Part {n}"},
     "fr": {"header": "Chapitrage", "greetings": "DEBUT", "band": "PRESENTATION DES MUSICIENS", "thanks": "REMERCIEMENTS",
-           "speech": "DISCOURS", "encore": "(rappel)", "part": "Partie {n}"},
+           "speech": "DISCOURS", "break": "ENTRACTE", "encore": "(rappel)", "part": "Partie {n}"},
 }
 
 def labels(cfg):

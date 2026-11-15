@@ -4,7 +4,7 @@
   "subtitle": "Venue · Town · 1 janvier 2027",
   "metadata_title": "Band name - Venue, Town, 1 janvier 2027",
   "output": "render/Band name - Venue 2027-01-01.mp4",
-  "_lang": "the chapters' and titles' words: en (Chapters, GREETINGS, BAND INTRODUCTION, THANKS, (encore), Part 2) or fr; \"labels\" overrides any of them",
+  "_lang": "the chapters' and titles' words: en (Chapters, GREETINGS, BAND INTRODUCTION, THANKS, INTERMISSION, (encore), Part 2) or fr; \"labels\" overrides any of them",
   "lang": "en",
   "_languages": "the languages Whisper may hear",
   "languages": ["en", "fr"],

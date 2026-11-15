@@ -26,8 +26,10 @@ drawn as it moved, every change told in a chat.
 - **The sound**: the front-of-house stereo the audience heard (often a
   matrix pair, not Main LR), the sets joined, false starts and the break
   cut, one gain to −14 LUFS and a peak limiter.
-- **Chapters**: one per song from where its music starts, and the spoken
-  parts (greetings, the band's introduction, thanks), in English or French,
+- **Chapters**: one per song from where its music starts, the spoken
+  parts (greetings, the band's introduction, thanks) and the intermission
+  (from the end of the set to the next one, the break itself being cut),
+  in English or French, each at least 10 s long as YouTube wants them,
   ready for the video's description and embedded in the MP4.
 
 The video is 2560×1072 at 30 fps (H.264, AAC). It is made by

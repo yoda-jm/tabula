@@ -15,6 +15,9 @@ seg = segments(cfg)
 ch = sorted(seg["chapters"], key=lambda c: c["t"])
 dur = sum(s["b"] - s["a"] for s in seg["sets"])
 hms = lambda t: f"{int(t // 3600):02d}:{int(t % 3600 // 60):02d}:{int(t % 60):02d}"
+# YouTube shows no chapters at all when one lasts less than 10 s (whole seconds as written)
+short = [c["title"] for c, n in zip(ch, [x["t"] for x in ch[1:]] + [dur]) if int(n) - int(c["t"]) < 10]
+if short: print("chapters shorter than 10 s, YouTube would show none: " + ", ".join(short), file=sys.stderr)
 if len(sys.argv) > 1 and sys.argv[1] == "ffmeta":
     print(";FFMETADATA1\ntitle=" + cfg.get("metadata_title", cfg.get("title", "")))
     for i, c in enumerate(ch):

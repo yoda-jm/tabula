@@ -54,7 +54,8 @@
 ### Concert video (Claude Code skill)
 - **`.claude/skills/concert-video`**: a show's sessions become one YouTube
   video, 2560×1072: the front-of-house stereo at −14 LUFS, chapters for
-  the songs (English or French), and the console drawn as it moved —
+  the songs, the talk and the intermission (English or French, 10 s long
+  at least), and the console drawn as it moved —
   strips with their mini EQ over the RTA of their tracks, muted strips
   greyed, a detail panel drawing the EQ (input spectrum, curve, spectrum
   after it), compressor or effect being changed, a chat telling each

@@ -99,7 +99,7 @@ jobs:
         run: |
           set -e
           test "$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 render/demo.mp4)" = "2560,1072"
-          test "$(ffprobe -v error -show_chapters -of csv=p=0 render/demo.mp4 | wc -l)" = 3
+          test "$(ffprobe -v error -show_chapters -of csv=p=0 render/demo.mp4 | wc -l)" = 2
           grep -q "Second Song - The Demo Band" chapters.txt
           python3 -I -c 'import json, glob; g = json.load(open(glob.glob("analysis/*-gestures.json")[0])); assert len(g) >= 8, len(g); print(len(g), "changes in the chat")'
       - uses: actions/upload-artifact@v4

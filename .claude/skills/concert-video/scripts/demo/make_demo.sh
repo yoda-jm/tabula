@@ -65,7 +65,10 @@ sys.path.insert(0, sys.argv[1]); from common import project, meta; from onsets i
 cfg = project(); name = sys.argv[2]; m = meta(cfg, name)["audio"]
 songs = json.load(open("analysis/setlist.json"))["songs"]
 a = m["offset"] + 2.0; b = m["offset"] + m["frames"] / m["rate"] - 1.0
-chapters = [{"t": 0.0, "title": "GREETINGS"}] + [{"t": round(music_start(name, s["t"] + 2) - 1 - a, 2), "title": s["title"] + (" - " + s["artist"] if s["artist"] else "")} for s in songs]
+chapters = [{"t": round(music_start(name, s["t"] + 2) - 1 - a, 2), "title": s["title"] + (" - " + s["artist"] if s["artist"] else "")} for s in songs]
+# a greeting under 10 s is too short for a chapter of its own: the first song starts at 00:00:00
+if chapters[0]["t"] < 10: chapters[0]["t"] = 0.0
+else: chapters.insert(0, {"t": 0.0, "title": "GREETINGS"})
 json.dump({"sets": [{"name": name, "a": a, "b": b, "fade_in": 0.3, "fade_out": 2.0}], "chapters": chapters},
           open("analysis/segments.json", "w"), indent=1)
 EOF
