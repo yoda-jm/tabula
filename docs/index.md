@@ -235,6 +235,11 @@ tabula -console 192.168.1.62 -http :8033
   move or remove the markers afterwards; the markers export as YouTube
   chapters. A session's tracks can be compressed to FLAC in place,
   lossless, at about half the size. See [recording a show](recording.md).
+- **Concert video**: with Claude Code, the `concert-video` skill of the
+  repository turns a show's sessions into one YouTube video: the
+  front-of-house sound, chapters for the songs, and the console drawn as it
+  moved (faders, mutes, meters, EQ over the RTA, compressors, effects) with
+  every change told in a chat. See [concert video](concert-video.md).
 - **In-ear mixes for the band**: each musician scans a QR code and gets
   their own mix on their phone, and nothing else; viewers watch without
   touching; the Access page shows whose phone is online. Links use the

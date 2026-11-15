@@ -23,6 +23,11 @@ Tools for Behringer X32 / Midas M32 digital consoles, in Go.
   reviewing, and the tracks compressed to FLAC, lossless (see
   [recording](docs/recording.md)). Read-only until you arm writes; undo
   takes back the last changes.
+- **A concert video** — a [Claude Code](https://claude.com/claude-code)
+  skill (`.claude/skills/concert-video`) turning a show's sessions into one
+  YouTube video: the front-of-house sound, chapters for the songs, and the
+  console as it moved, every change told in a chat (see
+  [concert video](docs/concert-video.md)).
 
 See [how the emulator simulates the console](docs/emulator.md) (audio flow,
 meters, RTA, effects, linked strips), [the pages of the GUI](docs/gui.md) and

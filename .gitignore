@@ -9,6 +9,10 @@
 # redistribute): see docs/README.md for where to download it.
 /docs/reference/
 
+# Local settings (.env.example says which)
+/.env
+__pycache__/
+
 # Local runtime data (access.json holds the access link secrets)
 /var/
 *.local.scn

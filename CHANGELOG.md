@@ -51,6 +51,23 @@
 - The README and the site's front page list tap tempo, the local replay
   with CUE and marks, and the FLAC compression of a session's tracks.
 
+### Concert video (Claude Code skill)
+- **`.claude/skills/concert-video`**: a show's sessions become one YouTube
+  video, 2560×1072: the front-of-house stereo at −14 LUFS, chapters for
+  the songs (English or French), and the console drawn as it moved —
+  strips with their mini EQ over the RTA of their tracks, muted strips
+  greyed, a detail panel drawing the EQ (input spectrum, curve, spectrum
+  after it), compressor or effect being changed, a chat telling each
+  change (intent first, then the change), the progress with the chapters.
+  Python scripts (`scripts/`), driven by a `project.json` per video; the
+  setlist from the session's markers or setlist, a text file or a
+  troubastack server; Whisper on the singers' mics when nothing gives the
+  songs' times; a track inspector for strips that look wrong (bleed,
+  routing, mutes). Settings of the computer in `.env` (not in git,
+  `.env.example`). `scripts/demo/make_demo.sh` records a made-up show with
+  tabula from the emulator and makes its video; the CI runs it
+  (`concert-video` job). Docs: `docs/concert-video.md`.
+
 ## v0.3.0 — show safety, the mixing pages, a patch list
 
 ### tabula

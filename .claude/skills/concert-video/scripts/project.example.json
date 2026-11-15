@@ -1,0 +1,46 @@
+{
+  "_comment": "Copy to the project folder as project.json and fill it in. Keys starting with _ are notes. The sessions folder comes from TABULA_SESSIONS (.env); a \"sessions\" key here overrides it.",
+  "title": "Band name",
+  "subtitle": "Venue · Town · 1 janvier 2027",
+  "metadata_title": "Band name - Venue, Town, 1 janvier 2027",
+  "output": "render/Band name - Venue 2027-01-01.mp4",
+  "_lang": "the chapters' and titles' words: en (Chapters, GREETINGS, BAND INTRODUCTION, THANKS, (encore), Part 2) or fr; \"labels\" overrides any of them",
+  "lang": "en",
+  "_languages": "the languages Whisper may hear",
+  "languages": ["en", "fr"],
+
+  "_foh": "the stereo the audience heard: two card tracks, and the matrix pair they come from (null when they are Main LR itself)",
+  "foh": {"tracks": [23, 24], "matrix": 1, "label": "Façade"},
+  "_outputs": "other matrix pairs fed by the main mix, drawn with a meter computed from the FOH tracks",
+  "outputs": [{"matrix": 3, "label": "Delay spk"}],
+
+  "_inputs": "omit to show every channel with a recorded track plus every named channel sent to LR that was on at some time",
+  "_input_tracks": "channel → card track, only when tabula's track names do not match the channel names",
+  "input_tracks": {},
+
+  "_fx": "the effects shown; send_bus: the bus feeding it, send_track: the card track recording that bus (the strip's meter)",
+  "fx": [
+    {"fx": 1, "short": "Room", "spoken": "the room reverb", "send_bus": 13, "send_track": 17},
+    {"fx": 2, "short": "Hall", "spoken": "the hall reverb", "send_bus": 14, "send_track": 18},
+    {"fx": 3, "short": "Delay", "spoken": "the delay", "send_bus": 15, "send_track": 19},
+    {"fx": 4, "short": "Chorus", "spoken": "the chorus", "send_bus": 16, "send_track": 20}
+  ],
+  "_delay_fx": "the effect whose first parameter is a delay time in ms: its tempo is drawn, and its changes said as tempos",
+  "delay_fx": 3,
+  "_dca_hidden": "DCAs not shown (a calibration group, say); unnamed DCAs are never shown",
+  "dca_hidden": [],
+
+  "_voices": "the singers' mic tracks: Whisper listens to them, and an a cappella start is found on them",
+  "voices": [12, 13, 14],
+  "_onsets": "card track → dBFS RMS above which it is playing (DIs low, mics that hear the talk high or left out)",
+  "onsets": {"instr": {"6": -50, "8": -45, "9": -35}, "gap": 2.5},
+
+  "_spoken": "how the chat names a strip, by its scribble name (default: 'Vx Name' → \"Name's voice\", else 'the <name>')",
+  "spoken": {"Gtr El": "the electric guitar", "Kick": "the kick drum"},
+  "dca_spoken": {"Voix": "the vocals"},
+  "speakers": {"1": "the front speakers", "3": "the delay speakers"},
+  "bus_spoken": {"WedgeL": "the wedges", "WedgeR": "the wedges"},
+  "aux_spoken": {"7": "the break music"},
+
+  "loudness": {"target": -14, "ceiling": 0.85}
+}
