@@ -232,9 +232,9 @@ tabula -console 192.168.1.62 -http :8033
   the recorded tracks, and the stereo out or the tracks you choose play on
   the laptop in step; SOLO cues a channel's raw track in the phones, as an
   engineer checks a source. Mark the moments while reviewing, and rename,
-  move or remove the markers afterwards. A session's tracks can be
-  compressed to FLAC in place, lossless, at about half the size. See
-  [recording a show](recording.md).
+  move or remove the markers afterwards; the markers export as YouTube
+  chapters. A session's tracks can be compressed to FLAC in place,
+  lossless, at about half the size. See [recording a show](recording.md).
 - **In-ear mixes for the band**: each musician scans a QR code and gets
   their own mix on their phone, and nothing else; viewers watch without
   touching; the Access page shows whose phone is online. Links use the

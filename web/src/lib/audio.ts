@@ -172,7 +172,7 @@ export function configChanges(saved: AudioConfig, draft: AudioConfig): { label: 
   });
 }
 
-export type ExportFormat = "reaper" | "audacity" | "csv" | "scene";
+export type ExportFormat = "reaper" | "audacity" | "csv" | "chapters" | "scene";
 
 export const audioApi = {
   get: () => call<AudioView>("GET", "/api/audio"),

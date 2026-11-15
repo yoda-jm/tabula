@@ -594,6 +594,19 @@ the console writes it), `value` (raw), `origin` (`console`, `console, read back`
 for a change lost on the network and found again, `local`, or `web <name>`
 for an access link), `label` (markers).
 
+### YouTube chapters
+
+**YouTube chapters** gives the markers as chapters for a video's
+description, one `HH:MM:SS : label` a line, at their time in the audio
+files: for a video of the recording as it is (cut it, and the times move;
+the [concert video](concert-video.md) makes its chapters from the songs
+themselves). As YouTube wants it, the first chapter is at `00:00:00` (a
+first marker in the first 10 s is moved there, otherwise *Start* is added)
+and the chapters are 10 s apart at least (a marker closer to the one before
+is left out). A setlist's numbering (*3. Song*) is left out, and so are the
+markers tabula sets itself (*console connected*, *console lost*, *audio
+lost*…).
+
 ## Taking a show home
 
 After a show, a session is a folder of large WAV files on the stage laptop

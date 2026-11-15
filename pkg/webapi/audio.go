@@ -635,6 +635,8 @@ func (s *Server) exportSession(w http.ResponseWriter, r *http.Request) {
 		name = ses.Name() + " labels.txt"
 	case session.ExportCSV:
 		name, ctype = ses.Name()+".csv", "text/csv; charset=utf-8"
+	case session.ExportChapters:
+		name = ses.Name() + " chapters.txt"
 	case session.ExportScene:
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 			httpError(w, http.StatusNotFound, errors.New("this session has no start scene"))

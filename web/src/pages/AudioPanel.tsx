@@ -738,6 +738,11 @@ const EXPORTS: { format: ExportFormat; label: string; title: string }[] = [
   { format: "reaper", label: "Reaper project", title: "A .rpp with one track per audio file, and the markers" },
   { format: "audacity", label: "Audacity labels", title: "A label track: File › Import › Labels…" },
   { format: "csv", label: "CSV", title: "Every change and marker, with its time in the audio" },
+  {
+    format: "chapters",
+    label: "YouTube chapters",
+    title: "The markers as YouTube chapters (HH:MM:SS : label), for a video of the recording as it is",
+  },
 ];
 
 /** SessionAudio describes a session's audio and offers its exports. */

@@ -34,6 +34,11 @@
   as WAV ones; taken home as recorded, they become WAV again.
   `/api/sessions/{name}/compress`, `/api/compress`, `compress` in
   `audio.json`.
+- **YouTube chapters** export of a session (its details, or
+  `export?format=chapters`): the markers as `HH:MM:SS : label` lines at
+  their time in the audio, the first at 00:00:00 and 10 s apart at least
+  as YouTube wants them, a setlist's numbering and tabula's own markers
+  (console, audio gaps) left out. `session.AutoMarker` tells those.
 - The setlist takes a **tempo per song**, typed after its name (*Opening
   120 bpm*): the FX page sets it to the effects with one tap. `Setlist`
   has `tempos`, one per song.

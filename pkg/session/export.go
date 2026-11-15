@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -18,11 +19,13 @@ import (
 // Exports of a session for audio editors: a Reaper project (the audio
 // tracks at their place, the markers), an Audacity label track (the
 // markers, at their time in the audio files) and a CSV of every change and
-// marker; and the console at the start, as a scene file for M32-Edit.
+// marker; the markers as YouTube chapters; and the console at the start,
+// as a scene file for M32-Edit.
 const (
 	ExportReaper   = "reaper"
 	ExportAudacity = "audacity"
 	ExportCSV      = "csv"
+	ExportChapters = "chapters"
 	ExportScene    = "scene"
 )
 
@@ -39,10 +42,12 @@ func (s *Session) ExportFile(format string) (string, error) {
 		return "labels.txt", nil
 	case ExportCSV:
 		return "events.csv", nil
+	case ExportChapters:
+		return "chapters.txt", nil
 	case ExportScene:
 		return "start.scn", nil
 	}
-	return "", fmt.Errorf("unknown export %q (reaper, audacity, csv, scene)", format)
+	return "", fmt.Errorf("unknown export %q (reaper, audacity, csv, chapters, scene)", format)
 }
 
 // Export writes an export of the session.
@@ -54,6 +59,8 @@ func (s *Session) Export(w io.Writer, format string) error {
 		return s.writeLabels(w)
 	case ExportCSV:
 		return s.writeCSV(w)
+	case ExportChapters:
+		return s.writeChapters(w)
 	case ExportScene:
 		f, err := os.Open(filepath.Join(s.Dir, "start.scn"))
 		if err != nil {
@@ -170,6 +177,56 @@ func (s *Session) writeLabels(w io.Writer) error {
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// writeChapters writes the markers as YouTube chapters, one "HH:MM:SS :
+// label" a line, at their time in the audio files: for a video of the
+// recording as it is (cut it, and the times move). YouTube wants the first
+// chapter at 00:00:00 (a first marker in the first 10 s is moved there,
+// otherwise "Start" is added) and the chapters 10 s apart at least (a marker
+// closer to the one kept before is left out). A setlist's numbering ("3.
+// Song") is left out, and so are the markers tabula sets itself.
+func (s *Session) writeChapters(w io.Writer) error {
+	type chapter struct {
+		t     float64
+		label string
+	}
+	var out []chapter
+	for _, m := range s.Markers() {
+		if AutoMarker(m.Marker) {
+			continue
+		}
+		label := strings.TrimSpace(setlistNumber.ReplaceAllString(strings.NewReplacer("\n", " ", "\r", " ").Replace(m.Marker), ""))
+		t := math.Floor(math.Max(0, s.AudioTime(m.T)))
+		if label == "" || (len(out) > 0 && t-out[len(out)-1].t < 10) {
+			continue
+		}
+		out = append(out, chapter{t, label})
+	}
+	if len(out) > 0 && out[0].t < 10 {
+		out[0].t = 0
+	} else {
+		out = append([]chapter{{0, "Start"}}, out...)
+	}
+	b := &strings.Builder{}
+	for _, c := range out {
+		n := int(c.t)
+		fmt.Fprintf(b, "%02d:%02d:%02d : %s\n", n/3600, n%3600/60, n%60, c.label)
+	}
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+var setlistNumber = regexp.MustCompile(`^\d+\.\s+`)
+
+// AutoMarker tells the markers tabula sets by itself (the console link, the
+// audio's gaps) from the ones people set.
+func AutoMarker(label string) bool {
+	switch label {
+	case "console connected", "console lost", "console back":
+		return true
+	}
+	return strings.HasPrefix(label, "audio lost") || strings.HasPrefix(label, "audio back")
 }
 
 // writeCSV writes every change and marker: session time, time in the audio

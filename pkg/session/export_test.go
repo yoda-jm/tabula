@@ -116,3 +116,35 @@ func TestExportsWithoutAudio(t *testing.T) {
 		t.Errorf("project: %s", b.String())
 	}
 }
+
+func TestChaptersExport(t *testing.T) {
+	info := audio.Info{Rate: 48000, Offset: 2}
+	s := &Session{Meta: Meta{Audio: &info}, Events: []Event{
+		{T: 1, Marker: "console connected"},
+		{T: 30, Marker: "1. Opening"},
+		{T: 35, Marker: "Marker 0m35s"}, // 5 s after the one before: YouTube would refuse the list
+		{T: 200.9, Marker: "2. Second song"},
+		{T: 210, Marker: "audio lost (USB unplugged)"},
+		{T: 215, Marker: "audio back after 4.2s"},
+		{T: 3725, Marker: "Encore\nlast"},
+	}}
+	var b bytes.Buffer
+	if err := s.Export(&b, ExportChapters); err != nil {
+		t.Fatal(err)
+	}
+	want := "00:00:00 : Start\n00:00:28 : Opening\n00:03:18 : Second song\n01:02:03 : Encore last\n"
+	if b.String() != want {
+		t.Errorf("chapters:\n%s\nwant\n%s", b.String(), want)
+	}
+
+	// a first marker in the first 10 s opens the video
+	s.Events = []Event{{T: 8, Marker: "1. Opening"}, {T: 100, Marker: "2. Next"}}
+	b.Reset()
+	s.Export(&b, ExportChapters)
+	if want := "00:00:00 : Opening\n00:01:38 : Next\n"; b.String() != want {
+		t.Errorf("chapters:\n%s\nwant\n%s", b.String(), want)
+	}
+	if name, _ := s.ExportFile(ExportChapters); name != "chapters.txt" {
+		t.Errorf("file %q", name)
+	}
+}

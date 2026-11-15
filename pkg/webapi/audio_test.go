@@ -167,6 +167,13 @@ func TestAudioRecording(t *testing.T) {
 	if !strings.HasPrefix(string(body), "time,audio_time,clock,type") || !strings.Contains(string(body), ",marker,") {
 		t.Errorf("csv: %q", body)
 	}
+	resp, _ = http.Get(ts.URL + "/api/sessions/" + name + "/export?format=chapters")
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.HasPrefix(string(body), "00:00:00 : ") || !strings.Contains(string(body), " : Song 2\n") ||
+		resp.Header.Get("Content-Disposition") != `attachment; filename="`+name+` chapters.txt"` {
+		t.Errorf("chapters: %s %q", resp.Header, body)
+	}
 	resp, _ = http.Get(ts.URL + "/api/sessions/" + name + "/export?format=midi")
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
