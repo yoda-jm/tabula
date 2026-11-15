@@ -30,7 +30,7 @@ W, H, FPS = 2560, 1072, 30
 BG = (0.071, 0.078, 0.094); PANEL = (0.105, 0.115, 0.137); PANEL2 = (0.135, 0.146, 0.172)
 INK = (0.91, 0.92, 0.94); DIM = (0.55, 0.58, 0.64); FAINT = (0.30, 0.32, 0.37)
 AMBER = (0.96, 0.70, 0.24); RED = (0.90, 0.27, 0.27); GREEN = (0.30, 0.78, 0.42); YELLOW = (0.96, 0.84, 0.25)
-RTA_FILL = (0.27, 0.52, 0.72); RTA_LINE = (0.55, 0.80, 0.95)  # the spectrum behind the EQ, and after it
+RTA_FILL = (0.40, 0.45, 0.53); RTA_LINE = (0.84, 0.88, 0.93)  # the spectrum behind the EQ, and after it: neutral, the curve keeps the strip's colour
 RTA_LO, RTA_HI = -100.0, -20.0  # dB per band drawn from the bottom to the top of an EQ box
 COLORS = {"RD": (0.90, 0.29, 0.30), "GN": (0.30, 0.70, 0.38), "YE": (0.96, 0.85, 0.20), "BL": (0.27, 0.43, 0.90),
           "MG": (0.84, 0.30, 0.65), "CY": (0.10, 0.65, 0.78), "WH": (0.88, 0.88, 0.88), "OFF": (0.35, 0.36, 0.40)}
